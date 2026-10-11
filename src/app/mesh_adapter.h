@@ -230,6 +230,7 @@ private:
   uint32_t _lastBackupAt = 0;
   int _seenContacts = -1;
   uint32_t _activePin = 0;
+  uint32_t _prefsCheckAt = 0;
   uint32_t _bootGpsUntil = 0;     // boot-time GPS clock sync in progress until
 };
 

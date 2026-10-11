@@ -25,7 +25,7 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
               uint32_t& now, World& world) {
   Ctx c{app, world, now};
   char line[512];
-  bool started = false;
+  bool started = false, preStart = false;
   int lineNo = 0;
   while (fgets(line, sizeof line, in)) {
     lineNo++;
@@ -40,11 +40,26 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
 
     if (!started) {
       if (world.setup(cmd, arg)) continue;
-      world.attach(app, first);
-      world.start();
+      // Theme and text size before boot apply to the splash too.
+      if (!strcmp(cmd, "theme") || !strcmp(cmd, "textsize")) {
+        if (!preStart) { world.attach(app, first); world.start(); preStart = true; }
+        model::Prefs pr = app.m().prefs();
+        if (cmd[0] == 't' && cmd[1] == 'h') pr.theme = (uint8_t)atoi(arg);
+        else pr.textSize = (uint8_t)atoi(arg);
+        app.m().setPrefs(pr);
+        continue;
+      }
+      if (!preStart) { world.attach(app, first); world.start(); }
       app.begin(first);
-      c.advance(now + 1500);   // past the splash
+      if (!strcmp(cmd, "splashshot")) {   // capture the boot splash itself
+        c.advance(now + 700);
+        char path[400];
+        snprintf(path, sizeof path, "%s/%s.ppm", out, arg);
+        if (!disp.writePpm(path)) { perror(path); return 1; }
+      }
+      c.advance(2300);   // past the splash
       started = true;
+      if (!strcmp(cmd, "splashshot")) continue;
     }
 
     if (!strcmp(cmd, "key") || !strcmp(cmd, "hold")) {

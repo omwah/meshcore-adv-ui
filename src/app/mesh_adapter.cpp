@@ -43,12 +43,11 @@ uint16_t rd16(const uint8_t* p) { uint16_t v; memcpy(&v, p, 2); return v; }
 }  // namespace
 
 uint8_t batteryPercent(uint16_t mv) {
-  // Resting Li-ion curve, mV at 0,10,..,100 %.
-  static const uint16_t k[] = {3300, 3600, 3700, 3750, 3790, 3830, 3870, 3920, 3980, 4060, 4150};
-  if (mv <= k[0]) return 0;
-  for (int i = 1; i < 11; i++)
-    if (mv < k[i]) return (uint8_t)((i - 1) * 10 + (mv - k[i - 1]) * 10 / (k[i] - k[i - 1]));
-  return 100;
+  // As esp-vim configures the Cardputer (and M5Stack's library draws it): a
+  // straight line from 3300 mV (0 %) to 4100 mV (100 %).
+  if (mv <= 3300) return 0;
+  if (mv >= 4100) return 100;
+  return (uint8_t)((mv - 3300) * 100 / 800);
 }
 
 // ------------------------------------------------------------------ setup
@@ -611,6 +610,15 @@ void MeshAdapter::loop() {
       _bootGpsUntil = 0;
       if (!_prefs.gpsEnabled) _plat.setGpsPower(false);
     }
+  }
+
+  // A phone app can change MeshCore's prefs (name, GPS, PIN...) at any time:
+  // pick up what it changed.
+  if (ms - _prefsCheckAt >= 1000) {
+    _prefsCheckAt = ms;
+    model::Prefs before = _prefs;
+    syncPrefsFromMesh();
+    if (memcmp(&before, &_prefs, sizeof before) != 0) _rev++;
   }
 
   // Contacts MeshCore adds or drops by itself (auto-add) also count.

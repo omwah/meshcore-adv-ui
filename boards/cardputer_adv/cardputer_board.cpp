@@ -1,4 +1,6 @@
 #include "cardputer_board.h"
+#include <driver/adc.h>
+#include <esp_adc_cal.h>
 
 // PI4IOE5V6408 IO expander on the Cap LoRa-1262 (I2C 0x43). M5Stack: "Enable
 // the RF antenna switch: set P0 of the PI4IOE IO expansion chip to high".
@@ -36,9 +38,20 @@ void CardputerBoard::begin() {
   _capFound = ioeSetBits(IOE_OUT, 0x01, 0) && ioeSetBits(IOE_DIR, 0x01, 0) && ioeSetBits(IOE_HIGH_Z, 0, 0x01);
 }
 
+// Battery on GPIO10 (ADC1 channel 9) through a 2:1 divider, measured the way
+// esp-vim's esp_power.c does it (Apache-2.0): 12 dB attenuation, Espressif's
+// calibration, the mean of 8 readings. Ported to the ESP-IDF 4.4 ADC API that
+// this Arduino core has.
 uint16_t CardputerBoard::getBattMilliVolts() {
-  // GPIO10 through a 2:1 divider.
-  uint32_t mv = 0;
-  for (int i = 0; i < 8; i++) mv += analogReadMilliVolts(PIN_VBAT_READ);
-  return (uint16_t)(mv / 8 * 2);
+  static esp_adc_cal_characteristics_t chars;
+  static bool ready = false;
+  if (!ready) {
+    adc1_config_width(ADC_WIDTH_BIT_12);
+    adc1_config_channel_atten(ADC1_CHANNEL_9, ADC_ATTEN_DB_11);   // "DB_11" is the 12 dB setting
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &chars);
+    ready = true;
+  }
+  uint32_t sum = 0;
+  for (int i = 0; i < 8; i++) sum += esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_9), &chars);
+  return (uint16_t)(sum / 8 * 2);
 }

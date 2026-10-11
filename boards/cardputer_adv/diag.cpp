@@ -13,7 +13,7 @@ static int s_len = 0;
 
 static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, CardputerPlatform& p) {
   if (!strncmp(c, "stat", 4)) {
-    Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d, batt %u mV (adc pin raw %u mV)\n",
+    Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d, batt %u mV (arduino analogRead %u mV at pin)\n",
                   board.loraCapPresent() ? "ok" : "MISSING", k.present() ? "ok" : "MISSING", p.sd() ? "yes" : "no",
                   (unsigned)p.heapFree(), (unsigned)p.heapMin(), app.asleep(), board.getBattMilliVolts(),
                   (unsigned)analogReadMilliVolts(PIN_VBAT_READ));

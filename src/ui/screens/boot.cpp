@@ -16,7 +16,7 @@ public:
     _done = false;
   }
   bool tick(App& a, uint32_t now) override {
-    if (_done || now - _start < 1200) return false;
+    if (_done || now - _start < 2000) return true;   // keep animating the dots
     _done = true;
     a.replace(home());
     if (a.m().restoreOffered()) {
@@ -29,18 +29,28 @@ public:
   }
   void draw(App& a, Canvas& c, const Rect& r) override {
     c.fillRect(r.x, r.y, r.w, r.h, C_BG);
-    c.fillRect(0, 44, r.w, 34, C_HEAD);
-    c.hline(0, 78, r.w, C_ACCENT);
+    const mc_font_t* big = &font_xlarge;
+    const mc_font_t* med = &font_large;
+    const mc_font_t* sm = &font_medium;
+    // "MeshCore" on top, the node's name large in a band, then its key and
+    // the firmware version.
     const char* t = "MeshCore";
-    c.text((r.w - Canvas::textWidth(t, a.fList()) * 1) / 2, 47, t, a.fList(), C_HTXT);
-    const char* s = "keyboard edition";
-    c.text((r.w - Canvas::textWidth(s, a.fMed())) / 2, 63, s, a.fMed(), C_ACCENT);
-    char l[48];
-    snprintf(l, sizeof l, "%s  " MC_UI_VERSION, a.m().prefs().nodeName);
-    c.text((r.w - Canvas::textWidth(l, a.fSmall())) / 2, 92, l, a.fSmall(), C_DIM);
+    c.text((r.w - Canvas::textWidth(t, med)) / 2, 10, t, med, C_ACCENT);
+    int bandY = 34, bandH = big->height + 12;
+    c.fillRect(0, bandY, r.w, bandH, C_HEAD);
+    c.hline(0, bandY + bandH, r.w, C_ACCENT);
+    const char* name = a.m().prefs().nodeName;
+    int nw = Canvas::textWidth(name, big);
+    if (nw <= r.w - 12) c.text((r.w - nw) / 2, bandY + 6, name, big, C_HTXT);
+    else a.fitText(c, 6, bandY + 6, name, big, C_HTXT, r.w - 12, true);
+    uint8_t k[6];
+    a.m().selfKey(k);
+    char l[40];
+    snprintf(l, sizeof l, "%02X%02X%02X%02X  " MC_UI_VERSION, k[0], k[1], k[2], k[3]);
+    c.text((r.w - Canvas::textWidth(l, sm)) / 2, bandY + bandH + 10, l, sm, C_DIM);
     // Progress dots.
     int n = (int)((a.nowMs() - _start) / 200) % 4;
-    for (int i = 0; i < 3; i++) c.fillRect(r.w / 2 - 10 + i * 8, 108, 4, 4, i < n ? C_ACCENT : C_ZEBRA);
+    for (int i = 0; i < 3; i++) c.fillRect(r.w / 2 - 10 + i * 8, r.h - 14, 4, 4, i < n ? C_ACCENT : C_ZEBRA);
   }
   void onKey(App&, const Key&) override {}
 
