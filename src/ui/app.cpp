@@ -133,6 +133,7 @@ void App::begin(Screen* root) {
 void App::applyPrefs() {
   const model::Prefs& p = _m.prefs();
   _theme = p.theme < kThemeCount ? p.theme : 0;
+  _lastInput = _now;
   setTimeZone(kZones[p.timeZone < kZoneCount ? p.timeZone : 0].posix);
   _in.setLockout(p.inputLockoutMs);
   _d.setBacklight(p.brightness);
@@ -187,11 +188,44 @@ Rect App::content() const {
   return {0, HEAD_H, Canvas::W, Canvas::H - HEAD_H - FOOT_H};
 }
 
+void App::wake() {
+  if (!_asleep) return;
+  _asleep = false;
+  _d.sleep(false);
+  _d.setBacklight(_m.prefs().brightness);
+  _forceFlush = true;
+  _dirty = true;
+}
+
 uint32_t App::loop(uint32_t now) {
   _now = now;
   hal::KeyEvent ev;
-  while (_k.poll(ev)) _in.feed(ev, now);
+  while (_k.poll(ev)) {
+    _lastInput = now;
+    if (_asleep) {
+      // The key that wakes the screen does nothing else.
+      if (ev.down) wake();
+      _in.flush();
+      continue;
+    }
+    _in.feed(ev, now);
+  }
   _in.tick(now);
+
+  // A new unread message turns the screen on.
+  uint16_t unread = _m.unreadTotal();
+  if (unread > _lastUnread) {
+    _lastInput = now;
+    wake();
+  }
+  _lastUnread = unread;
+  // Screen timeout.
+  uint16_t timeout = _m.prefs().screenTimeoutS;
+  if (!_asleep && timeout && now - _lastInput > timeout * 1000u) {
+    _asleep = true;
+    _d.setBacklight(0);
+    _d.sleep(true);
+  }
 
   // Text-mode can change within a screen (e.g. starting to compose).
   Key k;
@@ -215,7 +249,7 @@ uint32_t App::loop(uint32_t now) {
   if (minute != _lastMinute) { _lastMinute = minute; _dirty = true; }
   if (_toastUntil && (int32_t)(now - _toastUntil) >= 0) { _toastUntil = 0; _dirty = true; }
 
-  if (_dirty) render();
+  if (_dirty && !_asleep) render();
 
   uint32_t wait = _in.wakeIn(now);
   return wait ? wait : 50;

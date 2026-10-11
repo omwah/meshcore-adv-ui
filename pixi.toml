@@ -32,3 +32,4 @@ build    = { cmd = "pio run -e cardputer_adv -e cardputer_adv_usb", depends-on =
 size     = { cmd = "python -I scripts/check-size.py", depends-on = ["build"] }
 pii      = "scripts/pii-check.sh --all"
 ci       = "scripts/ci-local.sh"
+upstream = "scripts/check-upstream-main.sh"

@@ -59,6 +59,12 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   syncPrefsFromMesh();
   _fresh = freshInstall;
   _seenContacts = _mesh->getNumContacts();
+  // "Set clock from GPS at boot": run the receiver until the first fix (at
+  // most 10 minutes) even if GPS is otherwise off.
+  if (_ui.gpsTimeSyncAtBoot) {
+    _bootGpsUntil = millis() + 600000UL;
+    if (!_prefs.gpsEnabled) _plat.setGpsPower(true);
+  }
   refreshBackupInfo();
   _rev++;
 }
@@ -574,6 +580,16 @@ void MeshAdapter::loop() {
   if (_discoverState == model::Req::Busy && (int32_t)(ms - _discoverUntil) >= 0) {
     _discoverState = model::Req::Ok;
     _rev++;
+  }
+
+  if (_bootGpsUntil) {
+    model::Gps g = _plat.gps();
+    bool done = g.fix && g.lastFixS;
+    if (done) gpsSyncTime();
+    if (done || (int32_t)(ms - _bootGpsUntil) >= 0) {
+      _bootGpsUntil = 0;
+      if (!_prefs.gpsEnabled) _plat.setGpsPower(false);
+    }
   }
 
   // Contacts MeshCore adds or drops by itself (auto-add) also count.

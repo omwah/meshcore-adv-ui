@@ -16,6 +16,7 @@
 //   wipe                          erase the UI node's flash and reboot (fresh install)
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   expect identity same|new      UI node key vs. before the last wipe
+//   expect screen on|off
 //   expect contacts|unread|heard|threads <n>
 //   expect status <pending|sent|delivered|failed>   last message we sent in the open chat
 //   dump                          print the UI node's view to stdout
@@ -226,6 +227,11 @@ private:
     else if (!strcmp(what, "heard")) got = _ui.heardCount();
     else if (!strcmp(what, "threads")) got = _ui.threadCount();
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
+    else if (!strcmp(what, "screen")) {
+      bool on = _app && !_app->asleep();
+      if (on != !strcmp(val, "on")) snprintf(err, n, "screen is %s", on ? "on" : "off");
+      return true;
+    }
     else if (!strcmp(what, "identity")) {
       bool same = !memcmp(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
       if (same != !strcmp(val, "same")) snprintf(err, n, "identity is %s", same ? "the same" : "new");

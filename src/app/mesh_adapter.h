@@ -222,6 +222,7 @@ private:
   uint32_t _cfgChangedAt = 0;      // 0: nothing waiting for an automatic backup
   uint32_t _lastBackupAt = 0;
   int _seenContacts = -1;
+  uint32_t _bootGpsUntil = 0;     // boot-time GPS clock sync in progress until
 };
 
 }  // namespace app

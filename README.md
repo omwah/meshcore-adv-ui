@@ -80,14 +80,36 @@ scripts/install-hooks.sh     # pre-commit check that keeps personal data out of 
 pixi run test                # host unit tests
 pixi run shots               # run the simulator scenarios -> shots/index.html
 pixi run build               # Cardputer ADV firmware (BLE and USB-only builds)
+pixi run simnet-test         # UI on real MeshCore nodes in a simulated mesh
+pixi run ci                  # everything, including size budgets
 ```
 
-### Simulator
+Flash with `pio run -e cardputer_adv -t upload`. See `docs/DEVICE-TESTING.md` for the
+first-flash checklist.
 
-`.pio/build/sim/program` runs the real UI with a scripted mock mesh and a
-virtual clock. Key presses go through the same Cardputer keymap code as the
-device. The scenarios are in `test/scenarios/*.sim`; see
-`boards/sim/main.cpp` for the script commands.
+| Build | What | Flash | Static RAM |
+|---|---|---|---|
+| `cardputer_adv` | UI + Bluetooth phone companion (default) | ~1.25 MB | ~123 KB |
+| `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.66 MB | ~98 KB |
+
+The stock MeshCore companion builds are about 1.25 MB with Bluetooth and
+0.64 MB without, so the keyboard UI adds roughly 40 KB.
+
+### Simulators
+
+There are two simulators. Both run the real UI on a virtual clock, and key
+presses go through the same Cardputer keymap code as the device.
+
+- **`sim`** uses a scripted mock mesh. It gives deterministic screenshots of
+  every screen and theme. Scenarios are in `test/scenarios/*.sim`.
+- **`simnet`** runs stock MeshCore: our node, scripted companion nodes, and
+  unmodified MeshCore repeaters, on a simulated LoRa medium with real airtime
+  and per-link SNR. It covers routing, ACKs, retries, admin, trace, channels,
+  backup and restore, and reboots. Scenarios with expectations are in
+  `test/simnet/*.sim`.
+
+The script commands are listed in `boards/sim/main.cpp`,
+`boards/simnet/main.cpp` and `boards/sim/runner.cpp`.
 
 ## Layout
 
@@ -97,7 +119,8 @@ src/model/     MeshModel: the UI's only view of the mesh
 src/app/       MeshCore adapter, radio presets, backup
 src/hal/       display / keyboard interfaces
 boards/<name>/ device drivers and MeshCore target for a board
-boards/sim/    host simulator
+boards/sim/    mock-data simulator and the shared script runner
+boards/simnet/ MeshCore on the host: Arduino shim, LoRa medium, nodes, repeaters
 external/      MeshCore submodule (never edited; see patches/)
 ```
 

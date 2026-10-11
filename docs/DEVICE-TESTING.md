@@ -1,0 +1,51 @@
+# Device bring-up checklist (Cardputer ADV + Cap LoRa-1262)
+
+Everything below was built and tested in the simulators. These items depend on
+hardware facts that the simulators can't check. Verify them in this order on
+first flash. Keep serial logs and photos of real devices **out of git**: they
+can show MAC addresses, node keys and names.
+
+## Flash
+
+```sh
+pixi run build                                  # both firmware images
+pio run -e cardputer_adv -t upload              # USB-C; hold G0 while plugging in if needed
+pio device monitor -e cardputer_adv             # 115200 baud
+```
+
+## 1. Boot, display, keyboard
+
+- [ ] **Splash.** It shows "MeshCore keyboard edition" right way up, with correct colours. Check that Midnight's header is dark blue, not yellow. If colours are inverted, toggle INVON (0x21) in `st7789_display.cpp`. If the picture is mirrored or offset, check MADCTL 0x60 and the gap (40, 53).
+- [ ] **Backlight.** It follows Settings > Brightness, and turns off after the screen timeout. Any key wakes it without doing anything else.
+- [ ] **Keyboard map.** Every key types its printed legend in a message. `; , . /` move in menus. Opt opens the menu. Holding `` ` `` goes Home.
+- [ ] **No missed or doubled presses.** With Settings > Key filter at 60 ms, fast Up/Down presses must neither drop nor double. If they do, try other values (10–500 ms).
+
+## 2. Radio (the riskiest assumptions)
+
+- [ ] **Radio starts.** Serial shows no `halt: radio init failed`.
+- [ ] **RF switch enabled.** The Cap's antenna switch is powered by PI4IOE5V6408 (I2C 0x43) P0 high: registers 0x05 (output), 0x03 (direction) and 0x07 (high-Z) are set by `cardputer_board.cpp`. Without it, transmit works only at very short range. Check this with a second node a room away.
+- [ ] **TCXO voltage.** It is set to 3.3 V (`SX126X_DIO3_TCXO_VOLTAGE`). If the radio fails to start or is deaf, try 1.8.
+- [ ] **TX current limit.** It is 140 mA. The other open Cardputer port uses 240 mA for this Cap; only raise it after measuring.
+- [ ] **Interop.** Exchange adverts and a DM with a stock MeshCore node or the phone app on the same preset (default "USA", 910.525 MHz / 62.5 kHz / SF7 / CR5).
+
+## 3. SD card (shares the LoRa SPI bus)
+
+- [ ] **Card detection.** Insert a FAT32 card. Backup & restore shows "SD card ready".
+- [ ] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12).
+- [ ] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back.
+
+## 4. GPS (ATGM336H)
+
+- [ ] **Fix.** Turn GPS on. Within a few minutes outdoors the GPS screen shows satellites and a fix. The module's TX goes to GPIO15 and its RX to GPIO13, at 115200 baud. If nothing arrives, swap `PIN_GPS_TX/RX`.
+- [ ] **Boot clock sync.** "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
+
+## 5. Bluetooth (default build)
+
+- [ ] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse.
+- [ ] **Bluetooth toggle.** Settings > Bluetooth off stops advertising.
+
+## 6. Power and memory
+
+- [ ] **Battery.** The voltage on Diagnostics > System is plausible against a meter (GPIO10, 2:1 divider).
+- [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
+- [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it, and after a re-install the restore offer appears.

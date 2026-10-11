@@ -76,6 +76,8 @@ public:
   const char* promptText() const;
 
   void invalidate() { _dirty = true; }
+  bool asleep() const { return _asleep; }
+  void wake();
   void applyPrefs();               // theme, lockout, brightness from model prefs
   void previewTheme(uint8_t idx);  // apply a theme without saving it
 
@@ -110,6 +112,9 @@ private:
   char _toast[48] = {};
   uint8_t _toastCol = C_ACCENT;
   uint32_t _toastUntil = 0;
+  uint32_t _lastInput = 0;
+  uint16_t _lastUnread = 0;
+  bool _asleep = false;
 };
 
 // Shared drawing helpers.

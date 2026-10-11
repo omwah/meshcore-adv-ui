@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Everything CI would run, locally: PII check, upstream-main guard, unit
+# tests, simulator scenarios (mock screenshots and real-MeshCore), firmware
+# builds and size budgets. Run inside pixi: `pixi run ci`.
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+export ASAN_OPTIONS=detect_leaks=0
+
+step() { printf '\n== %s\n' "$*"; }
+
+step "PII check";                  scripts/pii-check.sh --all
+step "upstream main.cpp";          scripts/check-upstream-main.sh
+step "patches apply";              scripts/prepare-deps.sh --force
+step "unit tests";                 pio test -e test -e simnet_test
+step "mock simulator scenarios";   pio run -e sim && python -I scripts/screenshots.py
+step "real MeshCore scenarios";    pio run -e simnet && python -I scripts/simnet_tests.py
+step "firmware";                   pio run -e cardputer_adv -e cardputer_adv_usb
+step "size budgets";               python -I scripts/check-size.py
+printf '\nall checks passed\n'

@@ -17,6 +17,8 @@ public:
   // Write rows [y, y+h) of full width from `px` (width*h values).
   virtual void pushRows(int y, int h, const uint16_t* px) = 0;
   virtual void setBacklight(uint8_t level) = 0;   // 0 = off, 255 = max
+  // Panel low-power mode while the screen is off (contents are kept).
+  virtual void sleep(bool on) { (void)on; }
 };
 
 }  // namespace hal

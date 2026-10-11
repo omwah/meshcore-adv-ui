@@ -1,0 +1,22 @@
+# Default 60 s screen timeout: the screen sleeps, the key that wakes it does
+# nothing else, and an incoming message wakes it too.
+node Ivy 7
+as Ivy advert
+wait 3000
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+key right
+shot timeout-before
+wait 61000
+expect screen off
+key right
+expect screen on
+shot timeout-woken-same-tab
+wait 61000
+expect screen off
+as Ivy dm Cardputer ping
+wait 3000
+expect screen on
