@@ -11,7 +11,10 @@ class BootScreen : public Screen {
 public:
   const char* title(App&) override { return ""; }
   bool fullscreen() override { return true; }
-  void onEnter(App& a) override { _start = a.nowMs(); }
+  void onEnter(App& a) override {
+    _start = a.nowMs();
+    _done = false;
+  }
   bool tick(App& a, uint32_t now) override {
     if (_done || now - _start < 1200) return false;
     _done = true;

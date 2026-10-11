@@ -40,6 +40,7 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
 
     if (!started) {
       if (world.setup(cmd, arg)) continue;
+      world.attach(app, first);
       world.start();
       app.begin(first);
       c.advance(now + 1500);   // past the splash

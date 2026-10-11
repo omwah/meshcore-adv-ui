@@ -11,6 +11,7 @@
 #include "model/model.h"
 #include "app/msg_store.h"
 #include "app/platform.h"
+#include "app/backup.h"
 
 namespace app {
 
@@ -33,7 +34,8 @@ public:
       : AbstractUITask(board, ifaces), _plat(platform) {}
 
   // Call after MyMesh::begin(): `fs` is the flash filesystem MeshCore uses.
-  void begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs::FS& fs, bool bleBuilt);
+  // `freshInstall`: there was no identity on flash before MyMesh::begin().
+  void begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs::FS& fs, bool bleBuilt, bool freshInstall);
 
   // ---- AbstractUITask (called by MyMesh) ----
   void msgRead(int) override {}
@@ -117,9 +119,9 @@ public:
   bool bleAvailable() const override { return _bleBuilt; }
 
   model::BackupStatus backupStatus() const override;
-  bool restoreOffered() const override { return false; }
-  bool backupNow() override { return false; }
-  bool restore(bool) override { return false; }
+  bool restoreOffered() const override { return _fresh && _bk.cur.valid; }
+  bool backupNow() override;
+  bool restore(bool previous) override;
   void factoryReset() override;
   void reboot() override { _plat.reboot(); }
 
@@ -176,6 +178,8 @@ private:
   void loadUiPrefs();
   void saveUiPrefs();
   void syncPrefsFromMesh();
+  void configChanged();          // something a backup holds changed
+  void refreshBackupInfo();
 
   Platform& _plat;
   MyMesh* _mesh = nullptr;
@@ -207,6 +211,17 @@ private:
   int16_t _lastRssi = 0;
   int8_t _lastSnr = 0;
   uint32_t _dupsSeen = 0;
+
+  // Backup state, cached so screens never trigger SD reads.
+  struct {
+    bool card;
+    Backup::Info cur, prev;
+    char error[32];
+  } _bk{};
+  bool _fresh = false;
+  uint32_t _cfgChangedAt = 0;      // 0: nothing waiting for an automatic backup
+  uint32_t _lastBackupAt = 0;
+  int _seenContacts = -1;
 };
 
 }  // namespace app

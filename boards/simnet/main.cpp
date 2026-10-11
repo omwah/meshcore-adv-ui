@@ -13,6 +13,9 @@
 //   as <name> chan <slot> <text>  post to channel slot (0 = Public)
 //   as <name> join <#hashtag>
 //   reboot                        restart the UI node on its existing flash
+//   wipe                          erase the UI node's flash and reboot (fresh install)
+//   sd on|off                     insert or remove the SD card (sim-data/.../sd)
+//   expect identity same|new      UI node key vs. before the last wipe
 //   expect contacts|unread|heard|threads <n>
 //   expect status <pending|sent|delivered|failed>   last message we sent in the open chat
 //   dump                          print the UI node's view to stdout
@@ -39,6 +42,9 @@ constexpr uint32_t kEpoch = 1791727500;   // 2026-10-11 14:05 UTC
 
 class SimPlatform : public app::Platform {
 public:
+  fs::FS* sd() override { return card ? &sdFs : nullptr; }
+  fs::FS sdFs;
+  bool card = true;
   uint32_t heapFree() override { return 118 * 1024; }
   uint32_t heapMin() override { return 96 * 1024; }
   uint32_t heapMaxBlock() override { return 64 * 1024; }
@@ -53,14 +59,35 @@ struct Bot {
 
 class NetWorld : public sim::World {
 public:
-  NetWorld(const std::string& dir, app::MeshAdapter& ui, MultiSerialInterface& ifaces)
-      : _dir(dir), _ui(ui), _ifaces(ifaces) {}
+  NetWorld(const std::string& dir, app::MeshAdapter& ui, MultiSerialInterface& ifaces, SimPlatform& plat)
+      : _dir(dir), _ui(ui), _ifaces(ifaces), _plat(plat) {
+    _plat.sdFs.setRoot(dir + "/sd");
+    _plat.sdFs.mkdir("/");
+  }
+
+  void attach(ui::App& app, ui::Screen* first) override {
+    _app = &app;
+    _first = first;
+  }
 
   void start() override {
-    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_ui, _fresh));
-    _uiNode->begin();
-    _ui.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false);
+    bootUiNode(_fresh);
     _ids["Cardputer"] = 0;
+  }
+
+  // Start (or restart) the UI node the way the firmware's setup() does.
+  void bootUiNode(bool format) {
+    _uiNode.reset();
+    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_ui, format));
+    bool fresh = !_uiNode->fs().exists("/identity/_main.id");
+    _uiNode->begin();
+    _ui.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false, fresh);
+    _plat.rebootRequested = false;
+  }
+
+  void reboot(bool format) {
+    bootUiNode(format);
+    if (_app) _app->begin(_first);   // the UI starts again at its boot screen
   }
 
   bool setup(const char* cmd, const char*) override {
@@ -70,6 +97,7 @@ public:
 
   void step(uint32_t now) override {
     sim_setMillis(now);
+    if (_plat.rebootRequested) reboot(false);
     if (_uiNode) {
       _uiNode->loop();
       _ui.loop();
@@ -121,13 +149,13 @@ public:
       return true;
     }
     if (!strcmp(cmd, "as")) return asNode(arg, err, n);
-    if (!strcmp(cmd, "reboot")) {
-      _uiNode.reset();
-      _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_ui, false));
-      _uiNode->begin();
-      _ui.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false);
+    if (!strcmp(cmd, "reboot")) { reboot(false); return true; }
+    if (!strcmp(cmd, "wipe")) {
+      memcpy(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
+      reboot(true);
       return true;
     }
+    if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
     if (!strcmp(cmd, "expect")) return expect(arg, err, n);
     if (!strcmp(cmd, "dump")) { dump(); return true; }
     return false;
@@ -197,6 +225,12 @@ private:
     else if (!strcmp(what, "unread")) got = _ui.unreadTotal();
     else if (!strcmp(what, "heard")) got = _ui.heardCount();
     else if (!strcmp(what, "threads")) got = _ui.threadCount();
+    else if (!strcmp(what, "channels")) got = _ui.channelCount();
+    else if (!strcmp(what, "identity")) {
+      bool same = !memcmp(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
+      if (same != !strcmp(val, "same")) snprintf(err, n, "identity is %s", same ? "the same" : "new");
+      return true;
+    }
     else if (!strcmp(what, "status")) {
       static const char* const names[] = {"none", "pending", "sent", "delivered", "failed"};
       app::MessageStore& s = _ui.store();
@@ -235,6 +269,10 @@ private:
   std::map<std::string, std::unique_ptr<SimRepeater>> _rpts;
   std::map<std::string, int> _ids;
   bool _fresh = true;
+  SimPlatform& _plat;
+  ui::App* _app = nullptr;
+  ui::Screen* _first = nullptr;
+  uint8_t _keyBeforeWipe[PUB_KEY_SIZE] = {};
   int _nextId = 1;   // 0 is the UI node
 };
 
@@ -261,7 +299,7 @@ int main(int argc, char** argv) {
   static sim::SimDisplay display;
   static sim::SimKeyboard kb(&g_now);
   static ui::App ui(adapter, display, kb);
-  static NetWorld world(data, adapter, ifaces);
+  static NetWorld world(data, adapter, ifaces, platform);
   return sim::runScript(in, out, ui, ui::screens::boot(), kb, display, g_now, world);
 }
 #endif

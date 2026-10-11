@@ -1,0 +1,30 @@
+# Back up to SD, wipe the device (fresh install), accept the restore offer:
+# same identity, contacts and channels come back.
+node Gus 7
+as Gus advert
+wait 3000
+key menu
+key enter
+key enter
+type backuptest
+key enter
+wait 500
+expect contacts 1
+expect channels 2
+# Menu > Backup & restore > Back up now
+key menu
+key down 10
+key enter
+key down 3
+key enter
+wait 500
+shot backup-written
+wipe
+wait 1600
+shot restore-offer
+key y
+wait 3000
+shot restored-home
+expect identity same
+expect contacts 1
+expect channels 2

@@ -1,0 +1,45 @@
+// Backup of a node's configuration to removable storage, and restore.
+//
+// The backup holds MeshCore's own files byte for byte (identity, prefs,
+// contacts, channels) plus the UI's files, so MeshCore keeps handling its own
+// formats (including migrations) after a restore.
+//
+// Container (little endian):
+//   "MCBK" u16 format u16 nsections u32 created(epoch) char fw[16]
+//   per section: u8 pathLen, path, u32 len, u32 crc32, data
+// Readers skip sections they don't know; a restore checks every CRC before
+// writing anything. Files are written as backup.tmp and renamed into place,
+// keeping the previous backup as backup.bak.
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+#include <FS.h>
+
+namespace app {
+
+class Backup {
+public:
+  static constexpr const char* DIR = "/meshcore-adv-ui";
+  static constexpr const char* PATH = "/meshcore-adv-ui/backup.bin";
+  static constexpr const char* PREV_PATH = "/meshcore-adv-ui/backup.bak";
+  static constexpr const char* TMP_PATH = "/meshcore-adv-ui/backup.tmp";
+
+  struct Options {
+    bool identity;   // include the private key
+    bool messages;   // include message history
+  };
+  struct Info {
+    bool valid;
+    uint32_t created;
+    uint16_t sections;
+    char fw[16];
+  };
+
+  static bool write(fs::FS& flash, fs::FS& sd, const Options& o, uint32_t now, const char* fw, char* err, size_t n);
+  static bool restore(fs::FS& flash, fs::FS& sd, bool previous, char* err, size_t n);
+  static Info info(fs::FS& sd, bool previous);   // header plus a full CRC check
+
+  static uint32_t crc32(uint32_t crc, const uint8_t* p, size_t n);
+};
+
+}  // namespace app

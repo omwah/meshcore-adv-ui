@@ -48,7 +48,7 @@ uint8_t batteryPercent(uint16_t mv) {
 
 // ------------------------------------------------------------------ setup
 
-void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs::FS& fs, bool bleBuilt) {
+void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs::FS& fs, bool bleBuilt, bool freshInstall) {
   _mesh = &mesh;
   _store = &store;
   _rtc = &rtc;
@@ -57,6 +57,9 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   _msgs.begin(&fs);
   loadUiPrefs();
   syncPrefsFromMesh();
+  _fresh = freshInstall;
+  _seenContacts = _mesh->getNumContacts();
+  refreshBackupInfo();
   _rev++;
 }
 
@@ -144,6 +147,7 @@ void MeshAdapter::setPrefs(const model::Prefs& p) {
   saveUiPrefs();
   syncPrefsFromMesh();
   (void)advertNeeded;   // the UI tells the user to advertise; we don't spend airtime unasked
+  configChanged();
   _rev++;
 }
 
@@ -223,6 +227,7 @@ void MeshAdapter::setFavourite(int i, bool fav) {
       }
   }
   saveUiPrefs();
+  configChanged();
   _rev++;
 }
 
@@ -235,6 +240,7 @@ bool MeshAdapter::removeContact(int i) {
   _mesh->uiDeleteContactBlob(key);
   _mesh->uiMarkContactsDirty();
   _msgs.forget(ThreadKey::direct(key));
+  configChanged();
   _rev++;
   return true;
 }
@@ -244,6 +250,7 @@ bool MeshAdapter::resetPath(int i) {
   if (!c) return false;
   c->out_path_len = OUT_PATH_UNKNOWN;
   _mesh->uiMarkContactsDirty();
+  configChanged();
   _rev++;
   return true;
 }
@@ -317,6 +324,7 @@ bool MeshAdapter::joinPrivate(const char* name, const uint8_t psk[16]) {
   _mesh->uiSaveChannels();
   _ui.mutedChannels &= ~(1u << s);
   saveUiPrefs();
+  configChanged();
   _rev++;
   return true;
 }
@@ -359,6 +367,7 @@ bool MeshAdapter::removeChannel(int i) {
   if (!_mesh->setChannel(s, d)) return false;
   _mesh->uiSaveChannels();
   _msgs.forget(ThreadKey::channel((uint8_t)s));
+  configChanged();
   _rev++;
   return true;
 }
@@ -369,6 +378,7 @@ void MeshAdapter::setMuted(int i, bool muted) {
   if (muted) _ui.mutedChannels |= (uint16_t)(1u << s);
   else _ui.mutedChannels &= (uint16_t)~(1u << s);
   saveUiPrefs();
+  configChanged();
   _rev++;
 }
 
@@ -565,6 +575,19 @@ void MeshAdapter::loop() {
     _discoverState = model::Req::Ok;
     _rev++;
   }
+
+  // Contacts MeshCore adds or drops by itself (auto-add) also count.
+  int nc = _mesh->getNumContacts();
+  if (nc != _seenContacts) {
+    _seenContacts = nc;
+    configChanged();
+  }
+  // Card inserted or removed: refresh what the Backup screen shows.
+  if ((_plat.sd() != nullptr) != _bk.card) refreshBackupInfo();
+  // Automatic backup: 10 s after the last change, at most once a minute.
+  if (_ui.autoBackup && _cfgChangedAt && _bk.card && ms - _cfgChangedAt > 10000 &&
+      (!_lastBackupAt || ms - _lastBackupAt > 60000))
+    backupNow();
 }
 
 // ------------------------------------------------------------------ receiving
@@ -590,6 +613,7 @@ void MeshAdapter::onDirectMessage(const ContactInfo& from, uint8_t txt_type, uin
   }
   snprintf(m.text, sizeof m.text, "%s", text);
   _msgs.append(ThreadKey::direct(from.id.pub_key), m);
+  if (_ui.backupMessages) configChanged();
   _rev++;
 }
 
@@ -609,6 +633,7 @@ void MeshAdapter::onChannelMessage(uint8_t idx, uint8_t path_len, float snr, uin
   ThreadKey k = ThreadKey::channel(idx);
   _msgs.append(k, m);
   if ((_ui.mutedChannels >> idx) & 1) _msgs.markRead(k);
+  if (_ui.backupMessages) configChanged();
   _rev++;
 }
 
@@ -746,6 +771,7 @@ bool MeshAdapter::addHeard(int i) {
   c.gps_lon = h.lon;
   if (!_mesh->addContact(c)) return false;
   _mesh->uiMarkContactsDirty();
+  configChanged();
   _rev++;
   return true;
 }
@@ -1062,6 +1088,7 @@ bool MeshAdapter::setRadio(const model::Radio& r) {
   radio_driver.setParams(p->freq, p->bw, p->sf, p->cr);
   radio_driver.setTxPower(p->tx_power_dbm);
   radio_driver.setRxBoostedGainMode(p->rx_boosted_gain);
+  configChanged();
   _rev++;
   return true;
 }
@@ -1111,11 +1138,63 @@ bool MeshAdapter::gpsSyncTime() {
   return true;
 }
 
+// ------------------------------------------------------------------ backup
+
+void MeshAdapter::refreshBackupInfo() {
+  fs::FS* sd = _plat.sd();
+  _bk.card = sd != nullptr;
+  memset(&_bk.cur, 0, sizeof _bk.cur);
+  memset(&_bk.prev, 0, sizeof _bk.prev);
+  if (sd) {
+    _bk.cur = Backup::info(*sd, false);
+    _bk.prev = Backup::info(*sd, true);
+  }
+  _rev++;
+}
+
 model::BackupStatus MeshAdapter::backupStatus() const {
   model::BackupStatus b;
   memset(&b, 0, sizeof b);
-  b.cardPresent = _plat.sd() != nullptr;
+  b.cardPresent = _bk.card;
+  b.hasBackup = _bk.cur.valid;
+  b.hasPrevious = _bk.prev.valid;
+  b.lastBackupTs = _bk.cur.valid ? _bk.cur.created : 0;
+  snprintf(b.lastError, sizeof b.lastError, "%s", _bk.error);
   return b;
+}
+
+void MeshAdapter::configChanged() {
+  _cfgChangedAt = millis() | 1;
+  _rev++;
+}
+
+bool MeshAdapter::backupNow() {
+  fs::FS* sd = _plat.sd();
+  if (!sd) {
+    snprintf(_bk.error, sizeof _bk.error, "No SD card");
+    _bk.card = false;
+    return false;
+  }
+  _mesh->uiFlushContacts();   // MeshCore saves contacts lazily
+  Backup::Options o{_ui.backupIdentity != 0, _ui.backupMessages != 0};
+  bool ok = Backup::write(*_fs, *sd, o, now(), FIRMWARE_VERSION, _bk.error, sizeof _bk.error);
+  if (ok) _bk.error[0] = 0;
+  _cfgChangedAt = 0;
+  _lastBackupAt = millis() | 1;
+  refreshBackupInfo();
+  return ok;
+}
+
+bool MeshAdapter::restore(bool previous) {
+  fs::FS* sd = _plat.sd();
+  if (!sd) return false;
+  if (!Backup::restore(*_fs, *sd, previous, _bk.error, sizeof _bk.error)) {
+    _rev++;
+    return false;
+  }
+  _fresh = false;
+  _plat.reboot();   // MeshCore reloads everything from flash
+  return true;
 }
 
 void MeshAdapter::factoryReset() {

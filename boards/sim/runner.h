@@ -17,6 +17,8 @@ public:
   virtual bool setup(const char* cmd, const char* arg) { (void)cmd; (void)arg; return false; }
   // Called once, just before the UI's first frame.
   virtual void start() {}
+  // The UI, for worlds that restart it (a simulated reboot).
+  virtual void attach(ui::App& app, ui::Screen* first) { (void)app; (void)first; }
   // Advance everything except the UI to `now` (ms).
   virtual void step(uint32_t now) = 0;
   // World-specific commands after start; true if handled. Set `err` on failure.

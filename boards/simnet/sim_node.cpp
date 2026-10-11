@@ -1,13 +1,14 @@
 #include "sim_node.h"
 
 static SimRNG* s_identityRng = nullptr;
+static uint32_t s_boots = 0;   // every boot draws different randomness, like real hardware
 
 // MeshCore asks the variant for a fresh identity on first boot.
 mesh::LocalIdentity radio_new_identity() { return mesh::LocalIdentity(s_identityRng); }
 
 SimNode::SimNode(SimMedium& medium, int id, const std::string& name, const std::string& dir, uint32_t epoch,
                  AbstractUITask* ui, bool fresh)
-    : _id(id), _name(name), _dir(dir), _radio(medium, id), _rtc(epoch), _rng(0x9E3779B9u * (uint32_t)(id + 1)) {
+    : _id(id), _name(name), _dir(dir), _radio(medium, id), _rtc(epoch), _rng(0x9E3779B9u * (uint32_t)(id + 1) + 0x7F4A7C15u * ++s_boots) {
   _fs.setRoot(dir);
   if (fresh) _fs.format();
   else _fs.mkdir("/");
