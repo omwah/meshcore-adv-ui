@@ -2,6 +2,7 @@
 #include "ui/icons.h"
 #include "ui/widgets.h"
 #include "ui/screens/screens.h"
+#include "ui/tz.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -13,7 +14,7 @@ namespace {
 
 class ConfirmScreen : public Screen {
 public:
-  char question[64];
+  char question[160];
   Action yes = nullptr;
   int arg = 0;
   const char* title(App&) override { return "Confirm"; }
@@ -132,6 +133,7 @@ void App::begin(Screen* root) {
 void App::applyPrefs() {
   const model::Prefs& p = _m.prefs();
   _theme = p.theme < kThemeCount ? p.theme : 0;
+  setTimeZone(kZones[p.timeZone < kZoneCount ? p.timeZone : 0].posix);
   _in.setLockout(p.inputLockoutMs);
   _d.setBacklight(p.brightness);
   _forceFlush = true;
@@ -369,8 +371,20 @@ void fmtAge(char* out, size_t n, uint32_t d) {
 }
 
 void fmtTime(char* out, size_t n, uint32_t ts) {
-  uint32_t s = ts % 86400;
+  uint32_t s = toLocal(ts) % 86400;
   snprintf(out, n, "%02u:%02u", (unsigned)(s / 3600), (unsigned)(s / 60 % 60));
+}
+
+void fmtStamp(char* out, size_t n, uint32_t now, uint32_t ts) {
+  uint32_t lt = toLocal(ts);
+  if (lt / 86400 == toLocal(now) / 86400) { fmtTime(out, n, ts); return; }
+  static const char* const kMon[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  int y;
+  unsigned m, d;
+  civilFromDays((int32_t)(lt / 86400), y, m, d);
+  char hm[8];
+  fmtTime(hm, sizeof hm, ts);
+  snprintf(out, n, "%s %u %s", kMon[m - 1], d, hm);
 }
 
 void fmtDur(char* out, size_t n, uint32_t s) {

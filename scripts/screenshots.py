@@ -44,6 +44,9 @@ def run(scenario, theme, outdir):
             im = Image.open(ppm)
             im.resize((im.width * 3, im.height * 3), Image.NEAREST).save(os.path.join(outdir, name + ".png"))
             names.append(name)
+    want = sum(1 for l in rest if l.strip().startswith("shot "))
+    if len(names) != want:
+        sys.exit(f"{scenario}: expected {want} shots, got {len(names)} (is {SIM} the simulator?)")
     return names
 
 

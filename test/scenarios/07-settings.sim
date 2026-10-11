@@ -4,6 +4,11 @@ key down 9
 key enter
 shot settings
 key down
+shot settings-timezone
+key right 4
+shot settings-timezone-eastern
+key left 4
+key down
 key right
 shot settings-theme-amber
 key right 3

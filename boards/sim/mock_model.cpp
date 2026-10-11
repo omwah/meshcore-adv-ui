@@ -32,6 +32,7 @@ MockModel::MockModel() {
   memset(&_prefs, 0, sizeof _prefs);
   snprintf(_prefs.nodeName, sizeof _prefs.nodeName, "Cardputer-7F");
   _prefs.theme = 0;
+  _prefs.timeZone = 1;   // US Pacific, to exercise DST in the simulator
   _prefs.brightness = 192;
   _prefs.screenTimeoutS = 60;
   _prefs.inputLockoutMs = 60;

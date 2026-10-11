@@ -129,6 +129,7 @@ struct Gps {
 struct Prefs {
   char nodeName[NAME_LEN];
   uint8_t theme;
+  uint8_t timeZone;               // index into ui::kZones
   uint8_t brightness;             // 0..255
   uint16_t screenTimeoutS;        // 0 = never
   uint16_t inputLockoutMs;

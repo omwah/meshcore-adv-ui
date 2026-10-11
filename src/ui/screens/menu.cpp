@@ -1,6 +1,7 @@
 // Main menu, Settings, Radio and Backup.
 #include "ui/screens/screens.h"
 #include "ui/widgets.h"
+#include "ui/tz.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -97,7 +98,7 @@ MainMenu s_menu;
 
 // ------------------------------------------------------------- settings
 
-enum SItem { S_HDR_ID, S_NAME, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
+enum SItem { S_HDR_ID, S_NAME, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
              S_HDR_IN, S_LOCKOUT, S_SOUND,
              S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
@@ -127,6 +128,8 @@ protected:
     switch (i) {
       case S_HDR_ID: it.label = "IDENTITY"; it.header = true; break;
       case S_NAME: it.label = "Node name"; snprintf(it.value, sizeof it.value, "%s", p.nodeName); break;
+      case S_HDR_TIME: it.label = "TIME"; it.header = true; break;
+      case S_TZ: it.label = "Time zone"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", kZones[p.timeZone % kZoneCount].name); break;
       case S_HDR_DISP: it.label = "DISPLAY"; it.header = true; break;
       case S_THEME: it.label = "Theme"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", kThemes[p.theme % kThemeCount].name); break;
       case S_BRIGHT: it.label = "Brightness"; it.choice = true; snprintf(it.value, sizeof it.value, "%d%%", (p.brightness * 100 + 127) / 255); break;
@@ -194,6 +197,7 @@ protected:
   void adjust(App& a, int i, int dir) override {
     model::Prefs p = a.m().prefs();
     switch (i) {
+      case S_TZ: p.timeZone = (uint8_t)((p.timeZone + kZoneCount + dir) % kZoneCount); break;
       case S_THEME: p.theme = (uint8_t)((p.theme + kThemeCount + dir) % kThemeCount); break;
       case S_BRIGHT: {
         int v = p.brightness + dir * 32;

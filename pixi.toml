@@ -24,7 +24,7 @@ pkg-config = "*"
 deps     = "scripts/prepare-deps.sh"
 fonts    = "python -I scripts/gen_fonts.py"
 sim      = { cmd = "pio run -e sim", depends-on = ["deps"] }
-test     = { cmd = "pio test -e sim", depends-on = ["deps"] }
+test     = { cmd = "pio test -e test", depends-on = ["deps"] }
 shots    = { cmd = "python -I scripts/screenshots.py", depends-on = ["sim"] }
 build    = { cmd = "pio run -e cardputer_adv -e cardputer_adv_usb", depends-on = ["deps"] }
 size     = { cmd = "python -I scripts/check-size.py", depends-on = ["build"] }

@@ -182,8 +182,8 @@ private:
 
     // Meta line: who, when, then delivery state or signal.
     const mc_font_t* sf = a.fSmall();
-    char t[8];
-    fmtTime(t, sizeof t, m.ts);
+    char t[16];
+    fmtStamp(t, sizeof t, a.m().now(), m.ts);
     int x = r.x + 9;
     if (m.outgoing) {
       x = c.text(x, top + 1, "me", sf, C_ACCENT) + 5;

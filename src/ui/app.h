@@ -120,7 +120,9 @@ uint8_t typeColor(model::NodeType t);
 const uint8_t* typeIcon(model::NodeType t);
 void fmtAgo(char* out, size_t n, uint32_t now, uint32_t ts);    // "3m", "2h", "5d"
 void fmtAge(char* out, size_t n, uint32_t secs);                // same, from seconds
-void fmtTime(char* out, size_t n, uint32_t ts);                 // "HH:MM"
+void fmtTime(char* out, size_t n, uint32_t ts);                 // local "HH:MM"
+// Local "HH:MM" for today, "Oct 9 14:05" for other days.
+void fmtStamp(char* out, size_t n, uint32_t now, uint32_t ts);
 void fmtDur(char* out, size_t n, uint32_t secs);                // "3m05s", "2h10m", "4d03h"
 void fmtSnr(char* out, size_t n, int8_t snr_x4);                 // "-7.5"
 uint8_t snrColor(int8_t snr_x4);
