@@ -171,6 +171,7 @@ void App::replace(Screen* s) {
 
 void App::popToRoot() {
   _depth = 1;
+  _stack[0]->onHome(*this);
   entered();
 }
 

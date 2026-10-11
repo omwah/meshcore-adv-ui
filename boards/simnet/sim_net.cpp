@@ -4,6 +4,8 @@
 #include "target.h"
 
 SimRadio* SimRadio::current = nullptr;
+SimRTC* SimRTC::current = nullptr;
+SimRTCProxy rtc_clock;
 SimBoard board;
 SimRadioProxy radio_driver;
 SensorManager sensors;

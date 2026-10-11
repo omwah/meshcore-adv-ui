@@ -32,6 +32,12 @@ class HomeScreen : public Screen {
 public:
   const char* title(App&) override { return "MeshCore"; }
 
+  void onHome(App&) override {
+    _tab = T_CHATS;
+    _query[0] = 0;
+    _nav[T_CHATS] = ListNav();
+  }
+
   void onEnter(App& a) override {
     _builtRev = ~0u;
     rebuild(a);
@@ -145,7 +151,8 @@ private:
     bool chan = t.id.kind == model::ThreadKind::Channel;
     uint8_t col = chan ? C_CHAN : typeColor(t.type);
     c.fillRect(0, y, 3, CHAT_ROW_H, col);
-    c.bitmap(6, y + 3, chan ? icon::hash : typeIcon(t.type), 8, 8, col);
+    // Channels: # for hashtag channels, a lock for ones with a private key.
+    c.bitmap(6, y + 3, chan ? (t.title[0] == '#' ? icon::hash : icon::lock) : typeIcon(t.type), 8, 8, col);
     // Right side: time, unread badge.
     char ts[12];
     fmtAgo(ts, sizeof ts, a.m().now(), t.lastTs);

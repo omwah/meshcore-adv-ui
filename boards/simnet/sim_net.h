@@ -35,6 +35,8 @@ public:
   uint32_t getPacketsSent() const { return _nSent; }
   uint32_t getPacketsRecvErrors() const { return 0; }
   uint32_t getRngSeed() const { return 1000 + _id; }
+  void resetStats() { _nRecv = _nSent = 0; }
+  bool configSideDetectors(const uint8_t*, int, float) { return false; }
 
   int id() const { return _id; }
   float freq() const { return _freq; }
@@ -78,6 +80,8 @@ public:
   uint32_t getPacketsRecvErrors() const { return SimRadio::current->getPacketsRecvErrors(); }
   uint32_t getRngSeed() const { return SimRadio::current->getRngSeed(); }
   uint32_t getEstAirtimeFor(int len) { return SimRadio::current->getEstAirtimeFor(len); }
+  void resetStats() { SimRadio::current->resetStats(); }
+  bool configSideDetectors(const uint8_t* sfs, int n, float bw) { return SimRadio::current->configSideDetectors(sfs, n, bw); }
   int getNoiseFloor() const { return SimRadio::current->getNoiseFloor(); }
 };
 
@@ -94,11 +98,19 @@ public:
 class SimRTC : public mesh::RTCClock {
 public:
   explicit SimRTC(uint32_t base) : _base(base) {}
+  static SimRTC* current;
   uint32_t getCurrentTime() override { return _base + (uint32_t)(millis() / 1000); }
   void setCurrentTime(uint32_t t) override { _base = t - (uint32_t)(millis() / 1000); }
 
 private:
   uint32_t _base;
+};
+
+// The global rtc_clock some MeshCore examples use, for the current node.
+class SimRTCProxy : public mesh::RTCClock {
+public:
+  uint32_t getCurrentTime() override { return SimRTC::current->getCurrentTime(); }
+  void setCurrentTime(uint32_t t) override { SimRTC::current->setCurrentTime(t); }
 };
 
 class SimMedium {

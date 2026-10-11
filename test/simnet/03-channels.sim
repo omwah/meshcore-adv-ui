@@ -1,0 +1,39 @@
+# Channels on real MeshCore: Public works out of the box, a #hashtag channel
+# joined from the UI matches one joined by another node, unread counts and
+# muting behave.
+node Dana 8
+as Dana join #trailcrew
+as Dana chan 0 Morning all, Public check
+wait 3000
+expect unread 1
+shot chan-public-unread
+# Join #trailcrew from the menu.
+key menu
+key enter
+key enter
+type trailcrew
+key enter
+wait 500
+shot chan-joined
+as Dana chan 1 Crew meets at 7
+wait 3000
+expect unread 2
+key enter
+shot chan-trailcrew
+expect unread 1
+type On my way
+key enter
+wait 2000
+expect status sent
+shot chan-sent
+hold esc 900
+key right 3
+key down
+key tab
+key down
+key enter
+shot chan-muted
+hold esc 900
+as Dana chan 1 Muted message
+wait 3000
+expect unread 1

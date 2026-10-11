@@ -81,7 +81,8 @@ protected:
     fmtAgo(ago, sizeof ago, a.m().now(), ct.lastHeard);
     char snr[8];
     fmtSnr(snr, sizeof snr, ct.snr_x4);
-    snprintf(line, sizeof line, "heard %s ago  snr %s  rssi %d", ago, snr, ct.rssi);
+    if (ct.snr_x4 == INT8_MIN) snprintf(line, sizeof line, "heard %s ago  (not heard directly)", ago);
+    else snprintf(line, sizeof line, "heard %s ago  snr %s  rssi %d", ago, snr, ct.rssi);
     c.text(r.x + 6, y + 19, line, s, C_TEXT);
     drawSignal(c, r.x + r.w - 14, y, ct.snr_x4);
     if (ct.hasPos) {

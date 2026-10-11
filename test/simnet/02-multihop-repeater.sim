@@ -1,0 +1,51 @@
+# Carol is out of our range; Hilltop (a stock MeshCore repeater) relays.
+repeater Hilltop 9 hunter2
+node Carol 6 echo
+unlink Cardputer Carol
+link Carol Hilltop 5
+as Hilltop advert
+as Carol advert flood
+wait 6000
+expect contacts 2
+# Flood our advert so Carol learns about us through the repeater.
+key menu
+key down 4
+key enter
+wait 6000
+hold esc 900
+key right
+type car
+key enter
+type Hi Carol, via the hill
+key enter
+wait 10000
+expect status delivered
+shot hop-dm
+key tab
+shot hop-contact-detail
+# Message, Favourite, Reset path, Trace route (Admin is disabled for people)
+key down 3
+key enter
+wait 4000
+shot hop-trace
+hold esc 900
+key right 2
+type hill
+key enter
+shot rpt-detail
+# repeaters open on Admin / status (Message is disabled)
+key enter
+key enter
+type hunter2
+key enter
+wait 4000
+shot rpt-login
+key down
+key enter
+wait 4000
+shot rpt-status
+key down
+key enter
+wait 4000
+shot rpt-neighbours
+dump

@@ -912,7 +912,8 @@ void MeshAdapter::onTraceData(uint32_t tag, uint8_t flags, const uint8_t* hashes
   int sz = 1 << (flags & 3);
   int hops = path_len / sz;
   char out[200];
-  int o = snprintf(out, sizeof out, "Round trip %u ms, %d relays\n", (unsigned)(millis() - _req.startedAt), hops);
+  int o = snprintf(out, sizeof out, "Round trip %u ms, %d relay%s\n", (unsigned)(millis() - _req.startedAt), hops,
+                   hops == 1 ? "" : "s");
   for (int h = 0; h < hops && o < (int)sizeof out - 40; h++) {
     char id[12], name[24] = "";
     hex(id, sizeof id, &hashes[h * sz], sz);

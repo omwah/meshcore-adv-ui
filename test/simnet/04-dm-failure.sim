@@ -1,0 +1,19 @@
+# A contact that goes out of range: the message is retried, then marked failed.
+node Erin 6
+as Erin advert
+wait 3000
+key menu
+key down 3
+key enter
+wait 2000
+unlink Cardputer Erin
+hold esc 900
+key right
+key enter
+type Are you there?
+key enter
+wait 1000
+expect status pending
+wait 30000
+expect status failed
+shot dm-failed

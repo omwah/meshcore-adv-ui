@@ -6,6 +6,7 @@
 //
 // The UI node is "Cardputer" (id 0). Commands besides runner.cpp's:
 //   node <name> [snr] [echo]      add a companion node linked to the UI node
+//   repeater <name> [snr] [password]   add a stock MeshCore repeater
 //   link <a> <b> <snr> | unlink <a> <b>
 //   as <name> advert [flood]
 //   as <name> dm <to> <text>      a direct message (to = node name)
@@ -28,6 +29,7 @@
 #include "runner.h"
 #include "sim_node.h"
 #include "bot.h"
+#include "sim_repeater.h"
 
 int simnetSmoke();
 
@@ -58,6 +60,7 @@ public:
     _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_ui, _fresh));
     _uiNode->begin();
     _ui.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false);
+    _ids["Cardputer"] = 0;
   }
 
   bool setup(const char* cmd, const char*) override {
@@ -75,6 +78,7 @@ public:
       b.second.node->loop();
       b.second.task->loop();
     }
+    for (auto& r : _rpts) r.second->loop();
     if (_uiNode) _uiNode->select();   // the UI reads its node's globals
   }
 
@@ -83,7 +87,7 @@ public:
       char name[32] = {}, flag[8] = {};
       float snr = 8.0f;
       sscanf(arg, "%31s %f %7s", name, &snr, flag);
-      int id = (int)_bots.size() + 1;
+      int id = _nextId++;
       Bot b;
       b.task.reset(new BotTask(&board, &_ifaces));
       b.node.reset(new SimNode(_medium, id, name, _dir + "/" + name, kEpoch, b.task.get()));
@@ -93,6 +97,16 @@ public:
       _medium.link(0, id, snr);
       _ids[name] = id;
       _bots[name] = std::move(b);
+      return true;
+    }
+    if (!strcmp(cmd, "repeater")) {
+      char name[32] = {}, pw[32] = "password";
+      float snr = 8.0f;
+      sscanf(arg, "%31s %f %31s", name, &snr, pw);
+      int id = _nextId++;
+      _rpts[name] = SimRepeater::create(_medium, id, name, _dir + "/" + name, kEpoch, pw);
+      _medium.link(0, id, snr);
+      _ids[name] = id;
       return true;
     }
     if (!strcmp(cmd, "link") || !strcmp(cmd, "unlink")) {
@@ -127,6 +141,13 @@ private:
     int used = 0;
     sscanf(arg, "%31s %15s %n", name, what, &used);
     const char* rest = arg + used;
+    auto rp = _rpts.find(name);
+    if (rp != _rpts.end()) {
+      if (strcmp(what, "advert")) { snprintf(err, n, "repeaters only advert"); return true; }
+      rp->second->advert(strstr(rest, "flood") != nullptr);
+      if (_uiNode) _uiNode->select();
+      return true;
+    }
     auto it = _bots.find(name);
     if (it == _bots.end()) { snprintf(err, n, "no node '%s'", name); return true; }
     SimNode& node = *it->second.node;
@@ -211,8 +232,10 @@ private:
   SimMedium _medium;
   std::unique_ptr<SimNode> _uiNode;
   std::map<std::string, Bot> _bots;
+  std::map<std::string, std::unique_ptr<SimRepeater>> _rpts;
   std::map<std::string, int> _ids;
   bool _fresh = true;
+  int _nextId = 1;   // 0 is the UI node
 };
 
 uint32_t g_now = 0;

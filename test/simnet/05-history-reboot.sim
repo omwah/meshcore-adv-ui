@@ -1,0 +1,27 @@
+# Message history, unread state and contacts survive a restart.
+node Finn 7 echo
+as Finn advert
+wait 3000
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+key right
+key enter
+type First message
+key enter
+wait 5000
+hold esc 900
+as Finn dm Cardputer Unread after reboot
+wait 3000
+expect unread 1
+reboot
+wait 2000
+expect contacts 1
+expect threads 1
+expect unread 1
+shot history-after-reboot
+key enter
+shot history-thread
+expect unread 0

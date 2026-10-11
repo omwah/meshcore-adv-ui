@@ -107,16 +107,20 @@ void MenuScreen::onKey(App& app, const Key& k) {
   int n = count(app);
   int vis = _vis;
   if (k.code == K_ESC) { app.pop(); return; }
+  int old = _nav.sel;
   if (_nav.key(k, n, vis)) {
-    // Never rest on a section header: keep going the way the cursor moved,
-    // and turn back at the ends.
+    // Never rest on a header or a disabled row: keep going the way the
+    // cursor moved; if there is nothing usable that way, go back to where
+    // the cursor started.
     int dir = (k.code == K_UP || k.code == K_PGUP || k.code == K_END) ? -1 : 1;
+    int start = old;
     for (int guard = 0; guard < 2 * n; guard++) {
       MenuItem it;
       memset(&it, 0, sizeof it);
+      it.enabled = true;
       item(app, _nav.sel, it);
-      if (!it.header) break;
-      if (_nav.sel + dir < 0 || _nav.sel + dir >= n) dir = -dir;
+      if (!it.header && it.enabled) break;
+      if (_nav.sel + dir < 0 || _nav.sel + dir >= n) { _nav.sel = start; break; }
       _nav.sel += dir;
     }
     _nav.clamp(n, vis);

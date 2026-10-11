@@ -41,6 +41,8 @@ public:
   virtual bool tick(App& app, uint32_t now) { (void)app; (void)now; return false; }
   // Screens that draw the full display (boot, lock) hide header and footer.
   virtual bool fullscreen() { return false; }
+  // The user asked to go home (long Esc): return to a known starting state.
+  virtual void onHome(App& app) { (void)app; }
 };
 
 using Action = void (*)(App& app, int arg);

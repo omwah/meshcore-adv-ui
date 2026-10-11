@@ -10,5 +10,6 @@
 extern SimBoard board;
 extern SimRadioProxy radio_driver;
 extern SensorManager sensors;
+extern SimRTCProxy rtc_clock;
 
 mesh::LocalIdentity radio_new_identity();

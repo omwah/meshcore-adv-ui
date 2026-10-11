@@ -23,6 +23,7 @@ SimNode::~SimNode() {
 
 void SimNode::select() {
   SimRadio::current = &_radio;
+  SimRTC::current = &_rtc;
   LittleFS.setRoot(_dir);
   s_identityRng = &_rng;
 }
