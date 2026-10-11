@@ -44,6 +44,7 @@ MockModel::MockModel() {
   _prefs.bleEnabled = true;
   _prefs.blePin = 123456;
   _prefs.presetIdx = 0;
+  _prefs.telemBattery = model::TelemMode::PerContact;
 
   const Preset& p = app::kRadioPresets[0];
   _radio = {p.freqMHz, p.bwKHz, p.sf, p.cr, 22, 22, false, true};
@@ -234,6 +235,10 @@ bool MockModel::removeContact(int i) {
   _nContacts--;
   _rev++;
   return true;
+}
+
+void MockModel::setTelemetry(int i, uint8_t telem) {
+  if (i >= 0 && i < _nContacts) { _contacts[i].telemetry = telem; _rev++; }
 }
 
 bool MockModel::resetPath(int i) {

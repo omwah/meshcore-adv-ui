@@ -21,6 +21,7 @@ struct Contact {
   NodeType type;
   int8_t hops;                    // -1: no known path (flood)
   bool favourite;
+  uint8_t telemetry;              // what this contact may request: TELEM_* bits
   bool hasPos;
   int32_t lat_e6, lon_e6;
   uint32_t lastHeard;             // epoch seconds of last advert/packet
@@ -29,6 +30,11 @@ struct Contact {
   uint8_t pathLen;                // bytes of stored path
   uint8_t path[16];               // first hops of the stored path (hash bytes)
 };
+
+// Telemetry categories (as MeshCore's companion firmware defines them).
+enum : uint8_t { TELEM_BATTERY = 1, TELEM_LOCATION = 2, TELEM_SENSORS = 4 };
+// Who may request a category: no one, contacts allowed one by one, everyone.
+enum class TelemMode : uint8_t { NoOne = 0, PerContact = 1, Everyone = 2 };
 
 struct Channel {
   uint8_t idx;
@@ -146,6 +152,7 @@ struct Prefs {
   uint32_t blePin;                // the fixed PIN
   bool blePinRandom;              // a new random PIN at every boot
   uint8_t presetIdx;              // index into presets(), 0xFF custom
+  TelemMode telemBattery, telemLocation, telemSensors;
 };
 
 struct BackupStatus {
@@ -194,6 +201,7 @@ public:
   virtual void setFavourite(int i, bool fav) = 0;
   virtual bool removeContact(int i) = 0;
   virtual bool resetPath(int i) = 0;
+  virtual void setTelemetry(int i, uint8_t telem) = 0;   // TELEM_* bits
 
   // Channels.
   virtual int channelCount() const = 0;

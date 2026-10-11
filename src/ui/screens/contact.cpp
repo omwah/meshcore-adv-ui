@@ -20,7 +20,7 @@ void fmtPos(char* out, size_t n, int32_t lat, int32_t lon) {
 
 // ------------------------------------------------------------- contact
 
-enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_PATH, CI_TRACE, CI_PING, CI_REMOVE, CI_N };
+enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_REMOVE, CI_N };
 
 class ContactScreen : public MenuScreen {
 public:
@@ -115,6 +115,27 @@ protected:
       case CI_MESSAGE: it.label = ct.type == model::NodeType::Room ? "Open room" : "Message"; it.enabled = ct.type != model::NodeType::Repeater && ct.type != model::NodeType::Sensor; break;
       case CI_ADMIN: it.label = "Admin / status"; it.enabled = admin; break;
       case CI_DETAILS: it.label = "Details"; break;
+      case CI_TBATT:
+      case CI_TLOC:
+      case CI_TENV: {
+        // What this contact may request from us, as the MeshCore app sets it.
+        static const char* const kLabels[] = {"Share battery", "Share location", "Share sensors"};
+        int k = i - CI_TBATT;
+        const model::Prefs& p = a.m().prefs();
+        model::TelemMode mode = k == 0 ? p.telemBattery : k == 1 ? p.telemLocation : p.telemSensors;
+        it.label = kLabels[k];
+        if (mode == model::TelemMode::PerContact) {
+          bool on = ct.telemetry & (1 << k);
+          it.choice = true;
+          snprintf(it.value, sizeof it.value, "%s", on ? "yes" : "no");
+          it.valueCol = on ? C_OK : C_DIM;
+        } else {
+          // Set for everyone in Settings > Telemetry.
+          it.enabled = false;
+          snprintf(it.value, sizeof it.value, "%s", mode == model::TelemMode::Everyone ? "everyone" : "no one");
+        }
+        break;
+      }
       case CI_FAV: it.label = "Favourite"; it.choice = true; snprintf(it.value, sizeof it.value, ct.favourite ? "yes" : "no"); it.valueCol = ct.favourite ? C_WARN : C_DIM; break;
       case CI_PATH: it.label = "Reset path"; it.enabled = ct.hops >= 0; break;
       case CI_TRACE: it.label = "Trace route"; break;
@@ -138,7 +159,10 @@ protected:
         openText(a, "Details", body);
         break;
       }
-      case CI_FAV: adjust(a, i, 1); break;
+      case CI_FAV:
+      case CI_TBATT:
+      case CI_TLOC:
+      case CI_TENV: adjust(a, i, 1); break;
       case CI_PATH:
         a.m().resetPath(idx);
         a.toast("Path reset: next message floods");
@@ -160,9 +184,10 @@ protected:
   }
 
   void adjust(App& a, int i, int) override {
-    if (i != CI_FAV) return;
     model::Contact ct;
-    if (a.m().contact(idx, ct)) a.m().setFavourite(idx, !ct.favourite);
+    if (!a.m().contact(idx, ct)) return;
+    if (i == CI_FAV) a.m().setFavourite(idx, !ct.favourite);
+    else if (i >= CI_TBATT && i <= CI_TENV) a.m().setTelemetry(idx, (uint8_t)(ct.telemetry ^ (1 << (i - CI_TBATT))));
   }
 
 private:

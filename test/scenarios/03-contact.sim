@@ -2,7 +2,8 @@
 key right
 key tab
 shot contact-detail
-key down 4
+# Details, Favourite, Share battery (per contact in the mock), Reset path, Trace route
+key down 5
 key enter
 wait 1600
 shot contact-trace
@@ -10,3 +11,7 @@ key esc
 key down 2
 key enter
 shot contact-remove-confirm
+key esc
+key up 7
+key down 3
+shot contact-telemetry

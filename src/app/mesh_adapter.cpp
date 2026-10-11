@@ -135,6 +135,11 @@ void MeshAdapter::syncPrefsFromMesh() {
   p.blePin = np->ble_pin ? np->ble_pin : _mesh->getBLEPin();
   p.presetIdx = _ui.presetIdx;
   p.blePinRandom = _ui.blePinRandom;
+  auto mode = [](uint8_t m) { return m == TELEM_MODE_ALLOW_ALL ? model::TelemMode::Everyone
+                                    : m == TELEM_MODE_ALLOW_FLAGS ? model::TelemMode::PerContact : model::TelemMode::NoOne; };
+  p.telemBattery = mode(np->telemetry_mode_base);
+  p.telemLocation = mode(np->telemetry_mode_loc);
+  p.telemSensors = mode(np->telemetry_mode_env);
 }
 
 void MeshAdapter::setPrefs(const model::Prefs& p) {
@@ -145,6 +150,11 @@ void MeshAdapter::setPrefs(const model::Prefs& p) {
   np->advert_loc_policy = p.gpsShareInAdvert ? ADVERT_LOC_SHARE : ADVERT_LOC_NONE;
   np->manual_add_contacts = !p.autoAddContacts;
   np->ble_pin = p.blePin;
+  auto mode = [](model::TelemMode m) { return (uint8_t)(m == model::TelemMode::Everyone ? TELEM_MODE_ALLOW_ALL
+                                              : m == model::TelemMode::PerContact ? TELEM_MODE_ALLOW_FLAGS : TELEM_MODE_DENY); };
+  np->telemetry_mode_base = mode(p.telemBattery);
+  np->telemetry_mode_loc = mode(p.telemLocation);
+  np->telemetry_mode_env = mode(p.telemSensors);
   if (p.presetIdx != _ui.presetIdx && p.presetIdx < kRadioPresetCount && kRadioPresets[p.presetIdx].pathHashSize)
     np->path_hash_mode = kRadioPresets[p.presetIdx].pathHashSize - 1;
   _mesh->savePrefs();
@@ -233,6 +243,7 @@ bool MeshAdapter::contact(int i, model::Contact& out) const {
     memcpy(out.path, c.out_path, out.pathLen);
   }
   out.favourite = isFavourite(c.id.pub_key);
+  out.telemetry = (uint8_t)((c.flags >> 1) & 7);   // flags: bit 0 favourite, bits 1-3 telemetry
   out.hasPos = c.gps_lat || c.gps_lon;
   out.lat_e6 = c.gps_lat;
   out.lon_e6 = c.gps_lon;
@@ -269,6 +280,17 @@ bool MeshAdapter::removeContact(int i) {
   configChanged();
   _rev++;
   return true;
+}
+
+void MeshAdapter::setTelemetry(int i, uint8_t telem) {
+  ContactInfo* c = contactPtr(i);
+  if (!c) return;
+  uint8_t flags = (uint8_t)((c->flags & ~0x0E) | ((telem & 7) << 1));
+  if (flags == c->flags) return;
+  c->flags = flags;
+  _mesh->uiMarkContactsDirty();
+  configChanged();
+  _rev++;
 }
 
 bool MeshAdapter::resetPath(int i) {

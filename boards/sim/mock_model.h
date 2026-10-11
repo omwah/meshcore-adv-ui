@@ -29,6 +29,7 @@ public:
   void setFavourite(int i, bool fav) override;
   bool removeContact(int i) override;
   bool resetPath(int i) override;
+  void setTelemetry(int i, uint8_t telem) override;
 
   int channelCount() const override { return _nChannels; }
   bool channel(int i, model::Channel& out) const override;

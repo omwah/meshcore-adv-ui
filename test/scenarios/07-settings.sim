@@ -18,6 +18,8 @@ key down 6
 shot settings-mid
 key down 10
 shot settings-end
+key down 5
+shot settings-telemetry
 hold esc 900
 key menu
 key down 10

@@ -102,6 +102,7 @@ enum SItem { S_HDR_ID, S_NAME, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, 
              S_HDR_IN, S_LOCKOUT, S_SOUND,
              S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
+             S_HDR_TELEM, S_TBATT, S_TLOC, S_TENV,
              S_HDR_DANGER, S_FACTORY, S_N };
 
 const uint16_t kTimeouts[] = {0, 15, 30, 60, 120, 300};
@@ -170,6 +171,19 @@ protected:
       case S_GPSADV: it.label = "Share position in adverts"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsShareInAdvert)); it.enabled = p.gpsEnabled; break;
       // Works with the receiver off too: it is powered just until the first fix.
       case S_GPSTIME: it.label = "Set clock from GPS at boot"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsTimeSyncAtBoot)); break;
+      case S_HDR_TELEM: it.label = "TELEMETRY: WHO MAY ASK"; it.header = true; break;
+      case S_TBATT:
+      case S_TLOC:
+      case S_TENV: {
+        static const char* const kLabels[] = {"Battery", "Location", "Sensors"};
+        static const char* const kModes[] = {"no one", "per contact", "everyone"};
+        model::TelemMode m = i == S_TBATT ? p.telemBattery : i == S_TLOC ? p.telemLocation : p.telemSensors;
+        it.label = kLabels[i - S_TBATT];
+        it.choice = true;
+        snprintf(it.value, sizeof it.value, "%s", kModes[(int)m % 3]);
+        it.valueCol = m == model::TelemMode::Everyone ? C_WARN : C_ACCENT;
+        break;
+      }
       case S_HDR_DANGER: it.label = "RESET"; it.header = true; break;
       case S_FACTORY: it.label = "Factory reset"; it.valueCol = C_ERR; break;
     }
@@ -236,6 +250,13 @@ protected:
       case S_GPS: p.gpsEnabled = !p.gpsEnabled; break;
       case S_GPSADV: p.gpsShareInAdvert = !p.gpsShareInAdvert; break;
       case S_GPSTIME: p.gpsTimeSyncAtBoot = !p.gpsTimeSyncAtBoot; break;
+      case S_TBATT:
+      case S_TLOC:
+      case S_TENV: {
+        model::TelemMode& m = i == S_TBATT ? p.telemBattery : i == S_TLOC ? p.telemLocation : p.telemSensors;
+        m = (model::TelemMode)(((int)m + 3 + dir) % 3);
+        break;
+      }
       default: return;
     }
     a.m().setPrefs(p);
