@@ -12,6 +12,8 @@ public:
   void setGpsPower(bool on) override;
   fs::FS* sd() override;
   void reboot() override;
+  bool blePairing() override { return blePairingFn && blePairingFn(); }
+  bool (*blePairingFn)() = nullptr;
 
 private:
   bool _sdTried = false, _sdOk = false;

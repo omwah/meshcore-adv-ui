@@ -3,6 +3,7 @@
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/TxtDataHelpers.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -76,7 +77,9 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
 void MeshAdapter::loadUiPrefs() {
   memset(&_ui, 0, sizeof _ui);
   File f = _fs->open(kUiPrefsFile, "r");
-  bool ok = f && f.read((uint8_t*)&_ui, sizeof _ui) == sizeof _ui && _ui.magic == UI_PREFS_MAGIC;
+  // A file from an older build is shorter: the fields it lacks stay 0.
+  size_t got = f ? f.read((uint8_t*)&_ui, sizeof _ui) : 0;
+  bool ok = got >= offsetof(UiPrefs, blePinRandom) && _ui.magic == UI_PREFS_MAGIC;
   if (f) f.close();
   if (!ok || _ui.version != UI_PREFS_VERSION) {
     memset(&_ui, 0, sizeof _ui);
@@ -122,6 +125,7 @@ void MeshAdapter::syncPrefsFromMesh() {
   p.bleEnabled = _ui.bleEnabled;
   p.blePin = np->ble_pin ? np->ble_pin : _mesh->getBLEPin();
   p.presetIdx = _ui.presetIdx;
+  p.blePinRandom = _ui.blePinRandom;
 }
 
 void MeshAdapter::setPrefs(const model::Prefs& p) {
@@ -155,11 +159,23 @@ void MeshAdapter::setPrefs(const model::Prefs& p) {
   _ui.backupMessages = p.backupMessages;
   _ui.bleEnabled = p.bleEnabled;
   _ui.presetIdx = p.presetIdx;
+  _ui.blePinRandom = p.blePinRandom;
   saveUiPrefs();
   syncPrefsFromMesh();
   (void)advertNeeded;   // the UI tells the user to advertise; we don't spend airtime unasked
   configChanged();
   _rev++;
+}
+
+uint32_t MeshAdapter::choosePinForBoot() {
+  if (_ui.blePinRandom) {
+    uint32_t r;
+    _mesh->getRNG()->random((uint8_t*)&r, sizeof r);
+    _activePin = 100000 + r % 900000;
+  } else {
+    _activePin = _prefs.blePin ? _prefs.blePin : 123456;
+  }
+  return _activePin;
 }
 
 // ------------------------------------------------------------------ time

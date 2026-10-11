@@ -21,7 +21,28 @@
 
 #if defined(BLE_PIN_CODE)
   #include <helpers/esp32/SerialBLEInterface.h>
-  static SerialBLEInterface ble_interface;
+  // MeshCore's Bluetooth companion, plus knowing when a phone is pairing so
+  // the UI can show the PIN: connected but not yet authenticated.
+  class PairingBLEInterface : public SerialBLEInterface {
+  public:
+    volatile bool linked = false, authed = false;
+    void onConnect(BLEServer* s, esp_ble_gatts_cb_param_t* p) override {
+      linked = true;
+      authed = false;
+      SerialBLEInterface::onConnect(s, p);
+    }
+    void onAuthenticationComplete(esp_ble_auth_cmpl_t c) override {
+      authed = c.success;
+      if (!c.success) linked = false;
+      SerialBLEInterface::onAuthenticationComplete(c);
+    }
+    void onDisconnect(BLEServer* s) override {
+      linked = authed = false;
+      SerialBLEInterface::onDisconnect(s);
+    }
+    bool pairing() const { return linked && !authed; }
+  };
+  static PairingBLEInterface ble_interface;
   static constexpr bool kBleBuilt = true;
 #else
   static constexpr bool kBleBuilt = false;
@@ -61,8 +82,10 @@ void setup() {
   store.begin();
   the_mesh.begin(true);
 
+  adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
 #if defined(BLE_PIN_CODE)
-  ble_interface.begin(BLE_NAME_PREFIX, the_mesh.getNodePrefs()->node_name, the_mesh.getBLEPin());
+  platform.blePairingFn = [] { return ble_interface.pairing(); };
+  ble_interface.begin(BLE_NAME_PREFIX, the_mesh.getNodePrefs()->node_name, adapter.choosePinForBoot());
   interfaces.addInterface(InterfaceType::Bluetooth, &ble_interface);
 #endif
 #if defined(ENABLE_USB_INTERFACE)
@@ -75,7 +98,6 @@ void setup() {
   the_mesh.applyGpsPrefs();
 #endif
 
-  adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
   if (!adapter.prefs().bleEnabled) adapter.disableBluetooth();
   keyboard.begin();
   ui_app.begin(ui::screens::boot());

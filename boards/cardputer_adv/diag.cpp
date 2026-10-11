@@ -5,6 +5,7 @@
 #include "tca8418_keyboard.h"
 #include "platform_cardputer.h"
 #include "target.h"
+#include "MyMesh.h"
 
 static char s_line[64];
 static int s_len = 0;
@@ -14,6 +15,13 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d\n",
                   board.loraCapPresent() ? "ok" : "MISSING", k.present() ? "ok" : "MISSING", p.sd() ? "yes" : "no",
                   (unsigned)p.heapFree(), (unsigned)p.heapMin(), app.asleep());
+  } else if (!strcmp(c, "radio")) {
+    NodePrefs* np = the_mesh.getNodePrefs();
+    Serial.printf("radio: %.3f MHz bw %.1f sf %u cr %u tx %d dBm boost %u | rx %lu tx %lu err %lu | noise %d last rssi %.0f snr %.1f\n",
+                  np->freq, np->bw, np->sf, np->cr, np->tx_power_dbm, np->rx_boosted_gain,
+                  (unsigned long)radio_driver.getPacketsRecv(), (unsigned long)radio_driver.getPacketsSent(),
+                  (unsigned long)radio_driver.getPacketsRecvErrors(), radio_driver.getNoiseFloor(),
+                  radio_driver.getLastRSSI(), radio_driver.getLastSNR());
   } else if (!strncmp(c, "bl ", 3)) {
     d.backlightRaw(!strcmp(c + 3, "gpio") ? -1 : atoi(c + 3));
     Serial.println("ok");
@@ -48,7 +56,7 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     k.inject(r, col, false);
     Serial.println("ok");
   } else if (c[0]) {
-    Serial.println("? stat | bl <n>|gpio | fill <rrggbb> | init | shot | key <row> <col>");
+    Serial.println("? stat | radio | bl <n>|gpio | blf <hz> <duty> | fill <rrggbb> | init | shot | key <row> <col>");
   }
 }
 

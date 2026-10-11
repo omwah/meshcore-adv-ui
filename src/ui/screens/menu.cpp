@@ -100,7 +100,7 @@ MainMenu s_menu;
 
 enum SItem { S_HDR_ID, S_NAME, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
              S_HDR_IN, S_LOCKOUT, S_SOUND,
-             S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN,
+             S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
              S_HDR_DANGER, S_FACTORY, S_N };
 
@@ -154,7 +154,17 @@ protected:
         snprintf(it.value, sizeof it.value, "%s", !it.enabled ? "n/a" : !p.bleEnabled ? "off" : a.m().bleConnected() ? "connected" : "on");
         it.valueCol = a.m().bleConnected() ? C_OK : C_ACCENT;
         break;
-      case S_PIN: it.label = "Bluetooth PIN"; it.enabled = a.m().bleAvailable(); snprintf(it.value, sizeof it.value, "%06u", (unsigned)p.blePin); break;
+      case S_PIN:
+        it.label = "Bluetooth PIN";
+        it.enabled = a.m().bleAvailable();
+        snprintf(it.value, sizeof it.value, "%06u", (unsigned)a.m().bleActivePin());
+        break;
+      case S_PINMODE:
+        it.label = "New PIN";
+        it.choice = true;
+        it.enabled = a.m().bleAvailable();
+        snprintf(it.value, sizeof it.value, p.blePinRandom ? "each boot" : "fixed");
+        break;
       case S_HDR_GPS: it.label = "GPS"; it.header = true; break;
       case S_GPS: it.label = "GPS receiver"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsEnabled)); break;
       case S_GPSADV: it.label = "Share position in adverts"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsShareInAdvert)); it.enabled = p.gpsEnabled; break;
@@ -176,6 +186,10 @@ protected:
         });
         break;
       case S_PIN:
+        if (a.m().prefs().blePinRandom) {
+          a.toast("PIN changes every boot: set New PIN to fixed to choose one", C_WARN);
+          break;
+        }
         a.prompt("6-digit PIN", "", 6, [](App& app, int) {
           const char* t = app.promptText();
           uint32_t v = 0;
@@ -185,7 +199,7 @@ protected:
           model::Prefs p = app.m().prefs();
           p.blePin = v;
           app.m().setPrefs(p);
-          app.toast("PIN saved: re-pair the phone", C_OK);
+          app.toast("PIN saved: restart, then re-pair the phone", C_OK);
         });
         break;
       case S_FACTORY:
@@ -214,6 +228,10 @@ protected:
       case S_SOUND: p.sound = !p.sound; break;
       case S_AUTOADD: p.autoAddContacts = !p.autoAddContacts; break;
       case S_BLE: p.bleEnabled = !p.bleEnabled; break;
+      case S_PINMODE:
+        p.blePinRandom = !p.blePinRandom;
+        a.toast("Applies after a restart", C_ACCENT);
+        break;
       case S_GPS: p.gpsEnabled = !p.gpsEnabled; break;
       case S_GPSADV: p.gpsShareInAdvert = !p.gpsShareInAdvert; break;
       case S_GPSTIME: p.gpsTimeSyncAtBoot = !p.gpsTimeSyncAtBoot; break;

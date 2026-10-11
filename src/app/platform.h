@@ -20,6 +20,8 @@ public:
   // Removable storage for backups; null when no card is present.
   virtual fs::FS* sd() { return nullptr; }
   virtual void reboot() = 0;
+  // A phone has connected over Bluetooth and is not yet authenticated.
+  virtual bool blePairing() { return false; }
 };
 
 // Battery percentage from a Li-ion cell voltage (open-circuit curve).

@@ -26,3 +26,8 @@ shot backup
 key down
 key enter
 shot backup-identity-confirm
+hold esc 900
+ble pairing
+shot ble-pairing-pin
+key esc
+shot ble-pairing-hidden

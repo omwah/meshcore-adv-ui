@@ -143,7 +143,8 @@ struct Prefs {
   bool backupIdentity;
   bool backupMessages;
   bool bleEnabled;
-  uint32_t blePin;
+  uint32_t blePin;                // the fixed PIN
+  bool blePinRandom;              // a new random PIN at every boot
   uint8_t presetIdx;              // index into presets(), 0xFF custom
 };
 
@@ -254,6 +255,8 @@ public:
   virtual void setPrefs(const Prefs& p) = 0;
   virtual bool bleConnected() const = 0;
   virtual bool bleAvailable() const = 0;                  // compiled in
+  virtual uint32_t bleActivePin() const = 0;              // the PIN in use since boot
+  virtual bool blePairing() const = 0;                    // a phone is connected, not yet authenticated
 
   // Backup.
   virtual BackupStatus backupStatus() const = 0;

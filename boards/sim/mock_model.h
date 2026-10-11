@@ -83,6 +83,9 @@ public:
   void setPrefs(const model::Prefs& p) override { _prefs = p; _rev++; }
   bool bleConnected() const override { return _ble; }
   bool bleAvailable() const override { return true; }
+  uint32_t bleActivePin() const override { return _prefs.blePinRandom ? 482913 : _prefs.blePin; }
+  bool blePairing() const override { return _pairing; }
+  void setPairing(bool on) { _pairing = on; _rev++; }
 
   model::BackupStatus backupStatus() const override;
   bool restoreOffered() const override { return _fresh; }
@@ -128,7 +131,7 @@ private:
   model::Prefs _prefs;
   model::Gps _gps;
   model::RemoteStats _stats;
-  bool _ble = false, _fresh = false;
+  bool _ble = false, _fresh = false, _pairing = false;
   model::Req _req = model::Req::Idle, _discover = model::Req::Idle;
   uint32_t _reqDone = 0, _discoverDone = 0;
   char _reqText[200] = {};

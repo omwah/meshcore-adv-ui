@@ -4,7 +4,7 @@
 //
 // Commands (see runner.cpp for key/hold/type/wait/shot/theme):
 //   rx dm <contact> <text>, rx chan <slot> <sender>|<text>
-//   ble on|off, gps on|off|fix|nofix
+//   ble on|off|pairing, gps on|off|fix|nofix
 //   fresh, empty                (before anything else)
 #ifndef PIO_UNIT_TESTING
 #include <stdio.h>
@@ -43,7 +43,11 @@ public:
       }
       return true;
     }
-    if (!strcmp(cmd, "ble")) { _m.setBle(!strcmp(arg, "on")); return true; }
+    if (!strcmp(cmd, "ble")) {
+      if (!strcmp(arg, "pairing")) _m.setPairing(true);
+      else { _m.setPairing(false); _m.setBle(!strcmp(arg, "on")); }
+      return true;
+    }
     if (!strcmp(cmd, "gps")) {
       if (!strcmp(arg, "on") || !strcmp(arg, "off")) {
         model::Prefs pr = _m.prefs();

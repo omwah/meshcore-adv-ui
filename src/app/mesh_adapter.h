@@ -26,6 +26,8 @@ struct UiPrefs {
   uint16_t mutedChannels;        // bit per channel slot
   uint8_t favourites[16][4];     // public key prefixes (MeshCore has no favourite flag)
   uint8_t nFavourites;
+  // Fields added later go here: older, shorter files load them as 0.
+  uint8_t blePinRandom;
 };
 
 class MeshAdapter : public AbstractUITask, public model::MeshModel {
@@ -117,6 +119,11 @@ public:
   void setPrefs(const model::Prefs& p) override;
   bool bleConnected() const override { return hasConnection(); }
   bool bleAvailable() const override { return _bleBuilt; }
+  uint32_t bleActivePin() const override { return _activePin; }
+  bool blePairing() const override { return _bleBuilt && _plat.blePairing(); }
+  // The PIN for this boot (fixed, or new random if so set); call once,
+  // before starting the Bluetooth interface.
+  uint32_t choosePinForBoot();
 
   model::BackupStatus backupStatus() const override;
   bool restoreOffered() const override { return _fresh && _bk.cur.valid; }
@@ -222,6 +229,7 @@ private:
   uint32_t _cfgChangedAt = 0;      // 0: nothing waiting for an automatic backup
   uint32_t _lastBackupAt = 0;
   int _seenContacts = -1;
+  uint32_t _activePin = 0;
   uint32_t _bootGpsUntil = 0;     // boot-time GPS clock sync in progress until
 };
 

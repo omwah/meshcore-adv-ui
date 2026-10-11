@@ -27,14 +27,17 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 2. Radio (the riskiest assumptions)
 
-- [ ] **Radio starts.** Serial shows no `halt: radio init failed`.
+- [x] **Radio starts.** Serial shows no `halt: radio init failed`. Serial command `radio` shows the live settings and counters.
 - [ ] **RF switch enabled.** The Cap's antenna switch is powered by PI4IOE5V6408 (I2C 0x43) P0 high: registers 0x05 (output), 0x03 (direction) and 0x07 (high-Z) are set by `cardputer_board.cpp`. Without it, transmit works only at very short range. Check this with a second node a room away.
 - [ ] **TCXO voltage.** It is set to 3.3 V (`SX126X_DIO3_TCXO_VOLTAGE`). If the radio fails to start or is deaf, try 1.8.
 - [ ] **TX current limit.** It is 140 mA. The other open Cardputer port uses 240 mA for this Cap; only raise it after measuring.
+- [x] **Receive (SoCal preset).** Packets and adverts from a stock node are received.
+- [ ] **Transmit.** Another node hears our adverts and DMs (serial `radio`: tx count).
 - [ ] **Interop.** Exchange adverts and a DM with a stock MeshCore node or the phone app on the same preset (default "USA", 910.525 MHz / 62.5 kHz / SF7 / CR5).
 
 ## 3. SD card (shares the LoRa SPI bus)
 
+- [x] **Backup works.** "Back up now" succeeded on hardware.
 - [ ] **Card detection.** Insert a FAT32 card. Backup & restore shows "SD card ready".
 - [ ] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12).
 - [ ] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back.
@@ -46,6 +49,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 5. Bluetooth (default build)
 
+- [x] **Pairing and key import.** Pairing works, and so does the app's private key import (after enabling ENABLE_PRIVATE_KEY_IMPORT/EXPORT as stock does).
 - [ ] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse.
 - [ ] **Bluetooth toggle.** Settings > Bluetooth off stops advertising.
 

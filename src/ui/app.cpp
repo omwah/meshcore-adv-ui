@@ -246,6 +246,15 @@ uint32_t App::loop(uint32_t now) {
   }
   _in.tick(now);
 
+  // A phone pairing over Bluetooth: show the PIN on top of everything.
+  bool pairing = _m.blePairing();
+  if (pairing != _pairing) {
+    _pairing = pairing;
+    _pairingHidden = false;
+    _dirty = true;
+    if (pairing) { _lastInput = now; wake(); }
+  }
+
   // A new unread message turns the screen on.
   uint16_t unread = _m.unreadTotal();
   if (unread > _lastUnread) {
@@ -265,6 +274,12 @@ uint32_t App::loop(uint32_t now) {
   Key k;
   while (_in.next(k)) {
     Screen* before = top();
+    if (_pairing && !_pairingHidden) {
+      // The overlay takes keys: Esc hides it, anything else is ignored.
+      if (k.code == K_ESC || k.code == K_LONG_ESC) _pairingHidden = true;
+      _dirty = true;
+      continue;
+    }
     if (k.code == K_LONG_ESC) {
       popToRoot();
     } else if (k.code == K_MENU && !top()->fullscreen()) {
@@ -307,6 +322,7 @@ void App::render() {
   s->draw(*this, _c, r);
   _c.noClip();
   if (!s->fullscreen()) drawFooter();
+  if (_pairing && !_pairingHidden) drawPairing();
   _c.flush(_d, kThemes[_theme].pal, _forceFlush);
   _forceFlush = false;
 }
@@ -343,6 +359,23 @@ void App::drawHeader() {
   if (unread) x = drawBadge(*this, x - 3, (H - 1 - (fSmall()->height + 2)) / 2, unread);
 
   fitText(_c, 3, ty, top()->title(*this), f, C_HTXT, x - 8, true);
+}
+
+void App::drawPairing() {
+  const mc_font_t* f = fMed();
+  const mc_font_t* big = &font_xlarge;
+  char pin[12];
+  snprintf(pin, sizeof pin, "%06u", (unsigned)_m.bleActivePin());
+  int w = Canvas::W - 24, h = f->height * 2 + big->height + 18;
+  int x = 12, y = (Canvas::H - h) / 2;
+  _c.fillRect(x, y, w, h, C_ZEBRA);
+  _c.rect(x, y, w, h, C_ACCENT);
+  _c.bitmap(x + 6, y + 6 + (f->height - 8) / 2, icon::ble, 8, 8, C_ACCENT);
+  _c.text(x + 18, y + 6, "Bluetooth pairing", f, C_TEXT, -1, w - 24);
+  _c.text(x + 6, y + 8 + f->height, "Enter this PIN on the phone:", fSmall(), C_DIM, -1, w - 12);
+  int pw = Canvas::textWidth(pin, big);
+  _c.text(x + (w - pw) / 2, y + 10 + f->height + fSmall()->height, pin, big, C_ACCENT);
+  _c.text(x + 6, y + h - fSmall()->height - 4, "esc: hide", fSmall(), C_DIM);
 }
 
 void App::drawFooter() {

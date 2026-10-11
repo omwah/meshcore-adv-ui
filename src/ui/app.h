@@ -117,6 +117,7 @@ private:
   void render();
   void drawHeader();
   void drawFooter();
+  void drawPairing();
   void entered();
 
   model::MeshModel& _m;
@@ -138,6 +139,8 @@ private:
   bool _asleep = false;
   uint32_t _marqueeStart = 0;   // restarts on every key, so a new selection starts at its beginning
   bool _animating = false;       // a marquee is moving: keep redrawing
+  bool _pairing = false;         // the PIN overlay is showing
+  bool _pairingHidden = false;   // dismissed with Esc for this attempt
 };
 
 // Shared drawing helpers.
