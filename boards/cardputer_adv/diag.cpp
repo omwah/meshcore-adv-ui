@@ -6,15 +6,17 @@
 #include "platform_cardputer.h"
 #include "target.h"
 #include "MyMesh.h"
+#include <SPIFFS.h>
 
 static char s_line[64];
 static int s_len = 0;
 
 static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, CardputerPlatform& p) {
   if (!strncmp(c, "stat", 4)) {
-    Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d\n",
+    Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d, batt %u mV (adc pin raw %u mV)\n",
                   board.loraCapPresent() ? "ok" : "MISSING", k.present() ? "ok" : "MISSING", p.sd() ? "yes" : "no",
-                  (unsigned)p.heapFree(), (unsigned)p.heapMin(), app.asleep());
+                  (unsigned)p.heapFree(), (unsigned)p.heapMin(), app.asleep(), board.getBattMilliVolts(),
+                  (unsigned)analogReadMilliVolts(PIN_VBAT_READ));
   } else if (!strcmp(c, "radio")) {
     NodePrefs* np = the_mesh.getNodePrefs();
     Serial.printf("radio: %.3f MHz bw %.1f sf %u cr %u tx %d dBm boost %u | rx %lu tx %lu err %lu | noise %d last rssi %.0f snr %.1f\n",
@@ -22,6 +24,21 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
                   (unsigned long)radio_driver.getPacketsRecv(), (unsigned long)radio_driver.getPacketsSent(),
                   (unsigned long)radio_driver.getPacketsRecvErrors(), radio_driver.getNoiseFloor(),
                   radio_driver.getLastRSSI(), radio_driver.getLastSNR());
+  } else if (!strcmp(c, "files")) {
+    // Flash files and sizes, and the start of the node's public key.
+    File root = SPIFFS.open("/");
+    for (File f = root.openNextFile(); f; f = root.openNextFile()) Serial.printf("file %s %u\n", f.path(), (unsigned)f.size());
+    const uint8_t* k = the_mesh.self_id.pub_key;
+    Serial.printf("node key starts %02X%02X%02X%02X\n", k[0], k[1], k[2], k[3]);
+  } else if (!strcmp(c, "txtest")) {
+    // One 4-byte packet that is not valid MeshCore (nodes ignore it): shows
+    // whether the transmitter works and RadioLib's error code if not.
+    uint8_t junk[4] = {0xFF, 0x00, 0x00, 0x00};
+    uint32_t t0 = millis();
+    int16_t err = radio.transmit(junk, sizeof junk);
+    uint32_t dt = millis() - t0;
+    radio_driver.begin();   // back to MeshCore's receive state
+    Serial.printf("txtest: err %d after %lu ms (0 = sent)\n", err, (unsigned long)dt);
   } else if (!strncmp(c, "bl ", 3)) {
     d.backlightRaw(!strcmp(c + 3, "gpio") ? -1 : atoi(c + 3));
     Serial.println("ok");
@@ -56,7 +73,7 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     k.inject(r, col, false);
     Serial.println("ok");
   } else if (c[0]) {
-    Serial.println("? stat | radio | bl <n>|gpio | blf <hz> <duty> | fill <rrggbb> | init | shot | key <row> <col>");
+    Serial.println("? stat | radio | files | txtest | bl <n>|gpio | blf <hz> <duty> | fill <rrggbb> | init | shot | key <row> <col>");
   }
 }
 

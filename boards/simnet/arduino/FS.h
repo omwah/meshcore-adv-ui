@@ -36,7 +36,8 @@ public:
     fseek(_f.get(), p, SEEK_SET);
     return (int)(e - p);
   }
-  bool seek(uint32_t pos) { return _f && fseek(_f.get(), pos, SEEK_SET) == 0; }
+  // Like SPIFFS on the device: seeking past the end of a file fails.
+  bool seek(uint32_t pos) { return _f && pos <= size() && fseek(_f.get(), pos, SEEK_SET) == 0; }
   size_t position() const { return _f ? (size_t)ftell(_f.get()) : 0; }
   size_t size() const {
     if (!_f) return 0;

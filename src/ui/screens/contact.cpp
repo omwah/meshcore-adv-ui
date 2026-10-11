@@ -147,7 +147,8 @@ protected:
       case CI_TRACE:
       case CI_PING:
         if ((i == CI_TRACE ? a.m().tracePath(idx) : a.m().ping(idx))) { _waiting = true; _pending = i; }
-        else a.toast("Busy: another request is running", C_WARN);
+        else if (a.m().requestState() == model::Req::Busy) a.toast("Busy: another request is running", C_WARN);
+        else a.toast(a.m().requestText()[0] ? a.m().requestText() : "Could not send", C_WARN);
         break;
       case CI_REMOVE:
         a.confirm("Remove this contact?", [](App& app, int arg) {

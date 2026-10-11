@@ -47,7 +47,21 @@ bool MessageStore::writeRec(const Rec& r) {
   // Open read/write so the rest of the ring is kept; create on first use.
   File f = _fs->exists(kFile) ? _fs->open(kFile, "r+") : _fs->open(kFile, "w", true);
   if (!f) return false;
-  bool ok = f.seek((uint32_t)(r.seq % CAPACITY) * sizeof(Rec)) && f.write((const uint8_t*)&r, sizeof r) == sizeof r;
+  uint32_t at = (uint32_t)(r.seq % CAPACITY) * sizeof(Rec);
+  // SPIFFS can't seek past the end of a file: grow it with empty records
+  // up to this slot first.
+  size_t size = f.size();
+  bool ok = true;
+  if (at > size) {
+    static const uint8_t zeros[64] = {};
+    ok = f.seek(size);
+    for (size_t left = at - size; ok && left;) {
+      size_t n = left < sizeof zeros ? left : sizeof zeros;
+      ok = f.write(zeros, n) == n;
+      left -= n;
+    }
+  }
+  ok = ok && f.seek(at) && f.write((const uint8_t*)&r, sizeof r) == sizeof r;
   f.close();
   return ok;
 }
