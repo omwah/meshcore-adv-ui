@@ -14,7 +14,10 @@ TOOL = os.path.expanduser("~/.platformio/packages/toolchain-xtensa-esp32s3/bin/x
 
 # env: (max app bytes, max static RAM bytes)
 BUDGETS = {
-    "cardputer_adv": (1_330_000, 135_000),       # stock BLE companion is ~1.25 MB
+    # Raised from 1.33 MB (2026-10-11) after taking the easy savings (no
+    # scanf in our code, Latin-1-only 12x24 font). The Bluedroid BLE library
+    # is most of this image; moving to NimBLE is the next big saving.
+    "cardputer_adv": (1_382_400, 135_000),       # 1350 KB; stock BLE companion is ~1.25 MB
     "cardputer_adv_usb": (720_000, 108_000),     # stock USB companion is ~0.64 MB
 }
 

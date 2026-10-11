@@ -20,7 +20,8 @@ FONTS = [
     ("font_small",  "spleen-5x8.bdf",  "0x20-0x7e,0xa0-0xff"),
     ("font_medium", "spleen-6x12.bdf", COMMON),
     ("font_large",  "spleen-8x16.bdf", COMMON),
-    ("font_xlarge", "spleen-12x24.bdf", "0x20-0x7e,0xa0-0x17f,0x2010-0x2027"),
+    # Large text only: ASCII + Latin-1 (Latin Extended-A would cost ~6.6 KB).
+    ("font_xlarge", "spleen-12x24.bdf", "0x20-0x7e,0xa0-0xff,0x2010-0x2027"),
 ]
 
 

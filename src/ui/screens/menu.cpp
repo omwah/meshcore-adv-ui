@@ -3,6 +3,7 @@
 #include "ui/widgets.h"
 #include "ui/tz.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace ui { namespace screens {
@@ -307,8 +308,11 @@ protected:
       char cur[16];
       snprintf(cur, sizeof cur, "%.3f", _r.freqMHz);
       a.prompt("Frequency MHz", cur, 10, [](App& app, int) {
-        float f = 0;
-        if (sscanf(app.promptText(), "%f", &f) == 1 && f > 100 && f < 2600) {
+        // strtod rather than sscanf: MeshCore already links strtod, and no
+        // scanf saves ~17 KB of flash.
+        char* end = nullptr;
+        float f = (float)strtod(app.promptText(), &end);
+        if (end != app.promptText() && f > 100 && f < 2600) {
           s_radioSetFreq(f);
         } else {
           app.toast("Invalid frequency", C_ERR);

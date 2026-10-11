@@ -43,8 +43,9 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     d.backlightRaw(!strcmp(c + 3, "gpio") ? -1 : atoi(c + 3));
     Serial.println("ok");
   } else if (!strncmp(c, "blf ", 4)) {
-    unsigned hz = 0, duty = 128;
-    sscanf(c + 4, "%u %u", &hz, &duty);
+    char* p = nullptr;
+    unsigned hz = (unsigned)strtoul(c + 4, &p, 10);
+    unsigned duty = *p ? (unsigned)strtoul(p, nullptr, 10) : 128;
     d.backlightPwm(hz, (uint8_t)duty);
     Serial.println("ok");
   } else if (!strncmp(c, "fill ", 5)) {
@@ -67,8 +68,9 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     for (int i = 0; i < 240 / 2 * 135; i++) Serial.printf("%02x", fb[i]);
     Serial.println();
   } else if (!strncmp(c, "key ", 4)) {
-    int r = -1, col = -1;
-    sscanf(c + 4, "%d %d", &r, &col);
+    char* p = nullptr;
+    int r = (int)strtol(c + 4, &p, 10);
+    int col = (int)strtol(p, nullptr, 10);
     k.inject(r, col, true);
     k.inject(r, col, false);
     Serial.println("ok");
