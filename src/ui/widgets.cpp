@@ -41,8 +41,6 @@ bool ListNav::key(const Key& k, int count, int visible) {
 
 // ---------------------------------------------------------------- MenuScreen
 
-static const int ROW_H = 16;
-
 void MenuScreen::onEnter(App& app) {
   if (!_fresh) return;   // returning from a child screen: keep the cursor
   _fresh = false;
@@ -62,12 +60,15 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
   int hh = drawHead(app, c, r);
   r.y += hh;
   r.h -= hh;
+  const int RH = app.mx().menuRow;
   int n = count(app);
-  int vis = r.h / ROW_H;
+  int vis = r.h / RH;
   if (vis < 1) vis = 1;
   _vis = vis;
   _nav.clamp(n, vis);
   const mc_font_t* f = app.fMed();
+  const mc_font_t* sm = app.fSmall();
+  const int ty = (RH - f->height) / 2, iy = (RH - 8) / 2;
   for (int row = 0; row < vis && _nav.top + row < n; row++) {
     int i = _nav.top + row;
     MenuItem it;
@@ -75,29 +76,34 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
     it.enabled = true;
     it.valueCol = C_ACCENT;
     item(app, i, it);
-    int y = r.y + row * ROW_H;
+    int y = r.y + row * RH;
     if (it.header) {
-      c.text(r.x + 4, y + 3, it.label, app.fSmall(), C_ACCENT);
-      c.hline(r.x + 6 + Canvas::textWidth(it.label, app.fSmall()), y + 7, r.w - 12 - Canvas::textWidth(it.label, app.fSmall()), C_DIM);
+      int lw = Canvas::textWidth(it.label, sm);
+      c.text(r.x + 4, y + (RH - sm->height) / 2, it.label, sm, C_ACCENT);
+      c.hline(r.x + 6 + lw, y + RH / 2, r.w - 12 - lw, C_DIM);
       continue;
     }
     bool sel = i == _nav.sel;
     if (sel) {
-      c.fillRect(r.x, y, r.w - 3, ROW_H, C_SEL);
-      c.fillRect(r.x, y, 2, ROW_H, C_ACCENT);
+      c.fillRect(r.x, y, r.w - 3, RH, C_SEL);
+      c.fillRect(r.x, y, 2, RH, C_ACCENT);
     } else if (row & 1) {
-      c.fillRect(r.x, y, r.w - 3, ROW_H, C_ZEBRA);
+      c.fillRect(r.x, y, r.w - 3, RH, C_ZEBRA);
     }
     uint8_t fg = it.enabled ? C_TEXT : C_DIM;
+    // The label keeps at least a third of the row; a long value is cut.
+    int lw = Canvas::textWidth(it.label, f);
+    int vmax = r.w - 26 - (lw < r.w / 3 ? lw : r.w / 3);
     int vw = it.value[0] ? Canvas::textWidth(it.value, f) : 0;
-    c.text(r.x + 6, y + 2, it.label, f, fg, -1, r.w - 16 - vw);
+    if (vw > vmax) vw = vmax;
+    app.fitText(c, r.x + 6, y + ty, it.label, f, fg, r.w - 18 - vw - (vw ? 10 : 0), sel);
     if (vw) {
       int vx = r.x + r.w - 8 - vw;
       if (sel && it.enabled && it.choice) {
         // Show that Left/Right change this value.
-        c.bitmap(vx - 9, y + 4, icon::arrowL, 8, 8, C_DIM);
+        c.bitmap(vx - 9, y + iy, icon::arrowL, 8, 8, C_DIM);
       }
-      c.text(vx, y + 2, it.value, f, it.enabled ? it.valueCol : C_DIM);
+      app.fitText(c, vx, y + ty, it.value, f, it.enabled ? it.valueCol : C_DIM, vw, sel);
     }
   }
   drawScrollbar(c, r, n, _nav.top, vis);

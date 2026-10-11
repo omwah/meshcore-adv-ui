@@ -38,6 +38,10 @@ public:
   // Bytes of `s` that fit in `maxw` pixels without breaking a UTF-8 sequence.
   static int fitBytes(const char* s, const mc_font_t* f, int maxw);
 
+  // Text shifted left by `offset` pixels and cut to [x, x+maxw): one frame of
+  // a marquee.
+  void textScrolled(int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, int offset);
+
   // Limit drawing to a rectangle (for scrolling regions).
   void clip(int x, int y, int w, int h);
   void noClip() { clip(0, 0, W, H); }

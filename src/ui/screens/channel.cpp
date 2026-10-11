@@ -19,7 +19,8 @@ public:
   int scroll = 0;
   const char* title(App&) override { return title_; }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    struct Ctx { Canvas* c; const mc_font_t* f; int x, y, first, rows; } ctx{&c, a.fMed(), r.x + 4, r.y + 2, scroll, (r.h - 2) / 12};
+    const int lh = a.fMed()->height;
+    struct Ctx { Canvas* c; const mc_font_t* f; int x, y, first, rows, lh; } ctx{&c, a.fMed(), r.x + 4, r.y + 2, scroll, (r.h - 2) / lh, lh};
     _lines = wrapText(body, a.fMed(), r.w - 10, [](void* p, const char* s, int len, int line) {
       Ctx* x = (Ctx*)p;
       int row = line - x->first;
@@ -28,7 +29,7 @@ public:
       if (len > 63) len = 63;
       memcpy(tmp, s, len);
       tmp[len] = 0;
-      x->c->text(x->x, x->y + row * 12, tmp, x->f, C_TEXT);
+      x->c->text(x->x, x->y + row * x->lh, tmp, x->f, C_TEXT);
     }, &ctx);
     _rows = ctx.rows;
     drawScrollbar(c, r, _lines, scroll, _rows);
@@ -76,16 +77,18 @@ protected:
   int drawHead(App& a, Canvas& c, const Rect& r) override {
     model::Channel ch;
     if (findChannel(a, chIdx, ch) < 0) return 0;
-    c.fillRect(r.x, r.y, r.w, 20, C_ZEBRA);
-    c.fillRect(r.x, r.y, 3, 20, C_CHAN);
-    c.bitmap(r.x + 6, r.y + 2, ch.hashtag ? icon::hash : icon::lock, 8, 8, C_CHAN);
+    const mc_font_t* s = a.fSmall();
+    const int lh = s->height + 1, h = 2 * lh + 4;
+    c.fillRect(r.x, r.y, r.w, h, C_ZEBRA);
+    c.fillRect(r.x, r.y, 3, h, C_CHAN);
+    c.bitmap(r.x + 6, r.y + 2 + (s->height - 8) / 2, ch.hashtag ? icon::hash : icon::lock, 8, 8, C_CHAN);
     char l[48];
     snprintf(l, sizeof l, "slot %u  %s", ch.idx, ch.hashtag ? "public hashtag" : "private key");
-    c.text(r.x + 18, r.y + 3, l, a.fSmall(), C_DIM);
-    c.text(r.x + 6, r.y + 11, ch.hashtag ? "anyone who joins the same #name can read"
-                                         : "only holders of the key can read",
-           a.fSmall(), C_DIM);
-    return 22;
+    c.text(r.x + 18, r.y + 2, l, s, C_DIM, -1, r.w - 22);
+    c.text(r.x + 6, r.y + 2 + lh, ch.hashtag ? "anyone who joins the same #name can read"
+                                             : "only holders of the key can read",
+           s, C_DIM, -1, r.w - 10);
+    return h + 2;
   }
 
   int count(App&) override { return CH_N; }

@@ -22,6 +22,21 @@ struct Rect {
   int x, y, w, h;
 };
 
+// Sizes derived from the text-size setting: every screen lays out from these
+// instead of fixed pixel values.
+struct Metrics {
+  const mc_font_t* small;    // footer hints, meta lines, small labels
+  const mc_font_t* med;      // header, menus, previews
+  const mc_font_t* list;     // list item names
+  const mc_font_t* body;     // message text
+  int head, foot;            // header and footer bar heights
+  int tab;                   // tab strip
+  int row;                   // single-line list row
+  int chatRow;               // two-line conversation row
+  int menuRow;               // settings/menu row
+  int meta;                  // message meta line
+};
+
 struct Hint {
   const char* key;    // short key name ("ent", "tab", "<>", "^v", "esc")
   const char* label;
@@ -49,11 +64,9 @@ using Action = void (*)(App& app, int arg);
 
 class App {
 public:
-  static constexpr int HEAD_H = 13;
-  static constexpr int FOOT_H = 10;
   static constexpr int MAX_DEPTH = 8;
 
-  App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k) : _m(m), _d(d), _k(k) {}
+  App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k);
 
   void begin(Screen* root);
   // Run one iteration: read keys, update, redraw if needed. Returns the
@@ -76,6 +89,10 @@ public:
   const char* promptText() const;
 
   void invalidate() { _dirty = true; }
+  // Draw text in `maxw` pixels: as is if it fits, cut with an ellipsis if it
+  // doesn't, or, with `scroll` (the selected row, titles), as a marquee that
+  // pauses, slides to show the end, pauses and starts again.
+  int fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, bool scroll);
   bool asleep() const { return _asleep; }
   void wake();
   void applyPrefs();               // theme, lockout, brightness from model prefs
@@ -86,10 +103,11 @@ public:
   uint32_t nowMs() const { return _now; }
   const Theme& theme() const { return kThemes[_theme]; }
 
-  const mc_font_t* fList() const { return &font_large; }
-  const mc_font_t* fBody() const { return _m.prefs().largeText ? &font_large : &font_medium; }
-  const mc_font_t* fSmall() const { return &font_small; }
-  const mc_font_t* fMed() const { return &font_medium; }
+  const Metrics& mx() const { return *_mx; }
+  const mc_font_t* fList() const { return _mx->list; }
+  const mc_font_t* fBody() const { return _mx->body; }
+  const mc_font_t* fSmall() const { return _mx->small; }
+  const mc_font_t* fMed() const { return _mx->med; }
 
   Rect content() const;
 
@@ -107,6 +125,7 @@ private:
   Screen* _stack[MAX_DEPTH] = {};
   int _depth = 0;
   uint8_t _theme = 0;
+  const Metrics* _mx;
   bool _dirty = true, _forceFlush = true;
   uint32_t _now = 0, _lastRev = 0, _lastMinute = 0;
   char _toast[48] = {};
@@ -115,6 +134,8 @@ private:
   uint32_t _lastInput = 0;
   uint16_t _lastUnread = 0;
   bool _asleep = false;
+  uint32_t _marqueeStart = 0;   // restarts on every key, so a new selection starts at its beginning
+  bool _animating = false;       // a marquee is moving: keep redrawing
 };
 
 // Shared drawing helpers.

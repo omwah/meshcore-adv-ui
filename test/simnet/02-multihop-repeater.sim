@@ -23,8 +23,8 @@ expect status delivered
 shot hop-dm
 key tab
 shot hop-contact-detail
-# Message, Favourite, Reset path, Trace route (Admin is disabled for people)
-key down 3
+# Message, Details, Favourite, Reset path, Trace route (Admin is disabled for people)
+key down 4
 key enter
 wait 4000
 shot hop-trace

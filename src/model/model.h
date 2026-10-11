@@ -134,7 +134,7 @@ struct Prefs {
   uint16_t screenTimeoutS;        // 0 = never
   uint16_t inputLockoutMs;
   bool sound;
-  bool largeText;
+  uint8_t textSize;               // 0 small, 1 medium, 2 large
   bool gpsEnabled;
   bool gpsShareInAdvert;
   bool gpsTimeSyncAtBoot;

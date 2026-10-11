@@ -92,6 +92,12 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
       char path[400];
       snprintf(path, sizeof path, "%s/%s.ppm", out, arg);
       if (!disp.writePpm(path)) { perror(path); return 1; }
+    } else if (!strcmp(cmd, "textsize")) {
+      model::Prefs pr = app.m().prefs();
+      pr.textSize = (uint8_t)atoi(arg);
+      app.m().setPrefs(pr);
+      app.applyPrefs();
+      c.advance(now + 20);
     } else if (!strcmp(cmd, "theme")) {
       model::Prefs pr = app.m().prefs();
       pr.theme = (uint8_t)atoi(arg);

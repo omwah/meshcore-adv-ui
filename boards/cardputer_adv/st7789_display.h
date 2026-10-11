@@ -14,6 +14,9 @@ public:
   void pushRows(int y, int h, const uint16_t* px) override;
   void setBacklight(uint8_t level) override;
   void sleep(bool on) override;
+  void backlightRaw(int level);   // diagnostics: <0 = plain GPIO high, else PWM duty
+  void backlightPwm(uint32_t hz, uint8_t duty);   // diagnostics: try a PWM frequency
+  void reinit() { _ready = false; begin(); }
 
 private:
   void cmd(uint8_t c);

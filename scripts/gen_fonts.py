@@ -20,6 +20,7 @@ FONTS = [
     ("font_small",  "spleen-5x8.bdf",  "0x20-0x7e,0xa0-0xff"),
     ("font_medium", "spleen-6x12.bdf", COMMON),
     ("font_large",  "spleen-8x16.bdf", COMMON),
+    ("font_xlarge", "spleen-12x24.bdf", "0x20-0x7e,0xa0-0x17f,0x2010-0x2027"),
 ]
 
 

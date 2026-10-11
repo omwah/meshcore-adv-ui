@@ -20,7 +20,7 @@ void fmtPos(char* out, size_t n, int32_t lat, int32_t lon) {
 
 // ------------------------------------------------------------- contact
 
-enum CItem { CI_MESSAGE, CI_ADMIN, CI_FAV, CI_PATH, CI_TRACE, CI_PING, CI_REMOVE, CI_N };
+enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_PATH, CI_TRACE, CI_PING, CI_REMOVE, CI_N };
 
 class ContactScreen : public MenuScreen {
 public:
@@ -55,43 +55,55 @@ public:
   }
 
 protected:
+  // The contact's facts as lines, most important first.
+  static int factLines(App& a, const model::Contact& ct, char out[][64]) {
+    static const char* const kTypes[] = {"node", "chat", "repeater", "room", "sensor"};
+    char key[16], ago[8], snr[8];
+    int n = 0;
+    fmtKey(key, sizeof key, ct.key, 4);
+    snprintf(out[n++], 64, "%s  %s", kTypes[(int)ct.type <= 4 ? (int)ct.type : 0], key);
+    if (ct.hops < 0) snprintf(out[n++], 64, "path: unknown (flood)");
+    else if (ct.hops == 0) snprintf(out[n++], 64, "path: direct");
+    else {
+      int o = snprintf(out[n], 64, "path: %d hop%s ", ct.hops, ct.hops == 1 ? "" : "s");
+      for (int i = 0; i < ct.pathLen && i < 6 && o < 60; i++) o += snprintf(out[n] + o, 64 - o, "%s%02X", i ? ">" : "", ct.path[i]);
+      n++;
+    }
+    fmtAgo(ago, sizeof ago, a.m().now(), ct.lastHeard);
+    fmtSnr(snr, sizeof snr, ct.snr_x4);
+    if (ct.snr_x4 == INT8_MIN) snprintf(out[n++], 64, "heard %s ago, not directly", ago);
+    else snprintf(out[n++], 64, "heard %s ago  snr %s  rssi %d", ago, snr, ct.rssi);
+    if (ct.hasPos) fmtPos(out[n++], 64, ct.lat_e6, ct.lon_e6);
+    else snprintf(out[n++], 64, "no position");
+    return n;
+  }
+
+  // As many facts as fit in half the screen; Details shows them all.
   int drawHead(App& a, Canvas& c, const Rect& r) override {
     model::Contact ct;
     if (!a.m().contact(idx, ct)) return 0;
     const mc_font_t* s = a.fSmall();
+    const int lh = s->height + 1;
+    char lines[4][64];
+    int n = factLines(a, ct, lines);
+    int fit = (r.h / 2 - 4) / lh;
+    if (n > fit) n = fit < 1 ? 1 : fit;
+    int h = n * lh + 4;
     uint8_t col = typeColor(ct.type);
-    int y = r.y + 2;
-    c.fillRect(r.x, r.y, r.w, 41, C_ZEBRA);
-    c.fillRect(r.x, r.y, 3, 41, col);
-    c.bitmap(r.x + 6, y, typeIcon(ct.type), 8, 8, col);
-    static const char* const kTypes[] = {"node", "chat", "repeater", "room", "sensor"};
-    char line[64], key[16], ago[8];
-    fmtKey(key, sizeof key, ct.key, 4);
-    snprintf(line, sizeof line, "%s  %s", kTypes[(int)ct.type <= 4 ? (int)ct.type : 0], key);
-    c.text(r.x + 18, y + 1, line, s, C_DIM);
-    // Path / hops.
-    if (ct.hops < 0) snprintf(line, sizeof line, "path: unknown (flood)");
-    else if (ct.hops == 0) snprintf(line, sizeof line, "path: direct");
-    else {
-      int o = snprintf(line, sizeof line, "path: %d hop%s ", ct.hops, ct.hops == 1 ? "" : "s");
-      for (int i = 0; i < ct.pathLen && i < 6 && o < (int)sizeof line - 4; i++)
-        o += snprintf(line + o, sizeof line - o, "%s%02X", i ? ">" : "", ct.path[i]);
+    c.fillRect(r.x, r.y, r.w, h, C_ZEBRA);
+    c.fillRect(r.x, r.y, 3, h, col);
+    for (int i = 0; i < n; i++) {
+      int y = r.y + 2 + i * lh;
+      int x = r.x + 6;
+      if (i == 0) {
+        c.bitmap(x, y + (s->height - 8) / 2, typeIcon(ct.type), 8, 8, col);
+        x += 12;
+        drawSignal(c, r.x + r.w - 14, y + (s->height - 8) / 2, ct.snr_x4);
+      }
+      uint8_t fg = i == 0 ? C_DIM : (i == 1 && ct.hops < 0) ? C_WARN : i == 3 ? C_DIM : C_TEXT;
+      c.text(x, y, lines[i], s, fg, -1, r.x + r.w - x - (i == 0 ? 18 : 4));
     }
-    c.text(r.x + 6, y + 10, line, s, ct.hops < 0 ? C_WARN : C_TEXT);
-    fmtAgo(ago, sizeof ago, a.m().now(), ct.lastHeard);
-    char snr[8];
-    fmtSnr(snr, sizeof snr, ct.snr_x4);
-    if (ct.snr_x4 == INT8_MIN) snprintf(line, sizeof line, "heard %s ago  (not heard directly)", ago);
-    else snprintf(line, sizeof line, "heard %s ago  snr %s  rssi %d", ago, snr, ct.rssi);
-    c.text(r.x + 6, y + 19, line, s, C_TEXT);
-    drawSignal(c, r.x + r.w - 14, y, ct.snr_x4);
-    if (ct.hasPos) {
-      fmtPos(line, sizeof line, ct.lat_e6, ct.lon_e6);
-      c.text(r.x + 6, y + 28, line, s, C_DIM);
-    } else {
-      c.text(r.x + 6, y + 28, "no position", s, C_DIM);
-    }
-    return 43;
+    return h + 2;
   }
 
   int count(App&) override { return CI_N; }
@@ -103,6 +115,7 @@ protected:
     switch (i) {
       case CI_MESSAGE: it.label = ct.type == model::NodeType::Room ? "Open room" : "Message"; it.enabled = ct.type != model::NodeType::Repeater && ct.type != model::NodeType::Sensor; break;
       case CI_ADMIN: it.label = "Admin / status"; it.enabled = admin; break;
+      case CI_DETAILS: it.label = "Details"; break;
       case CI_FAV: it.label = "Favourite"; it.choice = true; snprintf(it.value, sizeof it.value, ct.favourite ? "yes" : "no"); it.valueCol = ct.favourite ? C_WARN : C_DIM; break;
       case CI_PATH: it.label = "Reset path"; it.enabled = ct.hops >= 0; break;
       case CI_TRACE: it.label = "Trace route"; break;
@@ -116,6 +129,16 @@ protected:
     switch (i) {
       case CI_MESSAGE: openThread(a, {model::ThreadKind::Direct, (uint16_t)idx}); break;
       case CI_ADMIN: openAdmin(a, idx); break;
+      case CI_DETAILS: {
+        static char body[300];
+        model::Contact ct;
+        if (!a.m().contact(idx, ct)) break;
+        char lines[4][64];
+        int n = factLines(a, ct, lines), o = snprintf(body, sizeof body, "%s\n", ct.name);
+        for (int k = 0; k < n; k++) o += snprintf(body + o, sizeof body - o, "%s\n", lines[k]);
+        openText(a, "Details", body);
+        break;
+      }
       case CI_FAV: adjust(a, i, 1); break;
       case CI_PATH:
         a.m().resetPath(idx);
@@ -179,7 +202,7 @@ public:
         _loggedIn = true;
         a.toast(a.m().requestText(), C_OK);
       } else if (p == AI_STATS) {
-        _showStats = true;
+        showStats(a);
       } else if (p == AI_NEIGH) {
         showNeighbours(a);
       } else {
@@ -189,33 +212,9 @@ public:
     return true;
   }
 
-  void reset() { _loggedIn = false; _showStats = false; _pending = -1; }
+  void reset() { _loggedIn = false; _pending = -1; }
 
 protected:
-  int drawHead(App& a, Canvas& c, const Rect& r) override {
-    if (!_showStats) return 0;
-    const model::RemoteStats& s = a.m().remoteStats();
-    if (!s.valid) return 0;
-    const mc_font_t* f = a.fSmall();
-    c.fillRect(r.x, r.y, r.w, 46, C_ZEBRA);
-    char l[48], up[12];
-    fmtDur(up, sizeof up, s.uptimeS);
-    snprintf(l, sizeof l, "batt %u.%02uV  up %s  queue %u", s.battMv / 1000, (s.battMv % 1000) / 10, up, s.queueLen);
-    c.text(r.x + 4, r.y + 2, l, f, C_TEXT);
-    char snr[8];
-    fmtSnr(snr, sizeof snr, s.lastSnr_x4);
-    snprintf(l, sizeof l, "noise %d  rssi %d  snr %s", s.noiseFloor, s.lastRssi, snr);
-    c.text(r.x + 4, r.y + 11, l, f, C_TEXT);
-    snprintf(l, sizeof l, "rx %lu  tx %lu  air tx %lus rx %lus", (unsigned long)s.rxPackets, (unsigned long)s.txPackets,
-             (unsigned long)s.airTxS, (unsigned long)s.airRxS);
-    c.text(r.x + 4, r.y + 20, l, f, C_TEXT);
-    snprintf(l, sizeof l, "sent flood %lu direct %lu", (unsigned long)s.floodsSent, (unsigned long)s.directSent);
-    c.text(r.x + 4, r.y + 29, l, f, C_DIM);
-    snprintf(l, sizeof l, "dups flood %lu direct %lu", (unsigned long)s.dupsFlood, (unsigned long)s.dupsDirect);
-    c.text(r.x + 4, r.y + 38, l, f, C_DIM);
-    return 47;
-  }
-
   int count(App&) override { return AI_N; }
 
   void item(App& a, int i, MenuItem& it) override {
@@ -260,6 +259,23 @@ public:
   void setPending(int p) { _pending = p; }
 
 private:
+  void showStats(App& a) {
+    static char body[400];
+    const model::RemoteStats& s = a.m().remoteStats();
+    char up[12], snr[8];
+    fmtDur(up, sizeof up, s.uptimeS);
+    fmtSnr(snr, sizeof snr, s.lastSnr_x4);
+    snprintf(body, sizeof body,
+             "Battery %u.%02u V\nUp %s\nQueue %u\nNoise floor %d dBm\nLast RSSI %d, SNR %s\n"
+             "Received %lu, sent %lu\nAirtime tx %lus, rx %lus\nSent flood %lu, direct %lu\n"
+             "Duplicates flood %lu, direct %lu",
+             s.battMv / 1000, (s.battMv % 1000) / 10, up, s.queueLen, s.noiseFloor, s.lastRssi, snr,
+             (unsigned long)s.rxPackets, (unsigned long)s.txPackets, (unsigned long)s.airTxS, (unsigned long)s.airRxS,
+             (unsigned long)s.floodsSent, (unsigned long)s.directSent, (unsigned long)s.dupsFlood,
+             (unsigned long)s.dupsDirect);
+    openText(a, "Repeater status", body);
+  }
+
   void showNeighbours(App& a) {
     static char body[600];
     int o = 0, n = a.m().neighbourCount();
@@ -277,7 +293,7 @@ private:
   }
 
   char _title[model::NAME_LEN + 8];
-  bool _loggedIn = false, _showStats = false;
+  bool _loggedIn = false;
   int _pending = -1;
   model::Req _last = model::Req::Idle;
 };

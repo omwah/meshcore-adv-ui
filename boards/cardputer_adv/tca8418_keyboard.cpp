@@ -58,6 +58,11 @@ void Tca8418Keyboard::drain() {
   wr(REG_INT_STAT, 0x01);
 }
 
+void Tca8418Keyboard::inject(int row, int col, bool down) {
+  kbd_report_t r;
+  if (cardputer_keymap_event(&_st, row, col, down, &r)) _diff.update(r);
+}
+
 bool Tca8418Keyboard::poll(hal::KeyEvent& ev) {
   if (_diff.next(ev)) return true;
   if (!_ok) return false;

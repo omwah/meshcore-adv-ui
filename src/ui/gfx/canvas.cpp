@@ -156,6 +156,21 @@ int Canvas::text(int x, int y, const char* s, const mc_font_t* f, uint8_t fg, in
   return cx;
 }
 
+void Canvas::textScrolled(int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, int offset) {
+  int c0 = _cx0, c1 = _cx1, r0 = _cy0, r1 = _cy1;
+  // Intersect with the current clip, draw, restore.
+  _cx0 = x > c0 ? x : c0;
+  _cx1 = x + maxw < c1 ? x + maxw : c1;
+  int cx = x - offset;
+  while (*s) {
+    uint32_t cp = utf8Next(&s);
+    if (cx + f->width > _cx0 && cx < _cx1) drawGlyph(*this, cx, y, f, cp, fg);
+    cx += f->width;
+    if (cx >= _cx1) break;
+  }
+  _cx0 = c0; _cx1 = c1; _cy0 = r0; _cy1 = r1;
+}
+
 void Canvas::flush(hal::Display& d, const uint16_t palette[16], bool force) {
   uint16_t pal[16];
   for (int i = 0; i < 16; i++)

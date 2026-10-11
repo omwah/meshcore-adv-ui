@@ -22,9 +22,10 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIM = os.path.join(ROOT, ".pio", "build", "sim", "program")
 THEMES = ["Midnight", "Amber", "Phosphor", "Contrast", "Daylight", "Ocean"]
+SIZES = ["small", "medium", "large"]
 
 
-def run(scenario, theme, outdir):
+def run(scenario, theme, outdir, size=1):
     os.makedirs(outdir, exist_ok=True)
     with open(scenario) as f:
         body = f.read()
@@ -32,7 +33,7 @@ def run(scenario, theme, outdir):
     lines = body.splitlines()
     head = [l for l in lines if l.strip() in ("fresh", "empty")]
     rest = [l for l in lines if l.strip() not in ("fresh", "empty")]
-    script = "\n".join(head + [f"theme {theme}"] + rest) + "\n"
+    script = "\n".join(head + [f"theme {theme}", f"textsize {size}"] + rest) + "\n"
     with tempfile.TemporaryDirectory() as tmp:
         env = dict(os.environ, ASAN_OPTIONS="detect_leaks=0")
         r = subprocess.run([SIM, "-o", tmp], input=script, text=True, capture_output=True, env=env)
@@ -54,6 +55,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("scenarios", nargs="*", help="scenario names (default: all)")
     ap.add_argument("--themes", default="0", help="comma list of theme numbers, or 'all'")
+    ap.add_argument("--sizes", default="1", help="comma list of text sizes (0 small, 1 medium, 2 large), or 'all'")
     ap.add_argument("--out", default=os.path.join(ROOT, "shots"))
     a = ap.parse_args()
 
@@ -61,15 +63,18 @@ def main():
     if a.scenarios:
         files = [f for f in files if os.path.splitext(os.path.basename(f))[0] in a.scenarios]
     themes = range(len(THEMES)) if a.themes == "all" else [int(t) for t in a.themes.split(",")]
+    sizes = range(3) if a.sizes == "all" else [int(z) for z in a.sizes.split(",")]
 
     sections = []
     for f in files:
         sc = os.path.splitext(os.path.basename(f))[0]
         for t in themes:
-            d = os.path.join(a.out, sc, THEMES[t])
-            names = run(f, t, d)
-            sections.append((sc, THEMES[t], [os.path.relpath(os.path.join(d, n + ".png"), a.out) for n in names]))
-            print(f"{sc} / {THEMES[t]}: {len(names)} shots")
+            for z in sizes:
+                label = THEMES[t] if len(sizes) == 1 else f"{THEMES[t]}-{SIZES[z]}"
+                d = os.path.join(a.out, sc, label)
+                names = run(f, t, d, z)
+                sections.append((sc, label, [os.path.relpath(os.path.join(d, n + ".png"), a.out) for n in names]))
+                print(f"{sc} / {label}: {len(names)} shots")
 
     with open(os.path.join(a.out, "index.html"), "w") as o:
         o.write("<!doctype html><meta charset=utf-8><title>UI shots</title>"

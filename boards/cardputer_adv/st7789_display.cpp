@@ -56,7 +56,9 @@ bool St7789Display::begin() {
   cmd(0x13);   // NORON
   cmd(0x29);   // DISPON
 
-  ledcSetup(BL_CHANNEL, 5000, 8);
+  // The backlight driver only dims correctly at a low PWM rate: at 5 kHz it
+  // stays dark (found on hardware); 256 Hz works.
+  ledcSetup(BL_CHANNEL, 256, 8);
   ledcAttachPin(PIN_TFT_BL, BL_CHANNEL);
   _ready = true;
   return true;
@@ -69,6 +71,24 @@ void St7789Display::pushRows(int y, int h, const uint16_t* px) {
 
 void St7789Display::setBacklight(uint8_t level) {
   ledcWrite(BL_CHANNEL, level);
+}
+
+void St7789Display::backlightRaw(int level) {
+  if (level < 0) {
+    ledcDetachPin(PIN_TFT_BL);
+    pinMode(PIN_TFT_BL, OUTPUT);
+    digitalWrite(PIN_TFT_BL, HIGH);
+  } else {
+    ledcAttachPin(PIN_TFT_BL, BL_CHANNEL);
+    ledcWrite(BL_CHANNEL, level);
+  }
+}
+
+void St7789Display::backlightPwm(uint32_t hz, uint8_t duty) {
+  ledcDetachPin(PIN_TFT_BL);
+  ledcSetup(BL_CHANNEL, hz, 8);
+  ledcAttachPin(PIN_TFT_BL, BL_CHANNEL);
+  ledcWrite(BL_CHANNEL, duty);
 }
 
 void St7789Display::sleep(bool on) {

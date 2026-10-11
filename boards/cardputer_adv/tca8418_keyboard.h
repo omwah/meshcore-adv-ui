@@ -15,6 +15,8 @@ public:
   bool poll(hal::KeyEvent& ev) override;
   void setTextMode(bool on) override { cardputer_keymap_text_mode(&_st, on); }
   bool present() const { return _ok; }
+  // Feed a matrix event as if the key were pressed (bring-up diagnostics).
+  void inject(int row, int col, bool down);
 
 private:
   void drain();

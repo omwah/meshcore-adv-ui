@@ -2,6 +2,7 @@
 #include "ui/screens/screens.h"
 #include "ui/widgets.h"
 #include "ui/icons.h"
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -9,110 +10,102 @@ namespace ui { namespace screens {
 
 namespace {
 
-// Horizontal meter: label left, bar, value right.
-void meter(App& a, Canvas& c, int x, int y, int w, const char* label, const char* value,
-           int num, int lo, int hi, uint8_t col) {
-  const mc_font_t* f = a.fSmall();
-  c.text(x, y, label, f, C_DIM);
-  int bx = x + 42, bw = w - 42 - 44;
-  c.fillRect(bx, y + 1, bw, 6, C_ZEBRA);
-  int v = num < lo ? lo : num > hi ? hi : num;
-  int fw = hi > lo ? (v - lo) * bw / (hi - lo) : 0;
-  c.fillRect(bx, y + 1, fw, 6, col);
-  c.text(x + w - Canvas::textWidth(value, f), y, value, f, C_TEXT);
-}
-
-void kv(App& a, Canvas& c, int x, int y, const char* k, const char* v, uint8_t col = C_TEXT) {
-  c.text(x, y, k, a.fSmall(), C_DIM);
-  c.text(x + 8 * 5 + 2, y, v, a.fSmall(), col);
-}
-
 // ------------------------------------------------------------- diagnostics
+//
+// Built as a list of items (meters and label/value pairs) that is laid out
+// into rows for the current text size and split into pages, so every size
+// shows everything: small fits it on two pages, larger sizes use more.
+
+struct DiagItem {
+  enum Kind : uint8_t { Meter, Pair, Line, Break } kind;
+  const char* label;
+  char value[28];
+  int num, lo, hi;
+  uint8_t col;
+};
 
 class DiagScreen : public Screen {
 public:
-  const char* title(App&) override { return _page == 0 ? "Diagnostics: radio" : "Diagnostics: system"; }
-  bool tick(App& a, uint32_t now) override {
-    (void)a;
+  const char* title(App& a) override {
+    // The header is drawn before the page: lay out once to know the count.
+    _pages = layout(a, a.content(), nullptr);
+    if (_page >= _pages) _page = _pages - 1;
+    snprintf(_title, sizeof _title, "Diagnostics %d/%d", _page + 1, _pages);
+    return _title;
+  }
+  bool tick(App&, uint32_t now) override {
     if (now - _last >= 1000) { _last = now; return true; }
     return false;
   }
-  void draw(App& a, Canvas& c, const Rect& r) override {
-    model::Diag d = a.m().diag();
-    int x = r.x + 4, w = r.w - 8, y = r.y + 3;
-    char v[24], v2[24];
-    // Page dots.
-    for (int p = 0; p < 2; p++) c.fillRect(r.x + r.w - 14 + p * 6, r.y + r.h - 5, 4, 3, p == _page ? C_ACCENT : C_ZEBRA);
+  void draw(App& a, Canvas& c, const Rect& r) override { _pages = layout(a, r, &c); }
 
-    if (_page == 0) {
-      snprintf(v, sizeof v, "%d dBm", d.noiseFloor);
-      meter(a, c, x, y, w, "noise", v, d.noiseFloor, -130, -80, d.noiseFloor > -95 ? C_ERR : d.noiseFloor > -110 ? C_WARN : C_OK);
-      y += 11;
-      snprintf(v, sizeof v, "%d dBm", d.lastRssi);
-      meter(a, c, x, y, w, "rssi", v, d.lastRssi, -130, -40, d.lastRssi > -100 ? C_OK : d.lastRssi > -115 ? C_WARN : C_ERR);
-      y += 11;
-      fmtSnr(v2, sizeof v2, d.lastSnr_x4);
-      snprintf(v, sizeof v, "%s dB", v2);
-      meter(a, c, x, y, w, "snr", v, d.lastSnr_x4, -20 * 4, 12 * 4, snrColor(d.lastSnr_x4));
-      y += 11;
-      snprintf(v, sizeof v, "%u%%", d.dutyPct);
-      meter(a, c, x, y, w, "duty", v, d.dutyPct, 0, 10, d.dutyPct >= 10 ? C_ERR : d.dutyPct >= 5 ? C_WARN : C_OK);
-      y += 13;
-      c.hline(x, y - 2, w, C_ZEBRA);
-      int cx = x + w / 2;
-      snprintf(v, sizeof v, "%lu", (unsigned long)d.rxPackets); kv(a, c, x, y, "rx", v);
-      snprintf(v, sizeof v, "%lu", (unsigned long)d.txPackets); kv(a, c, cx, y, "tx", v);
-      y += 9;
-      snprintf(v, sizeof v, "%lu/%lu", (unsigned long)d.rxFlood, (unsigned long)d.rxDirect); kv(a, c, x, y, "rx f/d", v);
-      snprintf(v, sizeof v, "%lu/%lu", (unsigned long)d.txFlood, (unsigned long)d.txDirect); kv(a, c, cx, y, "tx f/d", v);
-      y += 9;
-      snprintf(v, sizeof v, "%lu", (unsigned long)d.dups); kv(a, c, x, y, "dups", v, d.dups ? C_WARN : C_TEXT);
-      snprintf(v, sizeof v, "%lu", (unsigned long)d.rxErrors); kv(a, c, cx, y, "errors", v, d.rxErrors ? C_ERR : C_TEXT);
-      y += 9;
-      fmtDur(v, sizeof v, d.airTxMs / 1000); kv(a, c, x, y, "air tx", v);
-      fmtDur(v, sizeof v, d.airRxMs / 1000); kv(a, c, cx, y, "air rx", v);
-      y += 9;
-      snprintf(v, sizeof v, "%u", d.queueLen); kv(a, c, x, y, "queue", v, d.queueLen > 4 ? C_WARN : C_TEXT);
-      snprintf(v, sizeof v, "%u", d.offlineQueue); kv(a, c, cx, y, "app q", v);
-      y += 9;
-      model::Radio rd = a.m().radio();
-      snprintf(v, sizeof v, "%.3f/%g/SF%u/4:%u %ddBm", rd.freqMHz, rd.bwKHz, rd.sf, rd.cr, rd.txDbm);
-      c.text(x, y + 1, v, a.fSmall(), C_ACCENT);
-    } else {
-      snprintf(v, sizeof v, "%luK", (unsigned long)(d.heapFree / 1024));
-      meter(a, c, x, y, w, "heap", v, (int)(d.heapFree / 1024), 0, 160, d.heapFree < 20000 ? C_ERR : d.heapFree < 40000 ? C_WARN : C_OK);
-      y += 11;
-      snprintf(v, sizeof v, "%luK", (unsigned long)(d.heapMin / 1024));
-      meter(a, c, x, y, w, "min", v, (int)(d.heapMin / 1024), 0, 160, d.heapMin < 15000 ? C_ERR : d.heapMin < 30000 ? C_WARN : C_OK);
-      y += 11;
-      snprintf(v, sizeof v, "%luK", (unsigned long)(d.heapMaxBlock / 1024));
-      meter(a, c, x, y, w, "block", v, (int)(d.heapMaxBlock / 1024), 0, 128, d.heapMaxBlock < 8000 ? C_ERR : C_OK);
-      y += 11;
-      snprintf(v, sizeof v, "%u.%02uV %u%%", d.battMv / 1000, d.battMv % 1000 / 10, d.battPct);
-      meter(a, c, x, y, w, "batt", v, d.battPct, 0, 100, d.charging ? C_OK : d.battPct <= 15 ? C_ERR : d.battPct <= 35 ? C_WARN : C_OK);
-      y += 13;
-      c.hline(x, y - 2, w, C_ZEBRA);
-      int cx = x + w / 2;
-      fmtDur(v, sizeof v, d.uptimeS); kv(a, c, x, y, "uptime", v);
-      kv(a, c, cx, y, "power", d.charging ? "charging" : "battery", d.charging ? C_OK : C_TEXT);
-      y += 9;
-      snprintf(v, sizeof v, "%u/%u", d.contacts, d.contactsMax); kv(a, c, x, y, "contacts", v, d.contacts * 10 >= d.contactsMax * 9 ? C_WARN : C_TEXT);
-      snprintf(v, sizeof v, "%u/%u", d.channels, d.channelsMax); kv(a, c, cx, y, "channels", v);
-      y += 9;
-      snprintf(v, sizeof v, "%s", a.m().bleAvailable() ? (a.m().bleConnected() ? "connected" : a.m().prefs().bleEnabled ? "advertising" : "off") : "not built");
-      kv(a, c, x, y, "ble", v, a.m().bleConnected() ? C_OK : C_TEXT);
-      y += 9;
-      uint8_t k[6];
-      a.m().selfKey(k);
-      snprintf(v, sizeof v, "%02X%02X%02X%02X", k[0], k[1], k[2], k[3]);
-      kv(a, c, x, y, "node id", v, C_ACCENT);
-      y += 9;
-      kv(a, c, x, y, "fw", MC_UI_VERSION, C_DIM);
+  // Lay the items out for this text size; draws the current page when `cp`
+  // is given. Returns the number of pages.
+  int layout(App& a, const Rect& r, Canvas* cp) {
+    int n = build(a);
+    const mc_font_t* f = a.fSmall();
+    const int cw = f->width, lh = f->height + 2;
+    const int x0 = r.x + 4, w = r.w - 8;
+    const int rows = (r.h - 6) / lh;
+    const int pairW = 9 * cw + 9 * cw;               // label + value
+    const int cols = w >= 2 * pairW + 8 ? 2 : 1;
+
+    // Lay items into rows, then rows into pages.
+    struct Cell { int item, col; };
+    static Cell cells[64];
+    static int rowOf[64];
+    int row = 0, colAt = 0, nc = 0;
+    int pageStart[16] = {0}, pages = 1;
+    for (int i = 0; i < n && nc < 64; i++) {
+      const DiagItem& it = _items[i];
+      if (it.kind == DiagItem::Break) {
+        if (colAt) { row++; colAt = 0; }
+        if (row - pageStart[pages - 1] > 0 && pages < 16) pageStart[pages++] = row;
+        continue;
+      }
+      bool full = it.kind != DiagItem::Pair;
+      if (full && colAt) { row++; colAt = 0; }
+      if (row - pageStart[pages - 1] >= rows && pages < 16) pageStart[pages++] = row;
+      cells[nc] = {i, colAt};
+      rowOf[nc++] = row;
+      if (full || ++colAt >= cols) { row++; colAt = 0; }
     }
+    if (!cp) return pages;
+    Canvas& c = *cp;
+    int page = _page < pages ? _page : pages - 1;
+    int first = pageStart[page], last = page + 1 < pages ? pageStart[page + 1] : 1 << 20;
+
+    for (int k = 0; k < nc; k++) {
+      if (rowOf[k] < first || rowOf[k] >= last) continue;
+      const DiagItem& it = _items[cells[k].item];
+      int y = r.y + 3 + (rowOf[k] - first) * lh;
+      if (it.kind == DiagItem::Meter) {
+        int lw = 6 * cw, vw = 9 * cw;
+        c.text(x0, y, it.label, f, C_DIM);
+        int bx = x0 + lw, bw = w - lw - vw - 4;
+        int bh = f->height / 2, by = y + (f->height - bh) / 2;
+        c.fillRect(bx, by, bw, bh, C_ZEBRA);
+        int v = it.num < it.lo ? it.lo : it.num > it.hi ? it.hi : it.num;
+        c.fillRect(bx, by, it.hi > it.lo ? (v - it.lo) * bw / (it.hi - it.lo) : 0, bh, it.col);
+        c.text(x0 + w - Canvas::textWidth(it.value, f), y, it.value, f, C_TEXT);
+      } else if (it.kind == DiagItem::Pair) {
+        int cx = x0 + cells[k].col * (w / cols);
+        c.text(cx, y, it.label, f, C_DIM);
+        c.text(cx + 9 * cw, y, it.value, f, it.col, -1, w / cols - 9 * cw - 2);
+      } else {
+        c.text(x0, y, it.value, f, it.col, -1, w);
+      }
+    }
+    // Page dots.
+    for (int p = 0; p < pages; p++)
+      c.fillRect(r.x + r.w - 6 * pages - 2 + p * 6, r.y + r.h - 4, 4, 3, p == page ? C_ACCENT : C_ZEBRA);
+    return pages;
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == K_ESC) a.pop();
-    else if ((k.code == K_LEFT || k.code == K_RIGHT || k.code == K_TAB) && !k.repeat) _page ^= 1;
+    else if (k.repeat) return;
+    else if ((k.code == K_RIGHT || k.code == K_TAB) && _page + 1 < _pages) _page++;
+    else if (k.code == K_LEFT && _page > 0) _page--;
   }
   const Hint* hints(App&) override {
     static const Hint h[] = {{"<>", "page"}, {"esc", "back"}, {nullptr, nullptr}};
@@ -120,11 +113,85 @@ public:
   }
 
 private:
-  int _page = 0;
+  void meter(int& n, const char* label, int num, int lo, int hi, uint8_t col, const char* fmt, ...)
+      __attribute__((format(printf, 8, 9))) {
+    DiagItem& it = _items[n++];
+    it = DiagItem{DiagItem::Meter, label, {}, num, lo, hi, col};
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(it.value, sizeof it.value, fmt, ap);
+    va_end(ap);
+  }
+  void pair(int& n, const char* label, uint8_t col, const char* fmt, ...) __attribute__((format(printf, 5, 6))) {
+    DiagItem& it = _items[n++];
+    it = DiagItem{DiagItem::Pair, label, {}, 0, 0, 0, col};
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(it.value, sizeof it.value, fmt, ap);
+    va_end(ap);
+  }
+
+  int build(App& a) {
+    model::Diag d = a.m().diag();
+    int n = 0;
+    char snr[8];
+    fmtSnr(snr, sizeof snr, d.lastSnr_x4);
+    // Radio.
+    meter(n, "noise", d.noiseFloor, -130, -80, d.noiseFloor > -95 ? C_ERR : d.noiseFloor > -110 ? C_WARN : C_OK,
+          "%d dBm", d.noiseFloor);
+    meter(n, "rssi", d.lastRssi, -130, -40, d.lastRssi > -100 ? C_OK : d.lastRssi > -115 ? C_WARN : C_ERR, "%d dBm",
+          d.lastRssi);
+    meter(n, "snr", d.lastSnr_x4, -20 * 4, 12 * 4, snrColor(d.lastSnr_x4), "%s dB", snr);
+    meter(n, "duty", d.dutyPct, 0, 10, d.dutyPct >= 10 ? C_ERR : d.dutyPct >= 5 ? C_WARN : C_OK, "%u%%", d.dutyPct);
+    pair(n, "rx", C_TEXT, "%lu", (unsigned long)d.rxPackets);
+    pair(n, "tx", C_TEXT, "%lu", (unsigned long)d.txPackets);
+    pair(n, "rx f/d", C_TEXT, "%lu/%lu", (unsigned long)d.rxFlood, (unsigned long)d.rxDirect);
+    pair(n, "tx f/d", C_TEXT, "%lu/%lu", (unsigned long)d.txFlood, (unsigned long)d.txDirect);
+    pair(n, "dups", d.dups ? C_WARN : C_TEXT, "%lu", (unsigned long)d.dups);
+    pair(n, "errors", d.rxErrors ? C_ERR : C_TEXT, "%lu", (unsigned long)d.rxErrors);
+    char t1[12], t2[12];
+    fmtDur(t1, sizeof t1, d.airTxMs / 1000);
+    fmtDur(t2, sizeof t2, d.airRxMs / 1000);
+    pair(n, "air tx", C_TEXT, "%s", t1);
+    pair(n, "air rx", C_TEXT, "%s", t2);
+    pair(n, "queue", d.queueLen > 4 ? C_WARN : C_TEXT, "%u", d.queueLen);
+    pair(n, "app q", C_TEXT, "%u", d.offlineQueue);
+    model::Radio rd = a.m().radio();
+    DiagItem& line = _items[n++];
+    line = DiagItem{DiagItem::Line, "", {}, 0, 0, 0, C_ACCENT};
+    snprintf(line.value, sizeof line.value, "%.3f/%g/SF%u/4:%u %ddBm", rd.freqMHz, rd.bwKHz, rd.sf, rd.cr, rd.txDbm);
+    _items[n++] = DiagItem{DiagItem::Break, "", {}, 0, 0, 0, 0};
+    // System.
+    meter(n, "heap", (int)(d.heapFree / 1024), 0, 160, d.heapFree < 20000 ? C_ERR : d.heapFree < 40000 ? C_WARN : C_OK,
+          "%luK", (unsigned long)(d.heapFree / 1024));
+    meter(n, "min", (int)(d.heapMin / 1024), 0, 160, d.heapMin < 15000 ? C_ERR : d.heapMin < 30000 ? C_WARN : C_OK,
+          "%luK", (unsigned long)(d.heapMin / 1024));
+    meter(n, "block", (int)(d.heapMaxBlock / 1024), 0, 128, d.heapMaxBlock < 8000 ? C_ERR : C_OK, "%luK",
+          (unsigned long)(d.heapMaxBlock / 1024));
+    meter(n, "batt", d.battPct, 0, 100, d.charging ? C_OK : d.battPct <= 15 ? C_ERR : d.battPct <= 35 ? C_WARN : C_OK,
+          "%u.%02uV", d.battMv / 1000, d.battMv % 1000 / 10);
+    fmtDur(t1, sizeof t1, d.uptimeS);
+    pair(n, "uptime", C_TEXT, "%s", t1);
+    pair(n, "battery", C_TEXT, "%u%%%s", d.battPct, d.charging ? " chg" : "");
+    pair(n, "contacts", d.contacts * 10 >= d.contactsMax * 9 ? C_WARN : C_TEXT, "%u/%u", d.contacts, d.contactsMax);
+    pair(n, "channels", C_TEXT, "%u/%u", d.channels, d.channelsMax);
+    pair(n, "ble", a.m().bleConnected() ? C_OK : C_TEXT, "%s",
+         a.m().bleAvailable() ? (a.m().bleConnected() ? "connected" : a.m().prefs().bleEnabled ? "on" : "off") : "none");
+    uint8_t k[6];
+    a.m().selfKey(k);
+    pair(n, "node id", C_ACCENT, "%02X%02X%02X%02X", k[0], k[1], k[2], k[3]);
+    pair(n, "fw", C_DIM, "%s", MC_UI_VERSION);
+    return n;
+  }
+
+  DiagItem _items[32];   // 28 used
+  int _page = 0, _pages = 1;
   uint32_t _last = 0;
+  char _title[24];
 };
 
 DiagScreen s_diag;
+
 
 // ------------------------------------------------------------- packet log
 
@@ -157,43 +224,55 @@ public:
   }
   void draw(App& a, Canvas& c, const Rect& r) override {
     const mc_font_t* f = a.fSmall();
-    // Column header.
-    c.fillRect(r.x, r.y, r.w, 10, C_ZEBRA);
-    c.text(r.x + 3, r.y + 1, "age  type  rt hop  snr  rssi len src", f, C_ACCENT);
+    const int cw = f->width, lh = f->height + 1;
+    // Columns on a character grid; the length column goes when it won't fit.
+    bool withLen = 33 * cw <= r.w - 6;
+    const int cAge = 0, cType = 4, cRt = 10, cHop = 12, cSnr = 15, cRssi = 21, cLen = 26, cSrc = withLen ? 30 : 26;
+    auto at = [&](int col) { return r.x + 3 + col * cw; };
+    c.fillRect(r.x, r.y, r.w, lh, C_ZEBRA);
+    c.text(at(cAge), r.y, "age", f, C_ACCENT);
+    c.text(at(cType), r.y, "type", f, C_ACCENT);
+    c.text(at(cRt), r.y, "r", f, C_ACCENT);
+    c.text(at(cHop), r.y, "hp", f, C_ACCENT);
+    c.text(at(cSnr), r.y, "snr", f, C_ACCENT);
+    c.text(at(cRssi), r.y, "rssi", f, C_ACCENT);
+    if (withLen) c.text(at(cLen), r.y, "len", f, C_ACCENT);
+    c.text(at(cSrc), r.y, "src", f, C_ACCENT);
     int n = a.m().rxLogCount();
-    int vis = (r.h - 11) / 10;
+    int vis = (r.h - lh) / lh;
+    _vis = vis;
     _nav.clamp(n, vis);
-    if (!n) c.text(r.x + 40, r.y + 40, "Nothing received yet", a.fMed(), C_DIM);
+    if (!n) c.text(r.x + 8, r.y + r.h / 2 - 6, "Nothing received yet", a.fMed(), C_DIM);
     for (int row = 0; row < vis && _nav.top + row < n; row++) {
       int i = _nav.top + row;
       model::RxLogEntry e;
       if (!a.m().rxLog(i, e)) continue;
-      int y = r.y + 11 + row * 10;
-      if (i == _nav.sel) c.fillRect(r.x, y - 1, r.w - 3, 10, C_SEL);
+      int y = r.y + lh + row * lh;
+      if (i == _nav.sel) c.fillRect(r.x, y, r.w - 3, lh, C_SEL);
       char ago[8], snr[8], l[16];
       fmtAge(ago, sizeof ago, (a.m().uptimeMs() - e.ms) / 1000);
-      c.text(r.x + 3, y, ago, f, C_DIM);
-      c.text(r.x + 28, y, payloadName(e.payloadType), f, payloadColor(e.payloadType));
-      c.text(r.x + 58, y, e.routeType == 1 || e.routeType == 0 ? "F" : "D", f, C_TEXT);
+      c.text(at(cAge), y, ago, f, C_DIM);
+      c.text(at(cType), y, payloadName(e.payloadType), f, payloadColor(e.payloadType));
+      c.text(at(cRt), y, e.routeType == 1 || e.routeType == 0 ? "F" : "D", f, C_TEXT);
       snprintf(l, sizeof l, "%u", e.pathLen);
-      c.text(r.x + 73, y, l, f, C_TEXT);
+      c.text(at(cHop), y, l, f, C_TEXT);
       fmtSnr(snr, sizeof snr, e.snr_x4);
-      c.text(r.x + 88, y, snr, f, snrColor(e.snr_x4));
+      c.text(at(cSnr), y, snr, f, snrColor(e.snr_x4));
       snprintf(l, sizeof l, "%d", e.rssi);
-      c.text(r.x + 118, y, l, f, C_TEXT);
-      snprintf(l, sizeof l, "%u", e.len);
-      c.text(r.x + 148, y, l, f, C_TEXT);
-      snprintf(l, sizeof l, "%02X", e.srcHash);
-      c.text(r.x + 168, y, l, f, C_DIM);
-      if (e.dup) c.text(r.x + 186, y, "dup", f, C_WARN);
+      c.text(at(cRssi), y, l, f, C_TEXT);
+      if (withLen) {
+        snprintf(l, sizeof l, "%u", e.len);
+        c.text(at(cLen), y, l, f, C_TEXT);
+      }
+      snprintf(l, sizeof l, "%02X%s", e.srcHash, e.dup ? "*" : "");
+      c.text(at(cSrc), y, l, f, e.dup ? C_WARN : C_DIM);
     }
-    Rect sr{r.x, r.y + 11, r.w, r.h - 11};
+    Rect sr{r.x, r.y + lh, r.w, r.h - lh};
     drawScrollbar(c, sr, n, _nav.top, vis);
   }
   void onKey(App& a, const Key& k) override {
-    Rect r = a.content();
     if (k.code == K_ESC) a.pop();
-    else _nav.key(k, a.m().rxLogCount(), (r.h - 11) / 10);
+    else _nav.key(k, a.m().rxLogCount(), _vis);
   }
   const Hint* hints(App&) override {
     static const Hint h[] = {{"^v", "scroll"}, {"esc", "back"}, {nullptr, nullptr}};
@@ -202,6 +281,7 @@ public:
 
 private:
   ListNav _nav;
+  int _vis = 8;
   uint32_t _rev = 0;
   char _title[24];
 };
@@ -220,28 +300,32 @@ public:
   void draw(App& a, Canvas& c, const Rect& r) override {
     model::Gps g = a.m().gps();
     const mc_font_t* f = a.fMed();
-    int x = r.x + 6, y = r.y + 4;
-    c.bitmap(x, y + 2, icon::gps, 8, 8, !g.enabled ? C_DIM : g.fix ? C_OK : C_WARN);
-    c.text(x + 12, y, !g.enabled ? "Receiver off" : g.fix ? "3D fix" : "Searching for satellites", f,
+    const int lh = f->height + 1;
+    int x = r.x + 6, y = r.y + 3;
+    c.bitmap(x, y + (f->height - 8) / 2, icon::gps, 8, 8, !g.enabled ? C_DIM : g.fix ? C_OK : C_WARN);
+    c.text(x + 12, y, !g.enabled ? "Receiver off" : g.fix ? "3D fix" : "Searching...", f,
            !g.enabled ? C_DIM : g.fix ? C_OK : C_WARN);
-    y += 16;
+    y += lh + 2;
     char l[48];
-    snprintf(l, sizeof l, "Satellites  %u", g.sats);
-    c.text(x, y, l, f, C_TEXT);
-    // Satellite count as blocks.
-    for (int i = 0; i < 12; i++) c.fillRect(x + 110 + i * 9, y + 2, 7, 8, i < g.sats ? (g.sats >= 6 ? C_OK : C_WARN) : C_ZEBRA);
-    y += 14;
+    snprintf(l, sizeof l, "Sats %u", g.sats);
+    int bx = c.text(x, y, l, f, C_TEXT) + 6;
+    int bw = (r.x + r.w - 6 - bx) / 12;
+    for (int i = 0; i < 12 && bw >= 3; i++)
+      c.fillRect(bx + i * bw, y + 2, bw - 2, f->height - 4, i < g.sats ? (g.sats >= 6 ? C_OK : C_WARN) : C_ZEBRA);
+    y += lh;
     if (g.fix) {
-      snprintf(l, sizeof l, "Lat  %.5f", g.lat_e6 / 1e6);  c.text(x, y, l, f, C_TEXT); y += 13;
-      snprintf(l, sizeof l, "Lon  %.5f", g.lon_e6 / 1e6);  c.text(x, y, l, f, C_TEXT); y += 13;
-      snprintf(l, sizeof l, "Alt  %ld m   HDOP %u.%u", (long)(g.altCm / 100), g.hdop_x10 / 10, g.hdop_x10 % 10);
-      c.text(x, y, l, f, C_TEXT); y += 13;
+      snprintf(l, sizeof l, "Lat %.5f", g.lat_e6 / 1e6);  c.text(x, y, l, f, C_TEXT); y += lh;
+      snprintf(l, sizeof l, "Lon %.5f", g.lon_e6 / 1e6);  c.text(x, y, l, f, C_TEXT); y += lh;
+      snprintf(l, sizeof l, "Alt %ld m  HDOP %u.%u", (long)(g.altCm / 100), g.hdop_x10 / 10, g.hdop_x10 % 10);
+      c.text(x, y, l, f, C_TEXT, -1, r.w - 12);
+      y += lh;
     } else {
-      c.text(x, y, "Position unknown", f, C_DIM); y += 39;
+      c.text(x, y, "Position unknown", f, C_DIM);
+      y += lh;
     }
     const model::Prefs& p = a.m().prefs();
-    snprintf(l, sizeof l, "share in adverts: %s   time sync: %s", p.gpsShareInAdvert ? "on" : "off", p.gpsTimeSyncAtBoot ? "on" : "off");
-    c.text(x, y + 2, l, a.fSmall(), C_DIM);
+    snprintf(l, sizeof l, "adverts: %s  clock sync: %s", p.gpsShareInAdvert ? "on" : "off", p.gpsTimeSyncAtBoot ? "on" : "off");
+    if (y + a.fSmall()->height <= r.y + r.h) c.text(x, y + 1, l, a.fSmall(), C_DIM, -1, r.w - 12);
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == K_ESC) a.pop();
@@ -276,11 +360,14 @@ public:
   }
   void onEnter(App& a) override { rebuild(a); }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    const int RH = 16;
+    const int RH = a.mx().row;
+    const mc_font_t* sm = a.fSmall();
     int vis = r.h / RH;
+    _vis = vis;
     _nav.clamp(_n, vis);
     if (!_n) {
-      c.text(r.x + 20, r.y + 40, repeatersOnly ? "Listening for repeaters..." : "No adverts heard yet", a.fMed(), C_DIM);
+      const char* msg = repeatersOnly ? "Listening for repeaters..." : "No adverts heard yet";
+      c.text(r.x + 8, r.y + (r.h - a.fMed()->height) / 2, msg, a.fMed(), C_DIM, -1, r.w - 16);
       return;
     }
     for (int row = 0; row < vis && _nav.top + row < _n; row++) {
@@ -288,33 +375,34 @@ public:
       model::Contact ct;
       if (!a.m().heard(i, ct)) continue;
       int y = r.y + row * RH;
+      const int iy = y + (RH - 8) / 2, sy = y + (RH - sm->height) / 2;
       if (_nav.top + row == _nav.sel) c.fillRect(r.x, y, r.w - 3, RH, C_SEL);
       else if (row & 1) c.fillRect(r.x, y, r.w - 3, RH, C_ZEBRA);
       uint8_t col = typeColor(ct.type);
-      c.bitmap(r.x + 4, y + 4, typeIcon(ct.type), 8, 8, col);
+      c.bitmap(r.x + 4, iy, typeIcon(ct.type), 8, 8, col);
       char snr[8], ago[8], l[24];
       fmtAgo(ago, sizeof ago, a.m().now(), ct.lastHeard);
-      int x = r.x + r.w - 6 - Canvas::textWidth(ago, a.fSmall());
-      c.text(x, y + 5, ago, a.fSmall(), C_DIM);
+      int x = r.x + r.w - 6 - Canvas::textWidth(ago, sm);
+      c.text(x, sy, ago, sm, C_DIM);
       fmtSnr(snr, sizeof snr, ct.snr_x4);
       snprintf(l, sizeof l, "%s", snr);
-      x -= Canvas::textWidth(l, a.fSmall()) + 6;
-      c.text(x, y + 5, l, a.fSmall(), snrColor(ct.snr_x4));
+      x -= Canvas::textWidth(l, sm) + 6;
+      c.text(x, sy, l, sm, snrColor(ct.snr_x4));
       x -= 13;
-      drawSignal(c, x, y + 4, ct.snr_x4);
+      drawSignal(c, x, iy, ct.snr_x4);
       if (ct.hops >= 0) {
         snprintf(l, sizeof l, "%d", ct.hops);
-        x -= 10;
-        c.text(x, y + 5, l, a.fSmall(), ct.hops == 0 ? C_OK : C_DIM);
+        x -= Canvas::textWidth(l, sm) + 4;
+        c.text(x, sy, l, sm, ct.hops == 0 ? C_OK : C_DIM);
       }
-      c.text(r.x + 16, y, ct.name, a.fList(), C_TEXT, -1, x - r.x - 22);
+      a.fitText(c, r.x + 16, y + (RH - a.fList()->height) / 2, ct.name, a.fList(), C_TEXT, x - r.x - 22,
+                _nav.top + row == _nav.sel);
     }
     drawScrollbar(c, r, _n, _nav.top, vis);
   }
   void onKey(App& a, const Key& k) override {
-    Rect r = a.content();
     if (k.code == K_ESC) { a.pop(); return; }
-    if (_nav.key(k, _n, r.h / 16)) return;
+    if (_nav.key(k, _n, _vis)) return;
     if (k.code == K_ENTER && _n) {
       if (a.m().addHeard(_idx[_nav.sel])) a.toast("Added to contacts", C_OK);
       else a.toast("Already a contact, or contacts full", C_WARN);
@@ -336,6 +424,7 @@ private:
     }
   }
   ListNav _nav;
+  int _vis = 6;
   uint8_t _idx[64];
   int _n = 0;
   uint32_t _rev = 0;

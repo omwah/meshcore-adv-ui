@@ -138,7 +138,11 @@ protected:
         if (p.screenTimeoutS) snprintf(it.value, sizeof it.value, "%us", p.screenTimeoutS);
         else snprintf(it.value, sizeof it.value, "never");
         break;
-      case S_TEXT: it.label = "Message text"; it.choice = true; snprintf(it.value, sizeof it.value, p.largeText ? "large" : "small"); break;
+      case S_TEXT: {
+        static const char* const kSizes[] = {"small", "medium", "large"};
+        it.label = "Text size"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", kSizes[p.textSize % 3]);
+        break;
+      }
       case S_HDR_IN: it.label = "INPUT & SOUND"; it.header = true; break;
       case S_LOCKOUT: it.label = "Key filter"; it.choice = true; snprintf(it.value, sizeof it.value, "%u ms", p.inputLockoutMs); break;
       case S_SOUND: it.label = "Sound"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.sound)); break;
@@ -205,7 +209,7 @@ protected:
         break;
       }
       case S_TIMEOUT: p.screenTimeoutS = (uint16_t)stepIn(kTimeouts, p.screenTimeoutS, dir); break;
-      case S_TEXT: p.largeText = !p.largeText; break;
+      case S_TEXT: p.textSize = (uint8_t)((p.textSize + 3 + dir) % 3); break;
       case S_LOCKOUT: p.inputLockoutMs = (uint16_t)stepIn(kLockouts, p.inputLockoutMs, dir); break;
       case S_SOUND: p.sound = !p.sound; break;
       case S_AUTOADD: p.autoAddContacts = !p.autoAddContacts; break;
@@ -347,7 +351,9 @@ public:
 protected:
   int drawHead(App& a, Canvas& c, const Rect& r) override {
     model::BackupStatus b = a.m().backupStatus();
-    c.fillRect(r.x, r.y, r.w, 20, C_ZEBRA);
+    const mc_font_t* s = a.fSmall();
+    const int lh = s->height + 1;
+    c.fillRect(r.x, r.y, r.w, 2 * lh + 4, C_ZEBRA);
     char l[48];
     if (!b.cardPresent) snprintf(l, sizeof l, "No SD card inserted");
     else if (!b.hasBackup) snprintf(l, sizeof l, "SD card ready, no backup yet");
@@ -356,10 +362,10 @@ protected:
       fmtAgo(ago, sizeof ago, a.m().now(), b.lastBackupTs);
       snprintf(l, sizeof l, "Last backup %s ago%s", ago, b.hasPrevious ? " (+ previous)" : "");
     }
-    c.text(r.x + 4, r.y + 2, l, a.fSmall(), b.cardPresent ? C_TEXT : C_WARN);
-    if (b.lastError[0]) c.text(r.x + 4, r.y + 11, b.lastError, a.fSmall(), C_ERR);
-    else c.text(r.x + 4, r.y + 11, "/meshcore-adv-ui/backup.bin", a.fSmall(), C_DIM);
-    return 22;
+    c.text(r.x + 4, r.y + 2, l, s, b.cardPresent ? C_TEXT : C_WARN, -1, r.w - 8);
+    if (b.lastError[0]) c.text(r.x + 4, r.y + 2 + lh, b.lastError, s, C_ERR, -1, r.w - 8);
+    else c.text(r.x + 4, r.y + 2 + lh, "/meshcore-adv-ui/backup.bin", s, C_DIM, -1, r.w - 8);
+    return 2 * lh + 6;
   }
   int count(App&) override { return B_N; }
   void item(App& a, int i, MenuItem& it) override {

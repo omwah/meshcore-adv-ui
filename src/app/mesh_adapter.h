@@ -21,7 +21,7 @@ struct UiPrefs {
   uint8_t version;
   uint8_t theme, timeZone, brightness;
   uint16_t screenTimeoutS, inputLockoutMs;
-  uint8_t sound, largeText, gpsTimeSyncAtBoot, autoBackup, backupIdentity, backupMessages, bleEnabled;
+  uint8_t sound, textSize, gpsTimeSyncAtBoot, autoBackup, backupIdentity, backupMessages, bleEnabled;
   uint8_t presetIdx;
   uint16_t mutedChannels;        // bit per channel slot
   uint8_t favourites[16][4];     // public key prefixes (MeshCore has no favourite flag)

@@ -19,26 +19,30 @@ public:
   int arg = 0;
   const char* title(App&) override { return "Confirm"; }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    int bx = r.x + 8, bw = r.w - 16;
-    int lines = wrapText(question, a.fMed(), bw - 16, nullptr, nullptr);
-    int bh = lines * 13 + 32;
-    if (bh > r.h - 4) bh = r.h - 4;
+    const mc_font_t* f = a.fMed();
+    const int lh = f->height + 1, bh_btn = f->height + 2;
+    int bx = r.x + 6, bw = r.w - 12;
+    int lines = wrapText(question, f, bw - 12, nullptr, nullptr);
+    int bh = 6 + lines * lh + 4 + bh_btn + 5;
+    if (bh > r.h - 2) bh = r.h - 2;
     int by = r.y + (r.h - bh) / 2;
     c.fillRect(bx, by, bw, bh, C_ZEBRA);
     c.rect(bx, by, bw, bh, C_WARN);
-    struct Ctx { Canvas* c; int x, y; const mc_font_t* f; } ctx{&c, bx + 8, by + 8, a.fMed()};
-    wrapText(question, a.fMed(), bw - 16, [](void* p, const char* s, int len, int line) {
+    struct Ctx { Canvas* c; int x, y, lh; const mc_font_t* f; } ctx{&c, bx + 6, by + 6, lh, f};
+    wrapText(question, f, bw - 12, [](void* p, const char* s, int len, int line) {
       Ctx* x = (Ctx*)p;
       char tmp[64];
       if (len > 63) len = 63;
       memcpy(tmp, s, len);
       tmp[len] = 0;
-      x->c->text(x->x, x->y + line * 13, tmp, x->f, C_TEXT);
+      x->c->text(x->x, x->y + line * x->lh, tmp, x->f, C_TEXT);
     }, &ctx);
-    c.pill(bx + 20, by + bh - 20, 70, 14, C_OK);
-    c.text(bx + 30, by + bh - 19, "Y: Yes", a.fMed(), C_BG);
-    c.pill(bx + bw - 90, by + bh - 20, 70, 14, C_DIM);
-    c.text(bx + bw - 80, by + bh - 19, "N: No", a.fMed(), C_BG);
+    int btnY = by + bh - bh_btn - 5;
+    int btnW = Canvas::textWidth("Y: Yes", f) + 16;
+    c.pill(bx + bw / 4 - btnW / 2, btnY, btnW, bh_btn, C_OK);
+    c.text(bx + bw / 4 - btnW / 2 + 8, btnY + 1, "Y: Yes", f, C_BG);
+    c.pill(bx + 3 * bw / 4 - btnW / 2, btnY, btnW, bh_btn, C_DIM);
+    c.text(bx + 3 * bw / 4 - btnW / 2 + 8, btnY + 1, "N: No", f, C_BG);
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == 'y' || k.code == 'Y' || k.code == K_ENTER) {
@@ -68,13 +72,17 @@ public:
   const char* title(App&) override { return label; }
   bool textMode(App&) override { return true; }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    c.fillRect(r.x + 4, r.y + 14, r.w - 8, 22, C_ZEBRA);
-    c.rect(r.x + 4, r.y + 14, r.w - 8, 22, C_ACCENT);
-    ed.draw(a, c, r.x + 8, r.y + 17, r.w - 16, a.fList(), C_TEXT, secret);
+    const mc_font_t* f = a.fList();
+    const int boxH = f->height + 6, top = r.y + 10;
+    c.fillRect(r.x + 4, top, r.w - 8, boxH, C_ZEBRA);
+    c.rect(r.x + 4, top, r.w - 8, boxH, C_ACCENT);
+    ed.draw(a, c, r.x + 8, top + 3, r.w - 16, f, C_TEXT, secret);
     char n[16];
     snprintf(n, sizeof n, "%d/%d", ed.length(), maxLen);
-    c.text(r.x + r.w - 6 - Canvas::textWidth(n, a.fSmall()), r.y + 40, n, a.fSmall(), C_DIM);
-    c.text(r.x + 6, r.y + 40, secret ? "hidden as you type" : "Fn + , / move the cursor", a.fSmall(), C_DIM);
+    int ny = top + boxH + 4;
+    c.text(r.x + r.w - 6 - Canvas::textWidth(n, a.fSmall()), ny, n, a.fSmall(), C_DIM);
+    c.text(r.x + 6, ny, secret ? "hidden as you type" : "Fn + , / move cursor", a.fSmall(), C_DIM, -1,
+           r.w - 20 - Canvas::textWidth(n, a.fSmall()));
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == K_ESC) { a.pop(); return; }
@@ -121,6 +129,15 @@ const char* App::promptText() const { return s_prompt.text; }
 
 // ---------------------------------------------------------------- app
 
+//                    small         med           list          body          head foot tab row chat menu meta
+static const Metrics kMetrics[3] = {
+  /* small  */ {&font_small,  &font_medium, &font_large,  &font_medium, 13, 10, 14, 16, 24, 16, 9},
+  /* medium */ {&font_medium, &font_large,  &font_large,  &font_large,  17, 14, 18, 18, 32, 20, 13},
+  /* large  */ {&font_large,  &font_large,  &font_xlarge, &font_xlarge, 17, 18, 18, 26, 34, 20, 17},
+};
+
+App::App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k) : _m(m), _d(d), _k(k), _mx(&kMetrics[1]) {}
+
 void App::begin(Screen* root) {
   _d.begin();
   _k.begin();
@@ -133,6 +150,7 @@ void App::begin(Screen* root) {
 void App::applyPrefs() {
   const model::Prefs& p = _m.prefs();
   _theme = p.theme < kThemeCount ? p.theme : 0;
+  _mx = &kMetrics[p.textSize < 3 ? p.textSize : 1];
   _lastInput = _now;
   setTimeZone(kZones[p.timeZone < kZoneCount ? p.timeZone : 0].posix);
   _in.setLockout(p.inputLockoutMs);
@@ -148,6 +166,7 @@ void App::previewTheme(uint8_t idx) {
 }
 
 void App::entered() {
+  _marqueeStart = _now;
   _in.flush();
   _k.setTextMode(top()->textMode(*this));
   top()->onEnter(*this);
@@ -185,7 +204,22 @@ void App::toast(const char* text, uint8_t col) {
 
 Rect App::content() const {
   if (_stack[_depth - 1] && _stack[_depth - 1]->fullscreen()) return {0, 0, Canvas::W, Canvas::H};
-  return {0, HEAD_H, Canvas::W, Canvas::H - HEAD_H - FOOT_H};
+  return {0, _mx->head, Canvas::W, Canvas::H - _mx->head - _mx->foot};
+}
+
+int App::fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, bool scroll) {
+  int tw = Canvas::textWidth(s, f);
+  if (tw <= maxw || maxw <= 0) return c.text(x, y, s, f, fg);
+  if (!scroll) return c.text(x, y, s, f, fg, -1, maxw);
+  // Pause 1.2 s, slide at 40 px/s, pause 1.2 s at the end, repeat.
+  const uint32_t PAUSE = 1200, MS_PER_PX = 25;
+  uint32_t over = (uint32_t)(tw - maxw);
+  uint32_t cycle = 2 * PAUSE + over * MS_PER_PX;
+  uint32_t t = (_now - _marqueeStart) % cycle;
+  int off = t < PAUSE ? 0 : t < PAUSE + over * MS_PER_PX ? (int)((t - PAUSE) / MS_PER_PX) : (int)over;
+  c.textScrolled(x, y, s, f, fg, maxw, off);
+  _animating = true;
+  return x + maxw;
 }
 
 void App::wake() {
@@ -238,6 +272,7 @@ uint32_t App::loop(uint32_t now) {
     } else {
       top()->onKey(*this, k);
     }
+    _marqueeStart = now;
     if (top() == before) _k.setTextMode(top()->textMode(*this));
     _dirty = true;
   }
@@ -250,6 +285,11 @@ uint32_t App::loop(uint32_t now) {
   if (_toastUntil && (int32_t)(now - _toastUntil) >= 0) { _toastUntil = 0; _dirty = true; }
 
   if (_dirty && !_asleep) render();
+  // A moving marquee needs the next frame; only changed rows are sent.
+  if (_animating && !_asleep) {
+    _dirty = true;
+    return 40;
+  }
 
   uint32_t wait = _in.wakeIn(now);
   return wait ? wait : 50;
@@ -257,6 +297,7 @@ uint32_t App::loop(uint32_t now) {
 
 void App::render() {
   _dirty = false;
+  _animating = false;
   _c.noClip();
   _c.clear(C_BG);
   Screen* s = top();
@@ -271,43 +312,48 @@ void App::render() {
 }
 
 void App::drawHeader() {
-  _c.fillRect(0, 0, Canvas::W, HEAD_H - 1, C_HEAD);
-  _c.hline(0, HEAD_H - 1, Canvas::W, C_ACCENT);
+  const int H = _mx->head;
+  _c.fillRect(0, 0, Canvas::W, H - 1, C_HEAD);
+  _c.hline(0, H - 1, Canvas::W, C_ACCENT);
   const mc_font_t* f = fMed();
+  const int ty = (H - 1 - f->height) / 2;   // text
+  const int iy = (H - 1 - 8) / 2;           // 8 px icons
 
   // Right to left: clock, battery, GPS, BLE, unread.
   int x = Canvas::W - 2;
   char hm[8];
   fmtTime(hm, sizeof hm, _m.now());
   x -= Canvas::textWidth(hm, f);
-  _c.text(x, 0, hm, f, C_HTXT);
+  _c.text(x, ty, hm, f, C_HTXT);
 
   model::Diag d = _m.diag();
   x -= 17;
-  drawBattery(_c, x, 3, d.battPct, d.charging, C_HTXT);
+  drawBattery(_c, x, (H - 1 - 7) / 2, d.battPct, d.charging, C_HTXT);
 
   model::Gps g = _m.gps();
   if (g.enabled) {
     x -= 10;
-    _c.bitmap(x, 2, icon::gps, 8, 8, g.fix ? C_OK : C_DIM);
+    _c.bitmap(x, iy, icon::gps, 8, 8, g.fix ? C_OK : C_DIM);
   }
   if (_m.bleAvailable() && _m.prefs().bleEnabled) {
     x -= 10;
-    _c.bitmap(x, 2, icon::ble, 8, 8, _m.bleConnected() ? C_OK : C_DIM);
+    _c.bitmap(x, iy, icon::ble, 8, 8, _m.bleConnected() ? C_OK : C_DIM);
   }
   unsigned unread = _m.unreadTotal();
-  if (unread) x = drawBadge(*this, x - 3, 1, unread);
+  if (unread) x = drawBadge(*this, x - 3, (H - 1 - (fSmall()->height + 2)) / 2, unread);
 
-  _c.text(3, 0, top()->title(*this), f, C_HTXT, -1, x - 8);
+  fitText(_c, 3, ty, top()->title(*this), f, C_HTXT, x - 8, true);
 }
 
 void App::drawFooter() {
-  int y = Canvas::H - FOOT_H;
-  _c.fillRect(0, y, Canvas::W, FOOT_H, C_ZEBRA);
+  const int FH = _mx->foot;
+  int y = Canvas::H - FH;
+  _c.fillRect(0, y, Canvas::W, FH, C_ZEBRA);
   const mc_font_t* f = fSmall();
+  const int ty = y + (FH - f->height) / 2;
   if (_toastUntil) {
-    _c.fillRect(0, y, Canvas::W, FOOT_H, _toastCol);
-    _c.text(4, y + 1, _toast, f, C_BG, -1, Canvas::W - 8);
+    _c.fillRect(0, y, Canvas::W, FH, _toastCol);
+    _c.text(4, ty, _toast, f, C_BG, -1, Canvas::W - 8);
     return;
   }
   const Hint* h = top()->hints(*this);
@@ -316,10 +362,10 @@ void App::drawFooter() {
     int kw = Canvas::textWidth(h->key, f) + 4;
     int lw = Canvas::textWidth(h->label, f);
     if (x + kw + lw + 2 > Canvas::W) break;
-    _c.pill(x, y + 1, kw, FOOT_H - 2, C_DIM);
-    _c.text(x + 2, y + 1, h->key, f, C_BG);
+    _c.pill(x, y + 1, kw, FH - 2, C_DIM);
+    _c.text(x + 2, ty, h->key, f, C_BG);
     x += kw + 2;
-    _c.text(x, y + 1, h->label, f, C_TEXT);
+    _c.text(x, ty, h->label, f, C_TEXT);
     x += lw + 7;
   }
 }
@@ -370,7 +416,7 @@ int drawBadge(App& a, int xRight, int y, unsigned n) {
   snprintf(b, sizeof b, n > 99 ? "99+" : "%u", n);
   int w = Canvas::textWidth(b, a.fSmall()) + 6;
   int x = xRight - w;
-  a.canvas().pill(x, y, w, 10, C_BADGE);
+  a.canvas().pill(x, y, w, a.fSmall()->height + 2, C_BADGE);
   a.canvas().text(x + 3, y + 1, b, a.fSmall(), C_HTXT);
   return x;
 }

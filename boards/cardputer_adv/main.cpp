@@ -15,6 +15,9 @@
 #include "st7789_display.h"
 #include "tca8418_keyboard.h"
 #include "platform_cardputer.h"
+#if !defined(ENABLE_USB_INTERFACE)
+  #include "diag.h"
+#endif
 
 #if defined(BLE_PIN_CODE)
   #include <helpers/esp32/SerialBLEInterface.h>
@@ -77,6 +80,11 @@ void setup() {
   keyboard.begin();
   ui_app.begin(ui::screens::boot());
   board.onBootComplete();
+  // One status line for bring-up (no keys, names or addresses).
+  Serial.printf("meshcore-adv-ui %s: lora-cap %s, keyboard %s, sd %s, contacts %d, heap %u (min %u)\n",
+                MC_UI_VERSION, board.loraCapPresent() ? "ok" : "MISSING", keyboard.present() ? "ok" : "MISSING",
+                platform.sd() ? "yes" : "no", the_mesh.getNumContacts(), (unsigned)platform.heapFree(),
+                (unsigned)platform.heapMin());
 }
 
 void loop() {
@@ -86,4 +94,7 @@ void loop() {
   adapter.loop();
   ui_app.loop(millis());
   rtc_clock.tick();
+#if !defined(ENABLE_USB_INTERFACE)
+  diagPoll(ui_app, display, keyboard, platform);
+#endif
 }

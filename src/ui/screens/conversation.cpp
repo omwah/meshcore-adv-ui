@@ -11,9 +11,7 @@ namespace ui { namespace screens {
 
 namespace {
 
-constexpr int META_H = 9;     // small font line
 constexpr int GAP = 3;
-constexpr int COMPOSE_H = 30;
 
 struct DrawCtx {
   Canvas* c;
@@ -69,7 +67,7 @@ public:
 
   void draw(App& a, Canvas& c, const Rect& r) override {
     Rect mr = r;
-    if (_composing) mr.h -= COMPOSE_H;
+    if (_composing) mr.h -= composeH(a);
     int n = a.m().messageCount(id);
     const mc_font_t* f = a.fBody();
     int textW = mr.w - 14;
@@ -87,7 +85,7 @@ public:
       model::Message m;
       if (!a.m().message(id, i, m)) continue;
       int lines = wrapText(m.text, f, textW, nullptr, nullptr);
-      int h = META_H + lines * f->height + GAP;
+      int h = a.mx().meta + lines * f->height + GAP;
       total += h;
       int top = bottom - h;
       if (top < mr.y + mr.h && bottom > mr.y) drawMessage(a, c, m, mr, top, f, textW);
@@ -147,6 +145,9 @@ private:
     _ed.attach(_draft, maxLen(a) + 1);
   }
 
+  // Two lines of message text plus a margin.
+  static int composeH(App& a) { return 2 * a.fBody()->height + 6; }
+
   int maxLen(App& a) {
     // Channel messages carry "name: " inside the payload.
     int lim = model::TEXT_LEN - 1;
@@ -176,7 +177,7 @@ private:
     bool chan = id.kind == model::ThreadKind::Channel;
     uint8_t bar = m.outgoing ? C_ACCENT : chan ? C_CHAN : C_CHAT;
     int lines = wrapText(m.text, f, textW, nullptr, nullptr);
-    int h = META_H + lines * f->height;
+    int h = a.mx().meta + lines * f->height;
     if (m.outgoing) c.fillRect(r.x + 4, top, r.w - 7, h + 1, C_ZEBRA);
     c.fillRect(r.x + 4, top, 2, h + 1, bar);
 
@@ -202,7 +203,7 @@ private:
         case model::Delivery::Failed: ic = icon::cross; col = C_ERR; label = "failed"; break;
         default: ic = nullptr; label = ""; break;
       }
-      if (ic) c.bitmap(x, top, ic, 8, 8, col);
+      if (ic) c.bitmap(x, top + (sf->height + 1 - 8) / 2, ic, 8, 8, col);
       x = c.text(x + 10, top + 1, label, sf, col) + 4;
       if (chan && m.repeats) {
         char rp[16];
@@ -227,21 +228,22 @@ private:
       }
     }
 
-    DrawCtx d{&c, f, r.x + 9, top + META_H, C_TEXT};
+    DrawCtx d{&c, f, r.x + 9, top + a.mx().meta, C_TEXT};
     wrapText(m.text, f, textW, drawLine, &d);
   }
 
   void drawCompose(App& a, Canvas& c, const Rect& r) {
-    int y = r.y + r.h - COMPOSE_H;
-    c.fillRect(r.x, y, r.w, COMPOSE_H, C_ZEBRA);
+    const int CH = composeH(a);
+    int y = r.y + r.h - CH;
+    c.fillRect(r.x, y, r.w, CH, C_ZEBRA);
     c.hline(r.x, y, r.w, C_ACCENT);
-    Rect er{r.x + 4, y + 3, r.w - 8, COMPOSE_H - 4};
-    _ed.drawWrapped(a, c, er, a.fMed(), C_TEXT);
+    Rect er{r.x + 4, y + 3, r.w - 8, CH - 4};
+    _ed.drawWrapped(a, c, er, a.fBody(), C_TEXT);
     char cnt[12];
     int len = _ed.length(), lim = maxLen(a);
     snprintf(cnt, sizeof cnt, "%d", lim - len);
     int w = Canvas::textWidth(cnt, a.fSmall());
-    c.text(r.x + r.w - w - 3, y + COMPOSE_H - 9, cnt, a.fSmall(), lim - len < 20 ? C_WARN : C_DIM);
+    c.text(r.x + r.w - w - 3, y + CH - a.fSmall()->height - 1, cnt, a.fSmall(), lim - len < 20 ? C_WARN : C_DIM);
   }
 
   char _title[model::NAME_LEN];

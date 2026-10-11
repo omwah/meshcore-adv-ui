@@ -15,8 +15,13 @@ pio device monitor -e cardputer_adv             # 115200 baud
 
 ## 1. Boot, display, keyboard
 
+Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
+`blf <hz> <duty>`, `fill <rrggbb>`, `init`, `shot` (dumps the UI frame) and
+`key <row> <col>`. See `boards/cardputer_adv/diag.h`.
+
 - [ ] **Splash.** It shows "MeshCore keyboard edition" right way up, with correct colours. Check that Midnight's header is dark blue, not yellow. If colours are inverted, toggle INVON (0x21) in `st7789_display.cpp`. If the picture is mirrored or offset, check MADCTL 0x60 and the gap (40, 53).
-- [ ] **Backlight.** It follows Settings > Brightness, and turns off after the screen timeout. Any key wakes it without doing anything else.
+- [x] **Backlight.** It needs a low PWM rate: at 5 kHz the driver stays dark, while 256 Hz works (found on hardware).
+- [ ] **Brightness and timeout.** Brightness follows Settings > Brightness, and the backlight turns off after the screen timeout. Any key wakes it without doing anything else.
 - [ ] **Keyboard map.** Every key types its printed legend in a message. `; , . /` move in menus. Opt opens the menu. Holding `` ` `` goes Home.
 - [ ] **No missed or doubled presses.** With Settings > Key filter at 60 ms, fast Up/Down presses must neither drop nor double. If they do, try other values (10–500 ms).
 

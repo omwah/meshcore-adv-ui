@@ -6,12 +6,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef UI_DEFAULT_TEXT_SIZE
+#define UI_DEFAULT_TEXT_SIZE 1   // medium
+#endif
+
 namespace app {
 
 namespace {
 
 constexpr uint32_t UI_PREFS_MAGIC = 0x4955434D;   // "MCUI"
-constexpr uint8_t UI_PREFS_VERSION = 1;
+constexpr uint8_t UI_PREFS_VERSION = 2;   // 2: text size levels
 const char* const kUiPrefsFile = "/ui/prefs.bin";
 
 constexpr uint8_t REQ_GET_STATUS = 0x01;
@@ -82,6 +86,7 @@ void MeshAdapter::loadUiPrefs() {
     _ui.screenTimeoutS = 60;
     _ui.inputLockoutMs = 60;
     _ui.sound = 1;
+    _ui.textSize = UI_DEFAULT_TEXT_SIZE;
     _ui.autoBackup = 1;
     _ui.backupIdentity = 1;
     _ui.bleEnabled = 1;
@@ -106,7 +111,7 @@ void MeshAdapter::syncPrefsFromMesh() {
   p.screenTimeoutS = _ui.screenTimeoutS;
   p.inputLockoutMs = _ui.inputLockoutMs;
   p.sound = _ui.sound;
-  p.largeText = _ui.largeText;
+  p.textSize = _ui.textSize;
   p.gpsEnabled = np->gps_enabled;
   p.gpsShareInAdvert = np->advert_loc_policy != ADVERT_LOC_NONE;
   p.gpsTimeSyncAtBoot = _ui.gpsTimeSyncAtBoot;
@@ -143,7 +148,7 @@ void MeshAdapter::setPrefs(const model::Prefs& p) {
   _ui.screenTimeoutS = p.screenTimeoutS;
   _ui.inputLockoutMs = p.inputLockoutMs;
   _ui.sound = p.sound;
-  _ui.largeText = p.largeText;
+  _ui.textSize = p.textSize > 2 ? 2 : p.textSize;
   _ui.gpsTimeSyncAtBoot = p.gpsTimeSyncAtBoot;
   _ui.autoBackup = p.autoBackup;
   _ui.backupIdentity = p.backupIdentity;
