@@ -55,6 +55,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 6. Power and memory
 
-- [ ] **Battery.** The voltage on Diagnostics > System is plausible against a meter (GPIO10, 2:1 divider).
+- [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim does. With the power switch off on USB it reads 4.14 V (full). With the switch on it read 3.48 V after an evening on USB: the battery itself, which appears not to charge fully while the device runs.
+- [ ] **Charging.** Find out whether the Cardputer ADV charges with the power switch on, or only with it off.
 - [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
 - [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it, and after a re-install the restore offer appears.

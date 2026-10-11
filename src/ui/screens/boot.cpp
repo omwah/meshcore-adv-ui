@@ -11,11 +11,12 @@ class BootScreen : public Screen {
 public:
   const char* title(App&) override { return ""; }
   bool fullscreen() override { return true; }
-  void onEnter(App& a) override {
-    _start = a.nowMs();
+  void onEnter(App&) override {
+    _start = 0;      // set on the first frame: setup may take seconds before it
     _done = false;
   }
   bool tick(App& a, uint32_t now) override {
+    if (!_start) _start = now ? now : 1;
     if (_done || now - _start < 2000) return true;   // keep animating the dots
     _done = true;
     a.replace(home());

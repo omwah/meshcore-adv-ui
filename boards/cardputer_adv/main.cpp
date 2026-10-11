@@ -83,6 +83,10 @@ void setup() {
   the_mesh.begin(true);
 
   adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
+  // Show the splash now: Bluetooth and sensors take a while to start.
+  keyboard.begin();
+  ui_app.begin(ui::screens::boot());
+  ui_app.loop(millis());
 #if defined(BLE_PIN_CODE)
   platform.blePairingFn = [] { return ble_interface.pairing(); };
   ble_interface.begin(BLE_NAME_PREFIX, the_mesh.getNodePrefs()->node_name, adapter.choosePinForBoot());
@@ -99,8 +103,6 @@ void setup() {
 #endif
 
   if (!adapter.prefs().bleEnabled) adapter.disableBluetooth();
-  keyboard.begin();
-  ui_app.begin(ui::screens::boot());
   board.onBootComplete();
   // One status line for bring-up (no keys, names or addresses).
   Serial.printf("meshcore-adv-ui %s: lora-cap %s, keyboard %s, sd %s, contacts %d, heap %u (min %u)\n",
