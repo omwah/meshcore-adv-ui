@@ -20,7 +20,8 @@ key enter
 wait 500
 shot backup-written
 wipe
-wait 1600
+# the 2 s splash, then the restore offer
+wait 2600
 shot restore-offer
 key y
 wait 3000

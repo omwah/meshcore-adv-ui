@@ -10,7 +10,8 @@ shot auto-backup-status
 hold esc 900
 sd off
 wipe
-wait 1600
+# the 2 s splash, then the restore offer
+wait 2600
 shot fresh-no-card
 expect identity new
 expect contacts 0
