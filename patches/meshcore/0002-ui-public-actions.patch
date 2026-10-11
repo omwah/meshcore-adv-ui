@@ -1,0 +1,57 @@
+diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
+--- a/examples/companion_radio/MyMesh.cpp	2026-10-11 11:01:41.970420863 -0700
++++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 11:01:41.923461422 -0700
+@@ -2253,6 +2253,36 @@
+ #endif
+ }
+ 
++void MyMesh::uiMarkContactsDirty() {
++  dirty_contacts_expiry = futureMillis(LAZY_CONTACTS_WRITE_DELAY);
++}
++
++void MyMesh::uiSaveChannels() {
++  saveChannels();
++}
++
++void MyMesh::uiDeleteContactBlob(const uint8_t* pub_key) {
++  _store->deleteBlobByKey(pub_key, PUB_KEY_SIZE);
++}
++
++bool MyMesh::uiSendAdvert(bool flood) {
++  mesh::Packet* pkt;
++  if (_prefs.advert_loc_policy == ADVERT_LOC_NONE) {
++    pkt = createSelfAdvert(_prefs.node_name);
++  } else {
++    pkt = createSelfAdvert(_prefs.node_name, sensors.node_lat, sensors.node_lon);
++  }
++  if (!pkt) return false;
++  if (flood) {
++    TransportKey default_scope;
++    memcpy(&default_scope.key, _prefs.default_scope_key, sizeof(default_scope.key));
++    sendFloodScoped(default_scope, pkt, 0);
++  } else {
++    sendZeroHop(pkt);
++  }
++  return true;
++}
++
+ bool MyMesh::advert() {
+   mesh::Packet* pkt;
+   if (_prefs.advert_loc_policy == ADVERT_LOC_NONE) {
+diff -ruN a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.h
+--- a/examples/companion_radio/MyMesh.h	2026-08-14 05:19:19.000000000 -0700
++++ b/examples/companion_radio/MyMesh.h	2026-10-11 11:01:41.922935079 -0700
+@@ -98,6 +98,13 @@
+   void loop();
+   void handleCmdFrame(size_t len);
+   bool advert();
++
++  // meshcore-adv-ui: for a built-in UI that changes state directly instead of
++  // through app command frames. Each does what the matching app command does.
++  void uiMarkContactsDirty();                       // lazy save, as CMD_REMOVE_CONTACT etc.
++  void uiSaveChannels();                            // as CMD_SET_CHANNEL
++  void uiDeleteContactBlob(const uint8_t* pub_key); // as CMD_REMOVE_CONTACT
++  bool uiSendAdvert(bool flood);                    // as CMD_SEND_SELF_ADVERT
+   void enterCLIRescue();
+ 
+   int  getRecentlyHeard(AdvertPath dest[], int max_num);

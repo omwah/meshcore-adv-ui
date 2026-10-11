@@ -53,7 +53,7 @@ File FS::open(const char* path, const char* mode, bool create) {
   std::string f = full(path);
   bool write = mode[0] == 'w' || mode[0] == 'a';
   if (write || create) mkdirs(f);
-  const char* m = mode[0] == 'w' ? "w+b" : mode[0] == 'a' ? "a+b" : "rb";
+  const char* m = mode[0] == 'w' ? "w+b" : mode[0] == 'a' ? "a+b" : mode[1] == '+' ? "r+b" : "rb";
   FILE* fp = fopen(f.c_str(), m);
   return fp ? File(fp, path) : File();
 }

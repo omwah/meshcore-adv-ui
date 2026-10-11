@@ -49,6 +49,7 @@ public:
   MyMesh& mesh() { return *_mesh; }
   SimRadio& radio() { return _radio; }
   DataStore& store() { return *_store; }
+  fs::FS& fs() { return _fs; }
   const std::string& name() const { return _name; }
   int id() const { return _id; }
 

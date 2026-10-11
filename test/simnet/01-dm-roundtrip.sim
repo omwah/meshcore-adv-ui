@@ -1,0 +1,23 @@
+# Real MeshCore: exchange adverts, message a node, get the ACK and a reply.
+node Bob 7.5 echo
+as Bob advert
+wait 3000
+expect contacts 1
+# Advertise ourselves (zero hop) from the menu so Bob can decrypt our DMs.
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+key right
+shot net-contacts
+key enter
+type Hello Bob, radio check
+key enter
+wait 2000
+expect status delivered
+shot net-dm-delivered
+wait 4000
+shot net-dm-reply
+expect threads 1
+dump

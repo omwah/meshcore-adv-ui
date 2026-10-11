@@ -77,6 +77,8 @@ public:
   uint32_t getPacketsSent() const { return SimRadio::current->getPacketsSent(); }
   uint32_t getPacketsRecvErrors() const { return SimRadio::current->getPacketsRecvErrors(); }
   uint32_t getRngSeed() const { return SimRadio::current->getRngSeed(); }
+  uint32_t getEstAirtimeFor(int len) { return SimRadio::current->getEstAirtimeFor(len); }
+  int getNoiseFloor() const { return SimRadio::current->getNoiseFloor(); }
 };
 
 class SimBoard : public mesh::MainBoard {
