@@ -1,0 +1,23 @@
+# Settings, theme switching and backup.
+key menu
+key down 9
+key enter
+shot settings
+key down
+key right
+shot settings-theme-amber
+key right 3
+shot settings-theme-daylight
+key left 4
+key down 6
+shot settings-mid
+key down 10
+shot settings-end
+hold esc 900
+key menu
+key down 10
+key enter
+shot backup
+key down
+key enter
+shot backup-identity-confirm

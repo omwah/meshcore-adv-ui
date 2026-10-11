@@ -1,0 +1,32 @@
+# Host-side toolchain for meshcore-adv-ui. Firmware dependencies come from
+# PlatformIO (pinned in platformio.ini) and the MeshCore submodule.
+#
+#   pixi install         # materialise .pixi/envs/default
+#   pixi run <task>      # see `pixi task list`
+
+[workspace]
+authors = ["meshcore-adv-ui contributors"]
+license = "MIT"
+license-file = "LICENSE"
+channels = ["conda-forge"]
+name = "meshcore-adv-ui"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[dependencies]
+python = "3.13.*"
+platformio = ">=6.1"
+pillow = ">=11"
+sdl2 = ">=2.30"
+pkg-config = "*"
+
+[tasks]
+deps     = "scripts/prepare-deps.sh"
+fonts    = "python -I scripts/gen_fonts.py"
+sim      = { cmd = "pio run -e sim", depends-on = ["deps"] }
+test     = { cmd = "pio test -e sim", depends-on = ["deps"] }
+shots    = { cmd = "python -I scripts/screenshots.py", depends-on = ["sim"] }
+build    = { cmd = "pio run -e cardputer_adv -e cardputer_adv_usb", depends-on = ["deps"] }
+size     = { cmd = "python -I scripts/check-size.py", depends-on = ["build"] }
+pii      = "scripts/pii-check.sh --all"
+ci       = "scripts/ci-local.sh"

@@ -1,0 +1,19 @@
+meshcore-adv-ui
+Copyright (c) 2026 meshcore-adv-ui contributors. Licensed under the MIT License.
+
+This project includes or derives from the following third-party work:
+
+* esp-vim (Apache License 2.0)
+  - scripts/bdf2c.py (BDF font to C table converter)
+  - src/hal/keymap/cardputer_keymap.* (Cardputer ADV TCA8418 key mapping and
+    modifier logic, adapted from esp_kbd_cardputer.c)
+  - TCA8418 register sequence, ST7789 panel init values, SD/LoRa shared-bus
+    handling and battery curve, adapted into boards/cardputer_adv/
+  Files derived from esp-vim carry their original Apache-2.0 notice and a
+  statement of changes. See licenses/Apache-2.0.txt.
+
+* Spleen bitmap fonts by Frederic Cambus (BSD 2-Clause), fonts/spleen-*.bdf.
+  See fonts/LICENSE.spleen.
+
+* MeshCore (MIT), used unmodified as a git submodule in external/MeshCore with
+  local patches in patches/meshcore/.

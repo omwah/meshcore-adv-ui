@@ -1,0 +1,8 @@
+# Fresh install with an SD backup present, and an empty device.
+fresh
+empty
+shot firstboot-restore-offer
+key n
+shot firstboot-empty-home
+key right 3
+shot firstboot-channels

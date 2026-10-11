@@ -1,0 +1,23 @@
+# Patched MeshCore tree, produced by scripts/prepare-deps.sh. Never committed.
+/.deps/
+
+# PlatformIO
+/.pio/
+/platformio.local.ini
+
+# Generated sources (fonts etc.)
+/src/gen/
+
+# Simulator state and captures (may contain keys/backups)
+/sim-data/
+/shots/
+*.backup.bin
+
+# pixi
+.pixi/*
+!.pixi/config.toml
+
+__pycache__/
+*.swp
+*~
+.DS_Store

@@ -1,0 +1,26 @@
+# Repeater admin: login, stats, neighbours, telemetry.
+key right 2
+key enter
+shot rpt-detail
+key down
+key enter
+shot rpt-admin
+key enter
+type secret
+shot rpt-password
+key enter
+wait 1200
+shot rpt-logged-in
+key down
+key enter
+wait 1200
+shot rpt-stats
+key down
+key enter
+wait 1200
+shot rpt-neighbours
+key esc
+key down
+key enter
+wait 1300
+shot rpt-telemetry

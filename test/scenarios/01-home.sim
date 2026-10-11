@@ -1,0 +1,14 @@
+# Home tabs and type-to-find.
+shot home-chats
+key right
+shot home-contacts
+key right
+shot home-nodes
+key right
+shot home-channels
+key right
+type ali
+shot home-find
+key esc
+key esc
+shot home-esc-twice-stays

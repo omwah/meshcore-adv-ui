@@ -1,0 +1,20 @@
+# Conversation: read, scroll, compose, send, delivery.
+key down
+key enter
+shot chat-dm
+key up 4
+shot chat-scrolled
+key enter
+type See you at 9 by the trailhead, bringing 2 radios.
+shot chat-compose
+key enter
+wait 200
+shot chat-pending
+wait 2500
+shot chat-delivered
+hold esc 900
+type pub
+key enter
+shot chat-channel
+rx chan 0 Grace Park|Repeater on the ridge is back, try it now
+shot chat-channel-incoming

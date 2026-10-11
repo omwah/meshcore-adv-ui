@@ -1,0 +1,16 @@
+# Channel management and joining.
+key right 3
+key tab
+shot chan-manage
+key down 2
+key enter
+shot chan-key
+hold esc 900
+key menu
+key enter
+shot chan-join
+key enter
+type mesh-sd
+shot chan-join-hashtag
+key enter
+shot chan-joined
