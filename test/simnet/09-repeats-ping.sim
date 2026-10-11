@@ -1,0 +1,35 @@
+# Channel messages show "heard N repeats" as repeaters rebroadcast them; ping
+# reaches a companion that shares telemetry, via path discovery.
+repeater Hilltop 9
+repeater Ridge 7
+link Hilltop Ridge 6
+node Jo 8 telem
+as Hilltop advert
+as Ridge advert
+as Jo advert
+wait 3000
+# Post to Public (Channels tab): both repeaters rebroadcast it.
+key left
+key enter
+type Testing repeats
+key enter
+wait 4000
+expect repeats 2
+shot chan-heard-repeats
+hold esc 900
+# Advertise ourselves so Jo can answer, then ping Jo.
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+key right
+type jo
+key enter
+key tab
+# Message, Details, Favourite, (Reset path is disabled: no route yet), Trace, Ping
+key down 4
+key enter
+wait 6000
+expect request ok
+shot ping-companion

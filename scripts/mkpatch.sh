@@ -25,11 +25,11 @@ git -C "$SUB" archive --format=tar HEAD | tar -x -C "$tmp/a"
 # Baseline = pristine + all existing patches except the one being (re)written.
 shopt -s nullglob
 for p in "$PATCHES"/*.patch; do
-    [ -e "$p" ] && [ "$p" != "$out" ] && patch -d "$tmp/a" -p1 --silent < "$p"
+    [ -e "$p" ] && [ "$p" != "$out" ] && patch -d "$tmp/a" -p1 --silent --no-backup-if-mismatch < "$p"
 done
 cp -a "$EDITED" "$tmp/b"
 
-(cd "$tmp" && diff -ruN a b) > "$out.new" || true
+(cd "$tmp" && diff -ruN -x "*.orig" -x "*.rej" a b) > "$out.new" || true
 [ -s "$out.new" ] || { rm -f "$out.new"; echo "no differences"; exit 1; }
 mv "$out.new" "$out"
 echo "wrote $out"

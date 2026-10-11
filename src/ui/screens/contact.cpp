@@ -41,8 +41,7 @@ public:
         _waiting = false;
         if (s == model::Req::Ok) {
           char t[48];
-          if (_pending == CI_PING) snprintf(t, sizeof t, "Ping reply in %u ms", (unsigned)a.m().lastRttMs());
-          else snprintf(t, sizeof t, "%s", a.m().requestText());
+          snprintf(t, sizeof t, "%s", a.m().requestText());
           if (_pending == CI_TRACE) openText(a, "Trace", a.m().requestText());
           else a.toast(t, C_OK);
         } else {

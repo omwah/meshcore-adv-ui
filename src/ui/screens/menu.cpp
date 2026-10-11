@@ -168,7 +168,8 @@ protected:
       case S_HDR_GPS: it.label = "GPS"; it.header = true; break;
       case S_GPS: it.label = "GPS receiver"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsEnabled)); break;
       case S_GPSADV: it.label = "Share position in adverts"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsShareInAdvert)); it.enabled = p.gpsEnabled; break;
-      case S_GPSTIME: it.label = "Set clock from GPS at boot"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsTimeSyncAtBoot)); it.enabled = p.gpsEnabled; break;
+      // Works with the receiver off too: it is powered just until the first fix.
+      case S_GPSTIME: it.label = "Set clock from GPS at boot"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.gpsTimeSyncAtBoot)); break;
       case S_HDR_DANGER: it.label = "RESET"; it.header = true; break;
       case S_FACTORY: it.label = "Factory reset"; it.valueCol = C_ERR; break;
     }

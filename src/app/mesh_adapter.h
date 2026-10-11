@@ -24,7 +24,7 @@ struct UiPrefs {
   uint8_t sound, textSize, gpsTimeSyncAtBoot, autoBackup, backupIdentity, backupMessages, bleEnabled;
   uint8_t presetIdx;
   uint16_t mutedChannels;        // bit per channel slot
-  uint8_t favourites[16][4];     // public key prefixes (MeshCore has no favourite flag)
+  uint8_t favourites[16][4];     // unused: favourites moved to MeshCore's contact flag (kept for layout)
   uint8_t nFavourites;
   // Fields added later go here: older, shorter files load them as 0.
   uint8_t blePinRandom;
@@ -53,6 +53,8 @@ public:
                    float final_snr) override;
   void onRawRx(float snr, float rssi, const uint8_t* raw, int len) override;
   void onControlData(float snr, float rssi, uint8_t path_len, const uint8_t* payload, int len) override;
+  void onPathResponse(const ContactInfo& from, uint8_t in_path_len, uint8_t out_path_len, uint8_t extra_type,
+                      const uint8_t* extra, uint8_t extra_len) override;
 
   // ---- model::MeshModel ----
   uint32_t revision() const override { return _rev; }
@@ -230,6 +232,13 @@ private:
   uint32_t _lastBackupAt = 0;
   int _seenContacts = -1;
   uint32_t _activePin = 0;
+  // Channel messages we sent recently, to count other nodes repeating them.
+  struct SentChannelMsg {
+    uint32_t seq, until;
+    uint8_t hash[4];
+    uint8_t repeats;
+  };
+  SentChannelMsg _sentChan[4] = {};
   uint32_t _prefsCheckAt = 0;
   uint32_t _bootGpsUntil = 0;     // boot-time GPS clock sync in progress until
 };

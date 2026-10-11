@@ -62,6 +62,16 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   loadUiPrefs();
   syncPrefsFromMesh();
   _fresh = freshInstall;
+  // Favourites used to be kept here: move them to MeshCore's contact flag.
+  if (_ui.nFavourites) {
+    for (int i = 0; i < _ui.nFavourites && i < 16; i++) {
+      ContactInfo* c = _mesh->lookupContactByPubKey(_ui.favourites[i], 4);
+      if (c) c->flags |= 1;
+    }
+    _ui.nFavourites = 0;
+    saveUiPrefs();
+    _mesh->uiMarkContactsDirty();
+  }
   _seenContacts = _mesh->getNumContacts();
   // "Set clock from GPS at boot": run the receiver until the first fix (at
   // most 10 minutes) even if GPS is otherwise off.
@@ -201,10 +211,10 @@ int MeshAdapter::contactIndex(const uint8_t* key) const {
 
 int MeshAdapter::contactCount() const { return _mesh->getNumContacts(); }
 
+// Favourites live in MeshCore's contact flags (bit 0), shared with phone apps.
 bool MeshAdapter::isFavourite(const uint8_t* key) const {
-  for (int i = 0; i < _ui.nFavourites; i++)
-    if (!memcmp(_ui.favourites[i], key, 4)) return true;
-  return false;
+  ContactInfo* c = _mesh->lookupContactByPubKey(key, 6);
+  return c && (c->flags & 1);
 }
 
 bool MeshAdapter::contact(int i, model::Contact& out) const {
@@ -239,20 +249,10 @@ bool MeshAdapter::contact(int i, model::Contact& out) const {
 void MeshAdapter::setFavourite(int i, bool fav) {
   ContactInfo c;
   if (!getContact(i, c)) return;
-  bool is = isFavourite(c.id.pub_key);
-  if (fav == is) return;
-  if (fav) {
-    if (_ui.nFavourites == 16) return;
-    memcpy(_ui.favourites[_ui.nFavourites++], c.id.pub_key, 4);
-  } else {
-    for (int k = 0; k < _ui.nFavourites; k++)
-      if (!memcmp(_ui.favourites[k], c.id.pub_key, 4)) {
-        memmove(_ui.favourites[k], _ui.favourites[k + 1], 4 * (_ui.nFavourites - k - 1));
-        _ui.nFavourites--;
-        break;
-      }
-  }
-  saveUiPrefs();
+  ContactInfo* p = _mesh->lookupContactByPubKey(c.id.pub_key, PUB_KEY_SIZE);
+  if (!p || (bool)(p->flags & 1) == fav) return;
+  p->flags = fav ? (p->flags | 1) : (p->flags & ~1);
+  _mesh->uiMarkContactsDirty();
   configChanged();
   _rev++;
 }
@@ -528,9 +528,20 @@ bool MeshAdapter::send(model::ThreadId t, const char* text) {
     ChannelDetails d;
     if (!_mesh->getChannel(t.idx, d) || !d.name[0]) return false;
     const char* name = _mesh->getNodePrefs()->node_name;
-    bool ok = _mesh->sendGroupMessage(ts, d.channel, name, text, (int)strlen(text));
+    uint8_t hash[MAX_HASH_SIZE];
+    bool ok = _mesh->uiSendGroupMessage(ts, d.channel, name, text, (int)strlen(text), hash);
     m.status = ok ? model::Delivery::Sent : model::Delivery::Failed;
-    _msgs.append(ThreadKey::channel((uint8_t)t.idx), m);
+    uint32_t seq = _msgs.append(ThreadKey::channel((uint8_t)t.idx), m);
+    if (ok && seq) {
+      // Listen for repeats of it for a minute (the oldest entry is reused).
+      SentChannelMsg* slot = &_sentChan[0];
+      for (auto& sc : _sentChan)
+        if (sc.until < slot->until) slot = &sc;
+      slot->seq = seq;
+      slot->until = millis() + 60000;
+      slot->repeats = 0;
+      memcpy(slot->hash, hash, 4);
+    }
     _rev++;
     return ok;
   }
@@ -594,7 +605,7 @@ void MeshAdapter::loop() {
 
   if (_req.state == model::Req::Busy && (int32_t)(ms - _req.deadline) >= 0) {
     _req.state = model::Req::Timeout;
-    snprintf(_req.text, sizeof _req.text, "No reply");
+    snprintf(_req.text, sizeof _req.text, _req.kind == ReqKind::Ping ? "No reply (it may not share telemetry)" : "No reply");
     _rev++;
   }
   if (_discoverState == model::Req::Busy && (int32_t)(ms - _discoverUntil) >= 0) {
@@ -714,6 +725,12 @@ void MeshAdapter::onRawRx(float snr, float rssi, const uint8_t* raw, int len) {
   if (_nLog < MAX_LOG) _nLog++;
 
   if (t == PAYLOAD_TYPE_ADVERT && !dup) heardAdvert(pkt, snr, rssi);
+  if (t == PAYLOAD_TYPE_GRP_TXT) {
+    for (auto& sc : _sentChan)
+      if (sc.seq && (int32_t)(sc.until - e.ms) > 0 && !memcmp(sc.hash, hash, 4) && sc.repeats < 255) {
+        _msgs.setRepeats(sc.seq, ++sc.repeats);   // "heard N repeats"
+      }
+  }
   _rev++;
 }
 
@@ -969,11 +986,39 @@ bool MeshAdapter::tracePath(int ci) {
 }
 
 bool MeshAdapter::ping(int ci) {
-  ContactInfo c;
-  if (!getContact(ci, c)) return false;
-  bool ok = c.type == ADV_TYPE_CHAT ? tracePath(ci) : requestStats(ci);
-  if (ok) _req.kind = ReqKind::Ping;
-  return ok;
+  if (_req.state == model::Req::Busy) return false;
+  ContactInfo* c = contactPtr(ci);
+  if (!c) return false;
+  if (c->type != ADV_TYPE_CHAT) {
+    bool ok = requestStats(ci);   // repeaters, rooms, sensors answer status requests
+    if (ok) _req.kind = ReqKind::Ping;
+    return ok;
+  }
+  // Companions: path discovery, as the MeshCore app does it: a flooded
+  // request for basic telemetry, answered with the route both ways.
+  uint8_t req[9];
+  req[0] = REQ_GET_TELEMETRY;
+  req[1] = (uint8_t)~TELEM_PERM_BASE;   // inverse mask: only base telemetry
+  memset(&req[2], 0, 3);
+  _mesh->getRNG()->random(&req[5], 4);
+  uint8_t saved = c->out_path_len;
+  c->out_path_len = OUT_PATH_UNKNOWN;   // force a flood
+  uint32_t tag = 0, est = 0;
+  int r = _mesh->sendRequest(*c, req, sizeof req, tag, est);
+  c->out_path_len = saved;
+  if (r == MSG_SEND_FAILED) return false;
+  _req.tag = tag;
+  return startRequest(ReqKind::Ping, ci, est);
+}
+
+void MeshAdapter::onPathResponse(const ContactInfo& from, uint8_t in_len, uint8_t out_len, uint8_t extra_type,
+                                 const uint8_t* extra, uint8_t extra_len) {
+  if (_req.state != model::Req::Busy || _req.kind != ReqKind::Ping || memcmp(from.id.pub_key, _req.key, PUB_KEY_SIZE))
+    return;
+  if (extra_type != PAYLOAD_TYPE_RESPONSE || extra_len < 4 || rd32(extra) != _req.tag) return;
+  finishRequest(model::Req::Ok, "Reply in %u ms: %d hop%s there, %d back", (unsigned)(millis() - _req.startedAt),
+                out_len & 63, (out_len & 63) == 1 ? "" : "s", in_len & 63);
+  _rev++;
 }
 
 void MeshAdapter::onTraceData(uint32_t tag, uint8_t flags, const uint8_t* hashes, const uint8_t* snrs, uint8_t path_len,

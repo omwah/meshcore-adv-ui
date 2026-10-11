@@ -207,7 +207,7 @@ private:
       x = c.text(x + 10, top + 1, label, sf, col) + 4;
       if (chan && m.repeats) {
         char rp[16];
-        snprintf(rp, sizeof rp, "heard %ux", m.repeats);
+        snprintf(rp, sizeof rp, "heard %u repeat%s", m.repeats, m.repeats == 1 ? "" : "s");
         c.text(x, top + 1, rp, sf, C_OK);
       } else if (m.retries) {
         char rt[12];

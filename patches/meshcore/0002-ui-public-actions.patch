@@ -1,7 +1,7 @@
-diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
---- a/examples/companion_radio/MyMesh.cpp	2026-10-11 11:20:03.546181644 -0700
-+++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 11:20:03.499551349 -0700
-@@ -2253,6 +2253,43 @@
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
+--- a/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:45.270407630 -0700
++++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:45.224439780 -0700
+@@ -2254,6 +2254,61 @@
  #endif
  }
  
@@ -14,6 +14,24 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
 +    saveContacts();
 +    dirty_contacts_expiry = 0;
 +  }
++}
++
++bool MyMesh::uiSendGroupMessage(uint32_t timestamp, mesh::GroupChannel& channel, const char* sender_name,
++                                const char* text, int text_len, uint8_t hash_out[MAX_HASH_SIZE]) {
++  uint8_t temp[5 + MAX_TEXT_LEN + 32];
++  memcpy(temp, &timestamp, 4);
++  temp[4] = 0;  // TXT_TYPE_PLAIN
++  sprintf((char *) &temp[5], "%s: ", sender_name);
++  char *ep = strchr((char *) &temp[5], 0);
++  int prefix_len = ep - (char *) &temp[5];
++  if (text_len + prefix_len > MAX_TEXT_LEN) text_len = MAX_TEXT_LEN - prefix_len;
++  memcpy(ep, text, text_len);
++  ep[text_len] = 0;
++  auto pkt = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, channel, temp, 5 + prefix_len + text_len);
++  if (!pkt) return false;
++  pkt->calculatePacketHash(hash_out);
++  sendFloodScoped(channel, pkt);
++  return true;
 +}
 +
 +void MyMesh::uiSaveChannels() {
@@ -45,10 +63,10 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
  bool MyMesh::advert() {
    mesh::Packet* pkt;
    if (_prefs.advert_loc_policy == ADVERT_LOC_NONE) {
-diff -ruN a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.h
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.h
 --- a/examples/companion_radio/MyMesh.h	2026-08-14 05:19:19.000000000 -0700
-+++ b/examples/companion_radio/MyMesh.h	2026-10-11 11:20:03.499114825 -0700
-@@ -98,6 +98,14 @@
++++ b/examples/companion_radio/MyMesh.h	2026-10-11 16:26:45.223794594 -0700
+@@ -98,6 +98,18 @@
    void loop();
    void handleCmdFrame(size_t len);
    bool advert();
@@ -60,6 +78,10 @@ diff -ruN a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.
 +  void uiDeleteContactBlob(const uint8_t* pub_key); // as CMD_REMOVE_CONTACT
 +  bool uiSendAdvert(bool flood);                    // as CMD_SEND_SELF_ADVERT
 +  void uiFlushContacts();                          // write a pending lazy contacts save now
++  // As BaseChatMesh::sendGroupMessage, also giving the packet's hash (its
++  // repeats by other nodes carry the same hash), so a UI can count them.
++  bool uiSendGroupMessage(uint32_t timestamp, mesh::GroupChannel& channel, const char* sender_name,
++                          const char* text, int text_len, uint8_t hash_out[MAX_HASH_SIZE]);
    void enterCLIRescue();
  
    int  getRecentlyHeard(AdvertPath dest[], int max_num);

@@ -5,7 +5,7 @@
 //   simnet --smoke
 //
 // The UI node is "Cardputer" (id 0). Commands besides runner.cpp's:
-//   node <name> [snr] [echo]      add a companion node linked to the UI node
+//   node <name> [snr] [echo] [telem]   add a companion node linked to the UI node
 //   repeater <name> [snr] [password]   add a stock MeshCore repeater
 //   link <a> <b> <snr> | unlink <a> <b>
 //   as <name> advert [flood]
@@ -17,6 +17,8 @@
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
+//   expect request idle|busy|ok|failed|timeout
+//   expect repeats <n>         repeats heard of the last message we sent in the open chat
 //   expect contacts|unread|heard|threads <n>
 //   expect status <pending|sent|delivered|failed>   last message we sent in the open chat
 //   dump                          print the UI node's view to stdout
@@ -113,16 +115,20 @@ public:
 
   bool command(const char* cmd, const char* arg, char* err, size_t n) override {
     if (!strcmp(cmd, "node")) {
-      char name[32] = {}, flag[8] = {};
+      char name[32] = {}, flag[8] = {}, flag2[8] = {};
       float snr = 8.0f;
-      sscanf(arg, "%31s %f %7s", name, &snr, flag);
+      sscanf(arg, "%31s %f %7s %7s", name, &snr, flag, flag2);
       int id = _nextId++;
       Bot b;
       b.task.reset(new BotTask(&board, &_ifaces));
       b.node.reset(new SimNode(_medium, id, name, _dir + "/" + name, kEpoch, b.task.get()));
       b.node->begin();
       b.task->attach(&b.node->mesh(), rtcOf(*b.node));
-      b.task->echo = !strcmp(flag, "echo");
+      b.task->echo = !strcmp(flag, "echo") || !strcmp(flag2, "echo");
+      if (!strcmp(flag, "telem") || !strcmp(flag2, "telem")) {   // shares base telemetry: answers pings
+        b.node->select();
+        b.node->mesh().getNodePrefs()->telemetry_mode_base = TELEM_MODE_ALLOW_ALL;
+      }
       _medium.link(0, id, snr);
       _ids[name] = id;
       _bots[name] = std::move(b);
@@ -227,6 +233,18 @@ private:
     else if (!strcmp(what, "heard")) got = _ui.heardCount();
     else if (!strcmp(what, "threads")) got = _ui.threadCount();
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
+    else if (!strcmp(what, "request")) {
+      static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};
+      const char* g = st[(int)_ui.requestState()];
+      if (strcmp(g, val)) snprintf(err, n, "request is %s (%s)", g, _ui.requestText());
+      return true;
+    }
+    else if (!strcmp(what, "repeats")) {   // last message we sent in the open chat
+      app::MessageStore& s = _ui.store();
+      got = -1;
+      for (int i = s.count() - 1; i >= 0; i--)
+        if (s.at(i).outgoing) { got = s.at(i).repeats; break; }
+    }
     else if (!strcmp(what, "screen")) {
       bool on = _app && !_app->asleep();
       if (on != !strcmp(val, "on")) snprintf(err, n, "screen is %s", on ? "on" : "off");
