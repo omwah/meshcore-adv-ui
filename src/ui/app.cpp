@@ -129,11 +129,11 @@ const char* App::promptText() const { return s_prompt.text; }
 
 // ---------------------------------------------------------------- app
 
-//                    small         med           list          body          head foot tab row chat menu meta
+//                    small         med           list          body          menu          head foot tab row chat menu meta
 static const Metrics kMetrics[3] = {
-  /* small  */ {&font_small,  &font_medium, &font_large,  &font_medium, 13, 10, 14, 16, 24, 16, 9},
-  /* medium */ {&font_medium, &font_large,  &font_large,  &font_large,  17, 14, 18, 18, 32, 20, 13},
-  /* large  */ {&font_large,  &font_large,  &font_xlarge, &font_xlarge, 17, 18, 18, 26, 34, 20, 17},
+  /* small  */ {&font_small,  &font_medium, &font_large,  &font_medium, &font_medium, 13, 10, 14, 16, 24, 16, 9},
+  /* medium */ {&font_medium, &font_large,  &font_large,  &font_large,  &font_large,  17, 14, 18, 18, 32, 20, 13},
+  /* large  */ {&font_large,  &font_large,  &font_xlarge, &font_xlarge, &font_xlarge, 17, 18, 18, 26, 34, 27, 17},
 };
 
 App::App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k) : _m(m), _d(d), _k(k), _mx(&kMetrics[1]) {}

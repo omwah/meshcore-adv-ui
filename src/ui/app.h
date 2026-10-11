@@ -29,6 +29,7 @@ struct Metrics {
   const mc_font_t* med;      // header, menus, previews
   const mc_font_t* list;     // list item names
   const mc_font_t* body;     // message text
+  const mc_font_t* menu;     // menu and settings rows, text pages
   int head, foot;            // header and footer bar heights
   int tab;                   // tab strip
   int row;                   // single-line list row
@@ -108,6 +109,7 @@ public:
   const mc_font_t* fBody() const { return _mx->body; }
   const mc_font_t* fSmall() const { return _mx->small; }
   const mc_font_t* fMed() const { return _mx->med; }
+  const mc_font_t* fMenu() const { return _mx->menu; }
 
   Rect content() const;
 

@@ -19,9 +19,9 @@ public:
   int scroll = 0;
   const char* title(App&) override { return title_; }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    const int lh = a.fMed()->height;
-    struct Ctx { Canvas* c; const mc_font_t* f; int x, y, first, rows, lh; } ctx{&c, a.fMed(), r.x + 4, r.y + 2, scroll, (r.h - 2) / lh, lh};
-    _lines = wrapText(body, a.fMed(), r.w - 10, [](void* p, const char* s, int len, int line) {
+    const int lh = a.fMenu()->height;
+    struct Ctx { Canvas* c; const mc_font_t* f; int x, y, first, rows, lh; } ctx{&c, a.fMenu(), r.x + 4, r.y + 2, scroll, (r.h - 2) / lh, lh};
+    _lines = wrapText(body, a.fMenu(), r.w - 10, [](void* p, const char* s, int len, int line) {
       Ctx* x = (Ctx*)p;
       int row = line - x->first;
       if (row < 0 || row >= x->rows) return;

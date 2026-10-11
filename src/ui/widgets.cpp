@@ -66,7 +66,7 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
   if (vis < 1) vis = 1;
   _vis = vis;
   _nav.clamp(n, vis);
-  const mc_font_t* f = app.fMed();
+  const mc_font_t* f = app.fMenu();
   const mc_font_t* sm = app.fSmall();
   const int ty = (RH - f->height) / 2, iy = (RH - 8) / 2;
   for (int row = 0; row < vis && _nav.top + row < n; row++) {
@@ -91,10 +91,14 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
       c.fillRect(r.x, y, r.w - 3, RH, C_ZEBRA);
     }
     uint8_t fg = it.enabled ? C_TEXT : C_DIM;
-    // The label keeps at least a third of the row; a long value is cut.
+    // If label and value don't both fit (Large text), the value drops to the
+    // header font. The label keeps at least a third of the row; a value that
+    // still doesn't fit is cut (or scrolls when selected).
     int lw = Canvas::textWidth(it.label, f);
+    const mc_font_t* vf = f;
+    if (it.value[0] && lw + Canvas::textWidth(it.value, f) + 28 > r.w && app.fMed() != f) vf = app.fMed();
     int vmax = r.w - 26 - (lw < r.w / 3 ? lw : r.w / 3);
-    int vw = it.value[0] ? Canvas::textWidth(it.value, f) : 0;
+    int vw = it.value[0] ? Canvas::textWidth(it.value, vf) : 0;
     if (vw > vmax) vw = vmax;
     app.fitText(c, r.x + 6, y + ty, it.label, f, fg, r.w - 18 - vw - (vw ? 10 : 0), sel);
     if (vw) {
@@ -103,7 +107,7 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
         // Show that Left/Right change this value.
         c.bitmap(vx - 9, y + iy, icon::arrowL, 8, 8, C_DIM);
       }
-      app.fitText(c, vx, y + ty, it.value, f, it.enabled ? it.valueCol : C_DIM, vw, sel);
+      app.fitText(c, vx, y + (RH - vf->height) / 2, it.value, vf, it.enabled ? it.valueCol : C_DIM, vw, sel);
     }
   }
   drawScrollbar(c, r, n, _nav.top, vis);
