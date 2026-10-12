@@ -50,6 +50,16 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 5. Bluetooth (default build)
 
+The items below passed with stock's Bluedroid stack. Bluetooth now runs on
+NimBLE (`boards/cardputer_adv/nimble_serial.*`), so they need checking again:
+
+- [ ] **NimBLE: pairing.** On the phone, forget the old pairing first. The app finds the device, the PIN shows on screen while pairing, and pairing with it succeeds. A wrong PIN is refused and the device advertises again.
+- [ ] **NimBLE: reconnect.** After a reboot of either side, the phone reconnects without asking for the PIN again.
+- [ ] **NimBLE: phone app.** Contacts and channels sync, and messages go both ways, including long ones (the app's whole frame in one notify).
+- [ ] **NimBLE: toggle.** Settings > Bluetooth off disconnects the phone and stops advertising; on, it advertises again.
+- [ ] **NimBLE: heap.** Diagnostics > System shows more free heap than the Bluedroid build, with a phone connected.
+
+Earlier, with Bluedroid:
 - [x] **Pairing and key import.** Pairing works, and so does the app's private key import (after enabling ENABLE_PRIVATE_KEY_IMPORT/EXPORT as stock does).
 - [x] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse. Works on hardware.
 - [x] **Bluetooth toggle.** Settings > Bluetooth off stops advertising. Works on hardware.

@@ -21,29 +21,10 @@
 #endif
 
 #if defined(BLE_PIN_CODE)
-  #include <helpers/esp32/SerialBLEInterface.h>
-  // MeshCore's Bluetooth companion, plus knowing when a phone is pairing so
-  // the UI can show the PIN: connected but not yet authenticated.
-  class PairingBLEInterface : public SerialBLEInterface {
-  public:
-    volatile bool linked = false, authed = false;
-    void onConnect(BLEServer* s, esp_ble_gatts_cb_param_t* p) override {
-      linked = true;
-      authed = false;
-      SerialBLEInterface::onConnect(s, p);
-    }
-    void onAuthenticationComplete(esp_ble_auth_cmpl_t c) override {
-      authed = c.success;
-      if (!c.success) linked = false;
-      SerialBLEInterface::onAuthenticationComplete(c);
-    }
-    void onDisconnect(BLEServer* s) override {
-      linked = authed = false;
-      SerialBLEInterface::onDisconnect(s);
-    }
-    bool pairing() const { return linked && !authed; }
-  };
-  static PairingBLEInterface ble_interface;
+  // MeshCore's Bluetooth companion over NimBLE; it also tells the UI when a
+  // phone is pairing, so it can show the PIN.
+  #include "nimble_serial.h"
+  static NimbleSerialInterface ble_interface;
   static constexpr bool kBleBuilt = true;
 #else
   static constexpr bool kBleBuilt = false;

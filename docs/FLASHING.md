@@ -7,7 +7,7 @@ Images for the M5Stack Cardputer ADV with the Cap LoRa-1262. Build them with
 |---|---|
 | `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` | esptool, web flashers, M5Burner: one image, written at offset `0x0` |
 | `meshcore-adv-ui-<ver>-cardputer_adv.bin` | M5Launcher (from the SD card), or anything that installs an app at `0x10000` |
-| `...-cardputer_adv_usb...` | The same pair for the USB-only build (no Bluetooth, about 0.6 MB smaller) |
+| `...-cardputer_adv_usb...` | The same pair for the USB-only build (no Bluetooth, about 0.23 MB smaller) |
 | `SHA256SUMS` | Checksums of the above |
 
 Use the `cardputer_adv` images unless you know you want the USB-only build.
