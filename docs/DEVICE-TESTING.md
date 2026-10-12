@@ -21,9 +21,9 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 - [x] **Splash.** It shows "MeshCore keyboard edition" right way up, with correct colours. Check that Midnight's header is dark blue, not yellow. If colours are inverted, toggle INVON (0x21) in `st7789_display.cpp`. If the picture is mirrored or offset, check MADCTL 0x60 and the gap (40, 53). Colours look right on hardware.
 - [x] **Backlight.** It needs a low PWM rate: at 5 kHz the driver stays dark, while 256 Hz works (found on hardware).
-- [ ] **Brightness and timeout.** Brightness follows Settings > Brightness, and the backlight turns off after the screen timeout. Any key wakes it without doing anything else.
-- [ ] **Keyboard map.** Every key types its printed legend in a message. `; , . /` move in menus. Opt opens the menu. Holding `` ` `` goes Home.
-- [ ] **No missed or doubled presses.** With Settings > Key filter at 60 ms, fast Up/Down presses must neither drop nor double. If they do, try other values (10–500 ms).
+- [x] **Brightness and timeout.** Brightness follows Settings > Brightness, and the backlight turns off after the screen timeout. Any key wakes it without doing anything else. Works on hardware.
+- [x] **Keyboard map.** Every key types its printed legend in a message. `; , . /` move in menus. Opt opens the menu. Holding `` ` `` goes Home. Works on hardware.
+- [x] **No missed or doubled presses.** With Settings > Key filter at 60 ms, fast Up/Down presses must neither drop nor double. If they do, try other values (10–500 ms). Works on hardware at 60 ms.
 
 ## 2. Radio (the riskiest assumptions)
 
