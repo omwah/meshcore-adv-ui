@@ -126,9 +126,14 @@ void loop() {
   interfaces.loop();
   sensors.loop();
   adapter.loop();
-  ui_app.loop(millis());
+  uint32_t uiWait = ui_app.loop(millis());
   rtc_clock.tick();
 #if !defined(ENABLE_USB_INTERFACE)
   diagPoll(ui_app, display, keyboard, platform);
 #endif
+  // Don't spin: sleeping lets the idle task halt the CPU until the next
+  // interrupt. At most 10 ms, so the radio (one packet buffer, ~40 ms per
+  // packet at SF7) is always read in time; not at all while MeshCore has
+  // packets to send or retry.
+  if (!the_mesh.hasPendingWork()) delay(uiWait < 10 ? uiWait : 10);
 }

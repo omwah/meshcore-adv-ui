@@ -60,6 +60,9 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 7. Power and memory
 
+- [ ] **Battery drain.** With the idle sleep in the main loop: note the voltage on Diagnostics > System, run an hour on battery with the screen timing out, and note it again. Compare with an older build if possible.
+- [ ] **Lower CPU clock.** Build with `-D ESP32_CPU_FREQ=80` (or 160): check that Bluetooth with the phone, radio receive and the UI still work, then repeat the drain test.
+
 - [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim does. With the power switch off on USB it reads 4.14 V (full). With the switch on it read 3.48 V after an evening on USB: the battery itself, which appears not to charge fully while the device runs.
 - [ ] **Charging.** Find out whether the Cardputer ADV charges with the power switch on, or only with it off.
 - [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
