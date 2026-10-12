@@ -57,7 +57,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 ## 6. Sound
 
 - [x] **Chime.** Works on hardware. Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.
-- [ ] **No chime when muted.** No chime for messages in muted channels, or with Sound off. Sound off: works on hardware. Muted channel: not yet checked.
+- [x] **No chime when muted.** No chime for messages in muted channels, or with Sound off. Works on hardware for both.
 
 ## 7. Power and memory
 
