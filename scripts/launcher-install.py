@@ -29,7 +29,7 @@ $LAUNCHER_USER and $LAUNCHER_PASS say otherwise.
 The protocol (Launcher's src/webInterface.cpp and webUi/scripts.js):
   POST /login            username, password -> cookie ESP32SESSION
   GET  /partitions       the table as JSON
-  POST /partitions       action=delete offset=N, then action=apply (restarts)
+  POST /partitions       multipart: action=delete offset=N, then action=apply (restarts)
   POST /OTA              command=0, size, manifest (JSON: the parts to install)
   POST /OTAFILE          the file, multipart field "file1" -> "OK"
   GET  /reboot
@@ -113,6 +113,12 @@ class Launcher:
         except (urllib.error.URLError, OSError) as e:
             die(f"{method} {path}: {e}")
 
+    def multipart_form(self, path, fields, timeout=30):
+        """POST fields as multipart/form-data, as Launcher's page does (its
+        Partition Manager uses FormData; a urlencoded body gets 405)."""
+        body, ctype = multipart(fields)
+        return self.request("POST", path, body, ctype, timeout)
+
     def form(self, path, fields, timeout=30):
         body = urllib.parse.urlencode(fields).encode()
         return self.request("POST", path, body, "application/x-www-form-urlencoded", timeout)
@@ -146,10 +152,10 @@ class Launcher:
             return
         for e in old:
             say(f"deleting '{name}' ({e['label']} at {e['offset']:#x}, {e['size'] // 1024} KB)")
-            status, text = self.form("/partitions", {"action": "delete", "offset": e["offset"]})
+            status, text = self.multipart_form("/partitions", {"action": "delete", "offset": e["offset"]})
             if status != 200:
                 die(f"delete {e['label']}: {status} {text}")
-        status, text = self.form("/partitions", {"action": "apply"})
+        status, text = self.multipart_form("/partitions", {"action": "apply"})
         if status != 200:
             die(f"apply: {status} {text}")
         say("partition table written; Launcher restarts")
