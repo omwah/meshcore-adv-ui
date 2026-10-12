@@ -8,6 +8,16 @@ static const char* const SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
 static const char* const RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E";   // we write
 static const char* const TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E";   // it notifies
 
+// A saved peer's address as NimBLE wants it. Not NimBLEAddress(uint8_t[6]):
+// that constructor reverses the bytes, while getNative() (where they came
+// from) gives them unreversed.
+static NimBLEAddress addressOf(const app::Peer& p) {
+  ble_addr_t a;
+  a.type = p.addrType;
+  memcpy(a.val, p.addr, 6);
+  return NimBLEAddress(a);
+}
+
 void NimbleCentral::begin(const char* deviceName) {
   _rx = xQueueCreate(RX_FRAMES, sizeof(Frame));
   _tx = xQueueCreate(TX_FRAMES, sizeof(Frame));
@@ -120,7 +130,7 @@ void NimbleCentral::dropConnection() {
 // One go at the saved node: connect, pair (or use the bond), find the
 // service, subscribe to its notifications.
 bool NimbleCentral::attempt() {
-  NimBLEAddress addr(_peer.addr, _peer.addrType);
+  NimBLEAddress addr = addressOf(_peer);
   _state = State::Connecting;
   if (!_client->connect(addr, true)) {
     setError("Node not found or out of range");
@@ -167,7 +177,7 @@ void NimbleCentral::run() {
     if (_forgetPending) {
       _forgetPending = false;
       dropConnection();
-      NimBLEAddress a(_forgetPeer.addr, _forgetPeer.addrType);
+      NimBLEAddress a = addressOf(_forgetPeer);
       if (NimBLEDevice::isBonded(a)) NimBLEDevice::deleteBond(a);
     }
     // Scanning: while asked for (the Nodes nearby screen).
