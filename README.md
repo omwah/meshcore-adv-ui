@@ -21,6 +21,26 @@ can be added as new board directories.
   - Pending keys are discarded when the screen changes.
   - The key filter (debounce) is adjustable in Settings.
 
+## Remote node mode
+
+The Cardputer can also be the keyboard and screen of another MeshCore node
+that runs stock **companion** firmware (a Heltec, T-Echo, RAK...), over
+Bluetooth, the way the phone app is. Settings > Mesh node > remote switches
+to it (the device restarts); its own LoRa radio then sleeps and need not
+even be attached. Remote node (in the main menu) finds nodes nearby and
+connects with the node's Bluetooth PIN (stock default 123456); the device
+reconnects by itself after that.
+
+Everything works against the remote node: chats, contacts, channels,
+heard adverts, repeater and room admin, trace and ping, radio settings,
+diagnostics and the packet log (from the node's raw receive log). History is
+kept on the Cardputer, per node. Backup & restore saves the node's settings,
+channels, contacts and identity (if the node allows export) to the SD card
+and puts them back on the node. The Cardputer's GPS can set the node's clock
+and advert position. Remote node also restarts or erases the node.
+
+The Bluetooth build only: the USB-only build has no remote mode.
+
 ## Keys (Cardputer)
 
 | Key | In lists and menus | While typing |
@@ -118,7 +138,9 @@ presses go through the same Cardputer keymap code as the device.
   unmodified MeshCore repeaters, on a simulated LoRa medium with real airtime
   and per-link SNR. It covers routing, ACKs, retries, admin, trace, channels,
   backup and restore, and reboots. Scenarios with expectations are in
-  `test/simnet/*.sim`.
+  `test/simnet/*.sim`. With `--remote`, the UI drives our node as a remote
+  companion over a simulated Bluetooth link (it paces and drops frames as
+  stock's BLE interface does); scenarios marked `# both-modes` run both ways.
 
 The script commands are listed in `boards/sim/main.cpp`,
 `boards/simnet/main.cpp` and `boards/sim/runner.cpp`.
@@ -128,7 +150,8 @@ The script commands are listed in `boards/sim/main.cpp`,
 ```
 src/ui/        UI: canvas, fonts, themes, widgets, screens (no Arduino/MeshCore)
 src/model/     MeshModel: the UI's only view of the mesh
-src/app/       MeshCore adapter, radio presets, backup
+src/app/       MeshCore adapter (local node), radio presets, backup
+src/app/remote/ remote node: companion protocol client and its MeshModel
 src/hal/       display / keyboard interfaces
 boards/<name>/ device drivers and MeshCore target for a board
 boards/sim/    mock-data simulator and the shared script runner

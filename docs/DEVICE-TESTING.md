@@ -64,6 +64,23 @@ Earlier, with Bluedroid:
 - [x] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse. Works on hardware.
 - [x] **Bluetooth toggle.** Settings > Bluetooth off stops advertising. Works on hardware.
 
+## 5b. Remote node mode (Bluetooth client)
+
+Needs a second MeshCore node with stock **companion** firmware over BLE (a
+Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
+
+- [ ] **Switch.** Settings > Mesh node > remote: the device restarts on the Remote node screen (no node chosen yet). The LoRa Cap may be attached or not.
+- [ ] **Find.** Find nodes nearby lists the companion by its Bluetooth name (MeshCore-<name>) with a signal level.
+- [ ] **Pair.** Choosing it asks for the PIN (123456 prefilled); the right PIN connects ("Connected", node name, battery), a wrong one says so and stops.
+- [ ] **Sync.** Home fills with the node's contacts and channels; messages that waited on the node arrive.
+- [ ] **Messages.** A DM out shows delivered; a channel post shows "heard N repeats" when a repeater is near; incoming DMs and channel posts appear and chime.
+- [ ] **Reconnect.** Restart the node (Remote node > Restart the node), then the Cardputer: both times the link comes back by itself without the PIN.
+- [ ] **Admin.** Log in to a repeater or room through the node; status and neighbours come back.
+- [ ] **Settings.** Rename the node, change a radio setting: the node keeps them (check with the phone app or after a node restart).
+- [ ] **Backup.** Back up now with an SD card in; Restore puts it back (try after changing a channel).
+- [ ] **Battery, heap.** Header shows the Cardputer's battery; Diagnostics shows the node's battery, and free heap stays healthy.
+- [ ] **Back to local.** Settings > Mesh node > this device: the own node, its contacts and history are as before.
+
 ## 6. Sound
 
 - [x] **Chime.** Works on hardware. Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.

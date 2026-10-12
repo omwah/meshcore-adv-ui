@@ -31,6 +31,7 @@ struct UiPrefs {
   // Fields added later go here: older, shorter files load them as 0.
   uint8_t blePinRandom;
   uint8_t deviceMode;            // model::Mode
+  uint8_t remoteGps;             // remote mode: this device's GPS on (local mode keeps it in NodePrefs)
 };
 
 // The mode the device boots in, from the UI prefs on flash (before any

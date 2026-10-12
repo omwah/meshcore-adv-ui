@@ -69,7 +69,8 @@ void RemoteAdapter::begin(fs::FS& fs) {
   loadPeer();
   openHistory();   // with no node saved yet, an empty placeholder
   uiToPrefs();
-  _prefs.gpsEnabled = false;
+  _prefs.gpsEnabled = _ui.remoteGps;
+  _plat.setGpsPower(_ui.remoteGps);
   startBootGps();
   refreshBackupInfo();
   if (_peerSaved) _link.connect(_peer, _pin);
@@ -1069,6 +1070,7 @@ void RemoteAdapter::setPrefs(const model::Prefs& p) {
   // The GPS here is this device's own.
   if (p.gpsEnabled != _prefs.gpsEnabled) _plat.setGpsPower(p.gpsEnabled);
   prefsToUi(p);
+  _ui.remoteGps = p.gpsEnabled;
   saveUiPrefs();
   syncPrefs();
   _prefs.gpsEnabled = p.gpsEnabled;

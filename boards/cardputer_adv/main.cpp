@@ -16,6 +16,7 @@
 #include "tca8418_keyboard.h"
 #include "platform_cardputer.h"
 #include "es8311_sound.h"
+#include <new>
 #if !defined(ENABLE_USB_INTERFACE)
   #include "diag.h"
 #endif
@@ -28,6 +29,13 @@
   static constexpr bool kBleBuilt = true;
 #else
   static constexpr bool kBleBuilt = false;
+#endif
+#if defined(BLE_PIN_CODE) && MC_UI_REMOTE
+  // Remote node mode: this device as a companion node's screen, over BLE.
+  #include "nimble_central.h"
+  #include "app/remote/remote_adapter.h"
+  static NimbleCentral* central = nullptr;
+  static app::RemoteAdapter* remote = nullptr;
 #endif
 #if defined(ENABLE_USB_INTERFACE)
   #include <helpers/ArduinoSerialInterface.h>
@@ -45,32 +53,64 @@ MyMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables, store, &adapter);
 static St7789Display display;
 static Tca8418Keyboard keyboard;
 static Es8311Sound sound;
-static ui::App ui_app(adapter, display, keyboard, &sound);
+// The UI, built in setup() on the local or the remote model.
+alignas(ui::App) static uint8_t ui_storage[sizeof(ui::App)];
+static ui::App* ui_app = nullptr;
+static bool remoteMode = false;
 
 static void halt(const char* why) {
   Serial.printf("halt: %s\n", why);
   for (;;) delay(1000);
 }
 
+#if defined(BLE_PIN_CODE) && MC_UI_REMOTE
+// Remote node mode: no mesh node of our own. The radio sleeps (it need not
+// even be attached); the UI drives a companion node over Bluetooth.
+static void setupRemote() {
+  if (radio_init()) radio.sleep();
+  sensors.begin();   // this device's GPS
+  central = new NimbleCentral();
+  central->begin("MeshCore-UI");
+  remote = new app::RemoteAdapter(*central, platform);
+  remote->begin(SPIFFS);
+  ui_app = new (ui_storage) ui::App(*remote, display, keyboard, &sound);
+  keyboard.begin();
+  sound.begin();
+  ui_app->begin(ui::screens::boot());
+  board.onBootComplete();
+  Serial.printf("meshcore-adv-ui %s (remote node mode): keyboard %s, speaker %s, sd %s, heap %u (min %u)\n",
+                MC_UI_VERSION, keyboard.present() ? "ok" : "MISSING", sound.present() ? "ok" : "MISSING",
+                platform.sd() ? "yes" : "no", (unsigned)platform.heapFree(), (unsigned)platform.heapMin());
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
   board.begin();
   display.begin();
+  SPIFFS.begin(true);
+#if defined(BLE_PIN_CODE) && MC_UI_REMOTE
+  remoteMode = app::readDeviceMode(SPIFFS) == model::Mode::Remote;
+  if (remoteMode) {
+    setupRemote();
+    return;
+  }
+#endif
 
   if (!radio_init()) halt("radio init failed (is the Cap LoRa-1262 attached?)");
   fast_rng.begin(radio_driver.getRngSeed());
 
-  SPIFFS.begin(true);
   bool fresh = !SPIFFS.exists("/identity/_main.id");
   store.begin();
   the_mesh.begin(true);
 
   adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
+  ui_app = new (ui_storage) ui::App(adapter, display, keyboard, &sound);
   // Show the splash now: Bluetooth and sensors take a while to start.
   keyboard.begin();
   sound.begin();
-  ui_app.begin(ui::screens::boot());
-  ui_app.loop(millis());
+  ui_app->begin(ui::screens::boot());
+  ui_app->loop(millis());
 #if defined(BLE_PIN_CODE)
   platform.blePairingFn = [] { return ble_interface.pairing(); };
   ble_interface.begin(BLE_NAME_PREFIX, the_mesh.getNodePrefs()->node_name, adapter.choosePinForBoot());
@@ -103,14 +143,24 @@ void setup() {
 }
 
 void loop() {
+#if defined(BLE_PIN_CODE) && MC_UI_REMOTE
+  if (remoteMode) {
+    sensors.loop();
+    remote->loop();
+    uint32_t uiWait = ui_app->loop(millis());
+    diagPoll(*ui_app, display, keyboard, platform);
+    delay(uiWait < 10 ? uiWait : 10);
+    return;
+  }
+#endif
   the_mesh.loop();
   interfaces.loop();
   sensors.loop();
   adapter.loop();
-  uint32_t uiWait = ui_app.loop(millis());
+  uint32_t uiWait = ui_app->loop(millis());
   rtc_clock.tick();
 #if !defined(ENABLE_USB_INTERFACE)
-  diagPoll(ui_app, display, keyboard, platform);
+  diagPoll(*ui_app, display, keyboard, platform);
 #endif
   // Don't spin: sleeping lets the idle task halt the CPU until the next
   // interrupt. At most 10 ms, so the radio (one packet buffer, ~40 ms per
