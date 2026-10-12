@@ -41,7 +41,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [ ] **Card detection.** Insert a FAT32 card. Backup & restore shows "SD card ready".
 - [ ] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12).
 - [ ] **History archive.** With a card in, after more than 512 messages in all, scrolling up past the oldest flash message loads older ones from `/meshcore-adv-ui/history/`. "Clear history" removes that thread's file. (Covered in simnet with a 40-record ring.)
-- [ ] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back.
+- [x] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back. Works on hardware (a fresh Launcher install).
 
 ## 4. GPS (ATGM336H)
 
@@ -67,4 +67,4 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim and M5Unified do. On USB with the power switch off it reads 4.14 V, the charger's output.
 - [x] **Charging.** Pure hardware; the firmware has nothing to enable. A computer's USB port charged it little or not at all (3.5 V after hours); a standalone USB charger works. Use a wall charger.
 - [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
-- [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it (works: installed over its WebUI), and after a re-install the restore offer appears (not yet checked).
+- [x] **Launcher.** If you use bmorcelli's Launcher: the app runs from it (installed over its WebUI), and on first start the restore offer appears and brings back the identity, contacts and settings. Works on hardware.
