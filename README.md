@@ -117,13 +117,13 @@ for the first-flash checklist.
 
 | Build | What | Flash | Static RAM |
 |---|---|---|---|
-| `cardputer_adv` | UI + Bluetooth phone companion (default) | ~0.92 MB | ~113 KB |
-| `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.68 MB | ~101 KB |
+| `cardputer_adv` | UI + Bluetooth phone companion + remote node mode (default) | ~0.94 MB | ~113 KB |
+| `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.69 MB | ~101 KB |
 
 The stock MeshCore companion builds are about 1.25 MB with Bluetooth and
 0.64 MB without. The keyboard UI and its diagnostics add about 45 KB. Our
 Bluetooth build uses NimBLE instead of stock's Bluedroid, which makes it
-about 0.36 MB smaller than stock even with the UI. The phone apps see the same
+about 0.3 MB smaller than stock even with the UI and remote mode. The phone apps see the same
 service; a phone that was paired with a Bluedroid build has to forget the
 device and pair again once.
 
