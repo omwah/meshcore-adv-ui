@@ -1,5 +1,6 @@
 # Channel messages show "heard N repeats" as repeaters rebroadcast them; ping
 # reaches a companion that shares telemetry, via path discovery.
+# both-modes
 repeater Hilltop 9
 repeater Ridge 7
 link Hilltop Ridge 6

@@ -150,6 +150,7 @@ protected:
   virtual void onLoggedIn(const uint8_t* key, uint16_t keepAliveS) { (void)key; (void)keepAliveS; }
 
   // ---- shared helpers ----
+  void resetRuntime();                      // everything but prefs and files, as after a restart
   void loadUiPrefs(fs::FS& fs);
   void saveUiPrefs();
   void uiToPrefs();                         // UiPrefs -> the UI fields of _prefs

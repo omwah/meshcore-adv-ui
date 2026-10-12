@@ -1,4 +1,5 @@
 # Carol is out of our range; Hilltop (a stock MeshCore repeater) relays.
+# both-modes
 repeater Hilltop 9 hunter2
 node Carol 6 echo
 unlink Cardputer Carol

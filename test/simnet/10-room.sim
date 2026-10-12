@@ -1,6 +1,7 @@
 # A stock MeshCore room server: opening it asks for the password and logs in
 # (keep-alive started); our post is delivered; another member's post arrives
 # with their name; after a reboot the saved password logs in by itself.
+# both-modes
 room Club 8 sesame
 node Kim 7
 link Kim Club 7

@@ -1,4 +1,5 @@
 # Real MeshCore: exchange adverts, message a node, get the ACK and a reply.
+# both-modes
 node Bob 7.5 echo
 as Bob advert
 wait 3000

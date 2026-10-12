@@ -39,6 +39,29 @@ uint8_t batteryPercent(uint16_t mv) {
   return (uint8_t)((mv - 3300) * 100 / 800);
 }
 
+// ------------------------------------------------------------------ state
+
+void AdapterBase::resetRuntime() {
+  memset(_pending, 0, sizeof _pending);
+  memset(_signals, 0, sizeof _signals);
+  _nHeard = 0;
+  _logHead = _nLog = 0;
+  _req = Request();
+  _remote = model::RemoteStats();
+  _nNeighbours = 0;
+  _discoverState = model::Req::Idle;
+  _lastRssi = 0;
+  _lastSnr = 0;
+  _dupsSeen = 0;
+  memset(_sentChan, 0, sizeof _sentChan);
+  memset(_loggedIn, 0, sizeof _loggedIn);
+  _cfgChangedAt = _lastBackupAt = 0;
+  _bootGpsUntil = 0;
+  _bootGpsPending = false;
+  _hasOpen = false;
+  _rev++;
+}
+
 // ------------------------------------------------------------------ UI prefs
 
 void AdapterBase::loadUiPrefs(fs::FS& fs) {

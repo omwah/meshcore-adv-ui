@@ -3,6 +3,7 @@
 # the oldest loaded message brings them back, page by page. Down at the
 # bottom of an older page loads newer ones; sending returns to the newest.
 # Clear history removes ring and archive.
+# both-modes
 node Kim 8
 repeat 70 1500 as Kim chan 0 m#
 wait 3000

@@ -27,11 +27,12 @@ enum Cmd : uint8_t {
   SEND_CONTROL_DATA = 55, SET_PATH_HASH_MODE = 61,
 };
 
+// Reply codes (RC_: system headers define some of these names as macros).
 enum Resp : uint8_t {
-  OK = 0, ERR = 1, CONTACTS_START = 2, CONTACT = 3, END_OF_CONTACTS = 4, SELF_INFO = 5, SENT = 6,
-  CURR_TIME = 9, NO_MORE_MESSAGES = 10, EXPORT_CONTACT_R = 11, BATT_AND_STORAGE = 12, DEVICE_INFO = 13,
-  PRIVATE_KEY = 14, DISABLED = 15, CONTACT_MSG_RECV_V3 = 16, CHANNEL_MSG_RECV_V3 = 17, CHANNEL_INFO = 18,
-  TUNING_PARAMS = 23, STATS = 24,
+  RC_OK = 0, RC_ERR = 1, RC_CONTACTS_START = 2, RC_CONTACT = 3, RC_END_OF_CONTACTS = 4, RC_SELF_INFO = 5, RC_SENT = 6,
+  RC_CURR_TIME = 9, RC_NO_MORE_MESSAGES = 10, RC_EXPORT_CONTACT = 11, RC_BATT_AND_STORAGE = 12, RC_DEVICE_INFO = 13,
+  RC_PRIVATE_KEY = 14, RC_DISABLED = 15, RC_CONTACT_MSG_RECV_V3 = 16, RC_CHANNEL_MSG_RECV_V3 = 17, RC_CHANNEL_INFO = 18,
+  RC_TUNING_PARAMS = 23, RC_STATS = 24,
 };
 
 enum Push : uint8_t {
@@ -163,7 +164,7 @@ inline bool parseDeviceInfo(const uint8_t* f, int len, DeviceInfo& d) {
   return true;
 }
 
-// RESP_CODE_CONTACT_MSG_RECV_V3 / CHANNEL_MSG_RECV_V3.
+// RESP_CODE_CONTACT_MSG_RECV_V3 / RC_CHANNEL_MSG_RECV_V3.
 struct Msg {
   bool channel;
   int8_t snr_x4;
@@ -180,12 +181,12 @@ struct Msg {
 inline bool parseMsg(const uint8_t* f, int len, Msg& m) {
   memset(&m, 0, sizeof m);
   int i = 1;
-  if (f[0] == CONTACT_MSG_RECV_V3) {
+  if (f[0] == RC_CONTACT_MSG_RECV_V3) {
     if (len < 4 + 6 + 2 + 4) return false;
     m.snr_x4 = (int8_t)f[i];
     i += 3;
     memcpy(m.keyPrefix, f + i, 6); i += 6;
-  } else if (f[0] == CHANNEL_MSG_RECV_V3) {
+  } else if (f[0] == RC_CHANNEL_MSG_RECV_V3) {
     if (len < 4 + 1 + 2 + 4) return false;
     m.channel = true;
     m.snr_x4 = (int8_t)f[i];
@@ -213,7 +214,7 @@ inline bool parseMsg(const uint8_t* f, int len, Msg& m) {
 // RESP_CODE_SENT: the ACK (or request tag) to expect, and how long to wait.
 struct Sent { bool flood; uint32_t tag; uint32_t timeoutMs; };
 inline bool parseSent(const uint8_t* f, int len, Sent& s) {
-  if (len < 10 || f[0] != SENT) return false;
+  if (len < 10 || f[0] != RC_SENT) return false;
   s.flood = f[1];
   s.tag = rd32(f + 2);
   s.timeoutMs = rd32(f + 6);

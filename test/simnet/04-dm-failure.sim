@@ -1,4 +1,5 @@
 # A contact that goes out of range: the message is retried, then marked failed.
+# both-modes
 node Erin 6
 as Erin advert
 wait 3000

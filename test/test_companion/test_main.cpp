@@ -29,7 +29,7 @@ static void test_contact_round_trip() {
   uint8_t f[cp::MAX_FRAME];
   int n = cp::encodeContact(f, c);
   TEST_ASSERT_EQUAL(cp::CONTACT_FRAME, n);
-  f[0] = cp::CONTACT;   // the reply frame has the same layout
+  f[0] = cp::RC_CONTACT;   // the reply frame has the same layout
   cp::Contact d;
   TEST_ASSERT_TRUE(cp::parseContact(f, n, d));
   TEST_ASSERT_EQUAL_MEMORY(c.key, d.key, cp::KEY);
@@ -46,7 +46,7 @@ static void test_contact_round_trip() {
 static void test_self_info() {
   uint8_t f[cp::MAX_FRAME] = {};
   int i = 0;
-  f[i++] = cp::SELF_INFO;
+  f[i++] = cp::RC_SELF_INFO;
   f[i++] = 1;          // ADV_TYPE_CHAT
   f[i++] = 20;         // tx power
   f[i++] = 22;         // max
@@ -76,7 +76,7 @@ static void test_self_info() {
 
 static void test_device_info() {
   uint8_t f[82] = {};
-  f[0] = cp::DEVICE_INFO;
+  f[0] = cp::RC_DEVICE_INFO;
   f[1] = 13;
   f[2] = 175;            // MAX_CONTACTS / 2
   f[3] = 40;
@@ -100,7 +100,7 @@ static void test_messages() {
   // Direct, signed (a room post): snr, reserved x2, key prefix, path, type, ts, author prefix, text.
   uint8_t f[cp::MAX_FRAME] = {};
   int i = 0;
-  f[i++] = cp::CONTACT_MSG_RECV_V3;
+  f[i++] = cp::RC_CONTACT_MSG_RECV_V3;
   f[i++] = (uint8_t)(int8_t)-22;
   i += 2;
   memcpy(f + i, "\x01\x02\x03\x04\x05\x06", 6); i += 6;
@@ -121,7 +121,7 @@ static void test_messages() {
 
   // Channel: snr, reserved x2, channel index, path, type, ts, "name: text".
   i = 0;
-  f[i++] = cp::CHANNEL_MSG_RECV_V3;
+  f[i++] = cp::RC_CHANNEL_MSG_RECV_V3;
   f[i++] = 12;
   i += 2;
   f[i++] = 3;
@@ -202,12 +202,12 @@ static void test_one_command_in_flight() {
   c.loop(0);
   TEST_ASSERT_EQUAL(1, (int)link.sent.size());   // the second waits
   link.reply({cp::P_MSG_WAITING});               // a push in between is not a reply
-  link.reply({cp::CURR_TIME, 1, 2, 3, 4});
+  link.reply({cp::RC_CURR_TIME, 1, 2, 3, 4});
   c.loop(10);
   TEST_ASSERT_EQUAL(1, (int)log.pushes.size());
   TEST_ASSERT_EQUAL(1, (int)log.replies.size());
   TEST_ASSERT_EQUAL(7, log.replies[0].cookie);
-  TEST_ASSERT_EQUAL(cp::CURR_TIME, log.replies[0].code);
+  TEST_ASSERT_EQUAL(cp::RC_CURR_TIME, log.replies[0].code);
   TEST_ASSERT_EQUAL(2, (int)link.sent.size());   // now the second
   TEST_ASSERT_EQUAL(cp::SYNC_NEXT_MESSAGE, link.sent[1][0]);
 }
@@ -219,15 +219,15 @@ static void test_contact_list_streams() {
   uint8_t f[1] = {cp::GET_CONTACTS};
   c.queue(f, 1);
   c.loop(0);
-  link.reply({cp::CONTACTS_START, 2, 0, 0, 0});
-  link.reply({cp::CONTACT});
+  link.reply({cp::RC_CONTACTS_START, 2, 0, 0, 0});
+  link.reply({cp::RC_CONTACT});
   c.loop(4000);
-  link.reply({cp::CONTACT});
+  link.reply({cp::RC_CONTACT});
   c.loop(8000);   // more than the timeout since sending, but contacts kept coming
-  link.reply({cp::END_OF_CONTACTS, 0, 0, 0, 0});
+  link.reply({cp::RC_END_OF_CONTACTS, 0, 0, 0, 0});
   c.loop(9000);
   TEST_ASSERT_EQUAL(4, (int)log.replies.size());
-  TEST_ASSERT_EQUAL(cp::END_OF_CONTACTS, log.replies[3].code);
+  TEST_ASSERT_EQUAL(cp::RC_END_OF_CONTACTS, log.replies[3].code);
   TEST_ASSERT_TRUE(c.idle());
 }
 
@@ -241,7 +241,7 @@ static void test_timeout_and_late_reply() {
   c.loop(CompanionClient::REPLY_TIMEOUT_MS);
   TEST_ASSERT_EQUAL(1, (int)log.replies.size());
   TEST_ASSERT_EQUAL(-1, log.replies[0].code);    // no reply
-  link.reply({cp::CURR_TIME, 0, 0, 0, 0});       // too late: ignored
+  link.reply({cp::RC_CURR_TIME, 0, 0, 0, 0});       // too late: ignored
   c.loop(CompanionClient::REPLY_TIMEOUT_MS + 10);
   TEST_ASSERT_EQUAL(1, (int)log.replies.size());
 }

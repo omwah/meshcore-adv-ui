@@ -1,6 +1,7 @@
 # Channels on real MeshCore: Public works out of the box, a #hashtag channel
 # joined from the UI matches one joined by another node, unread counts and
 # muting behave.
+# both-modes
 node Dana 8
 as Dana join #trailcrew
 as Dana chan 0 Morning all, Public check

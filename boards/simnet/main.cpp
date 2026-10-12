@@ -4,6 +4,8 @@
 //   simnet [-s script] [-o outdir] [--data dir]
 //   simnet --smoke
 //   simnet --remote-smoke
+//   simnet --remote ...   the UI drives "Cardputer" as a remote node, over
+//                         simulated Bluetooth (RemoteAdapter)
 //
 // The UI node is "Cardputer" (id 0). Commands besides runner.cpp's:
 //   node <name> [snr] [echo] [telem]   add a companion node linked to the UI node
@@ -18,6 +20,7 @@
 //   reboot                        restart the UI node on its existing flash
 //   wipe                          erase the UI node's flash and reboot (fresh install)
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
+//   ble on|off                    remote mode: drop or restore the Bluetooth link
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
 //   expect sounds <n>          notification chimes played so far
@@ -36,6 +39,8 @@
 #include "ui/app.h"
 #include "ui/screens/screens.h"
 #include "app/mesh_adapter.h"
+#include "app/remote/remote_adapter.h"
+#include "pipe_link.h"
 #include "runner.h"
 #include "sim_node.h"
 #include "bot.h"
@@ -75,8 +80,12 @@ struct Bot {
 
 class NetWorld : public sim::World {
 public:
-  NetWorld(const std::string& dir, app::MeshAdapter& ui, MultiSerialInterface& ifaces, SimPlatform& plat)
-      : _dir(dir), _ui(ui), _ifaces(ifaces), _plat(plat) {
+  // `remote`: the UI is a RemoteAdapter, talking over a simulated Bluetooth
+  // link (PipeLink) to "Cardputer", which is then a plain companion node.
+  NetWorld(const std::string& dir, app::MeshAdapter& local, app::RemoteAdapter* remote, PipeLink& pipe,
+           MultiSerialInterface& ifaces, SimPlatform& plat)
+      : _dir(dir), _ui(remote ? (app::AdapterBase&)*remote : (app::AdapterBase&)local), _local(local), _remote(remote),
+        _pipe(pipe), _ifaces(ifaces), _plat(plat) {
     _plat.sdFs.setRoot(dir + "/sd");
     _plat.sdFs.mkdir("/");
   }
@@ -93,12 +102,27 @@ public:
 
   // Start (or restart) the UI node the way the firmware's setup() does.
   void bootUiNode(bool format) {
+    _plat.rebootRequested = false;
+    if (_remote) {
+      // This device restarts; the node it is connected to keeps running.
+      _pipe.linkUp(false);
+      if (!_uiNode) {
+        _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/node", kEpoch, nullptr, format, &_pipe));
+        _uiNode->begin();
+      }
+      _remoteFs.setRoot(_dir + "/ui");
+      if (format) _remoteFs.format();
+      else _remoteFs.mkdir("/");
+      _remote->begin(_remoteFs);
+      app::Peer p;
+      if (!_remote->hasSavedPeer() && _pipe.scanResult(0, p)) _remote->connectTo(p, _pipe.pin);
+      return;
+    }
     _uiNode.reset();
-    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_ui, format));
+    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_local, format));
     bool fresh = !_uiNode->fs().exists("/identity/_main.id");
     _uiNode->begin();
-    _ui.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false, fresh);
-    _plat.rebootRequested = false;
+    _local.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false, fresh);
   }
 
   void reboot(bool format) {
@@ -116,7 +140,8 @@ public:
     if (_plat.rebootRequested) reboot(false);
     if (_uiNode) {
       _uiNode->loop();
-      _ui.loop();
+      if (_remote) _remote->loop();
+      else _local.loop();
     }
     for (auto& b : _bots) {
       b.second.node->loop();
@@ -187,6 +212,7 @@ public:
       return true;
     }
     if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
+    if (!strcmp(cmd, "ble")) { _pipe.linkUp(!strcmp(arg, "on")); return true; }   // remote mode: the Bluetooth link
     if (!strcmp(cmd, "expect")) return expect(arg, err, n);
     if (!strcmp(cmd, "dump")) { dump(); return true; }
     return false;
@@ -271,6 +297,7 @@ private:
     else if (!strcmp(what, "heard")) got = _ui.heardCount();
     else if (!strcmp(what, "threads")) got = _ui.threadCount();
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
+    else if (!strcmp(what, "linked")) got = _ui.bleConnected();   // remote mode: link up (1) or not (0)
     else if (!strcmp(what, "sounds")) got = g_sound.played;
     else if (!strcmp(what, "request")) {
       static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};
@@ -328,10 +355,15 @@ private:
     model::Diag d = _ui.diag();
     printf("  rx %u tx %u flood %u/%u direct %u/%u dups %u air %lums\n", d.rxPackets, d.txPackets, d.rxFlood,
            d.txFlood, d.rxDirect, d.txDirect, d.dups, (unsigned long)d.airTxMs);
+    if (_remote) printf("  link: node frames dropped %u\n", _pipe.dropped);
   }
 
   std::string _dir;
-  app::MeshAdapter& _ui;
+  app::AdapterBase& _ui;
+  app::MeshAdapter& _local;
+  app::RemoteAdapter* _remote;
+  PipeLink& _pipe;
+  fs::FS _remoteFs;
   MultiSerialInterface& _ifaces;
   SimMedium _medium;
   std::unique_ptr<SimNode> _uiNode;
@@ -368,10 +400,16 @@ int main(int argc, char** argv) {
   static MultiSerialInterface ifaces;
   static SimPlatform platform;
   static app::MeshAdapter adapter(&board, &ifaces, platform);
+  static PipeLink pipe;
+  static app::RemoteAdapter remoteAdapter(pipe, platform);
+  app::RemoteAdapter* remote = nullptr;
+  for (int i = 1; i < argc; i++)
+    if (!strcmp(argv[i], "--remote")) remote = &remoteAdapter;
+  model::MeshModel& model = remote ? (model::MeshModel&)remoteAdapter : (model::MeshModel&)adapter;
   static sim::SimDisplay display;
   static sim::SimKeyboard kb(&g_now);
-  static ui::App ui(adapter, display, kb, &g_sound);
-  static NetWorld world(data, adapter, ifaces, platform);
+  static ui::App ui(model, display, kb, &g_sound);
+  static NetWorld world(data, adapter, remote, pipe, ifaces, platform);
   return sim::runScript(in, out, ui, ui::screens::boot(), kb, display, g_now, world);
 }
 #endif

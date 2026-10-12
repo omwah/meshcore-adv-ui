@@ -42,7 +42,7 @@ void CompanionClient::loop(uint32_t ms) {
     if (!_inFlight) continue;   // a late reply to a command that timed out
     const Cmd& c = _q[0];
     // A contact list: the start and each contact keep the command open.
-    if (c.f[0] == cp::GET_CONTACTS && (f[0] == cp::CONTACTS_START || f[0] == cp::CONTACT)) {
+    if (c.f[0] == cp::GET_CONTACTS && (f[0] == cp::RC_CONTACTS_START || f[0] == cp::RC_CONTACT)) {
       _sentAt = ms;   // still coming
       _h.onReply(c.f[0], c.cookie, f, n);
       continue;

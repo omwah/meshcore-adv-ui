@@ -1,6 +1,7 @@
 // Device services for the adapter: heap figures, GPS, SD card, reboot.
 #pragma once
 #include <SD.h>
+#include <esp_random.h>
 #include "app/platform.h"
 
 class CardputerPlatform : public app::Platform {
@@ -14,6 +15,7 @@ public:
   void reboot() override;
   bool blePairing() override { return blePairingFn && blePairingFn(); }
   bool (*blePairingFn)() = nullptr;
+  void randomBytes(uint8_t* out, int n) override { esp_fill_random(out, n); }
 
 private:
   bool _sdTried = false, _sdOk = false;

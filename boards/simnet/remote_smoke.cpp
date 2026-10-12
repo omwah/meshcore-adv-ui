@@ -25,9 +25,9 @@ struct Recorder : CompanionClient::Handler {
   void onReply(uint8_t cmd, uint32_t, const uint8_t* f, int len) override {
     if (!f) { timeouts++; printf("  no reply to command %u\n", cmd); return; }
     switch (f[0]) {
-      case cp::DEVICE_INFO: cp::parseDeviceInfo(f, len, dev); break;
-      case cp::SELF_INFO: cp::parseSelfInfo(f, len, self); break;
-      case cp::CONTACT: {
+      case cp::RC_DEVICE_INFO: cp::parseDeviceInfo(f, len, dev); break;
+      case cp::RC_SELF_INFO: cp::parseSelfInfo(f, len, self); break;
+      case cp::RC_CONTACT: {
         cp::Contact c;
         if (cp::parseContact(f, len, c)) {
           contacts++;
@@ -35,13 +35,13 @@ struct Recorder : CompanionClient::Handler {
         }
         break;
       }
-      case cp::END_OF_CONTACTS: ends++; break;
-      case cp::SENT: {
+      case cp::RC_END_OF_CONTACTS: ends++; break;
+      case cp::RC_SENT: {
         cp::Sent s;
         if (cp::parseSent(f, len, s)) expectAck = s.tag;
         break;
       }
-      case cp::CONTACT_MSG_RECV_V3: case cp::CHANNEL_MSG_RECV_V3: {
+      case cp::RC_CONTACT_MSG_RECV_V3: case cp::RC_CHANNEL_MSG_RECV_V3: {
         cp::Msg m;
         if (cp::parseMsg(f, len, m)) { messages++; snprintf(lastText, sizeof lastText, "%s", m.text); }
         uint8_t q[1] = {cp::SYNC_NEXT_MESSAGE};   // until NO_MORE_MESSAGES

@@ -1,5 +1,6 @@
 # Default 60 s screen timeout: the screen sleeps, the key that wakes it does
 # nothing else, and an incoming message wakes it too.
+# both-modes
 node Ivy 7
 as Ivy advert
 wait 3000

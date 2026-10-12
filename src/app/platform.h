@@ -2,6 +2,7 @@
 // Each board implements this (ESP32 heap, GPS module, SD card...).
 #pragma once
 #include <stdint.h>
+#include <stdlib.h>
 #include "model/model.h"
 
 namespace fs { class FS; }
@@ -22,6 +23,8 @@ public:
   virtual void reboot() = 0;
   // A phone has connected over Bluetooth and is not yet authenticated.
   virtual bool blePairing() { return false; }
+  // Random bytes for keys and tags (the device overrides with its hardware RNG).
+  virtual void randomBytes(uint8_t* out, int n) { for (int i = 0; i < n; i++) out[i] = (uint8_t)rand(); }
 };
 
 // Battery percentage from a Li-ion cell voltage: M5Unified's straight line,

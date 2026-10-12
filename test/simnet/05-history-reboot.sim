@@ -1,4 +1,5 @@
 # Message history, unread state and contacts survive a restart.
+# both-modes
 node Finn 7 echo
 as Finn advert
 wait 3000

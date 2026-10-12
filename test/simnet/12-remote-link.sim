@@ -1,0 +1,32 @@
+# Remote node: the Bluetooth link drops. What reaches the node meanwhile (a
+# new contact, a DM) shows up once the link is back.
+# remote-only
+node Bob 7.5 echo
+as Bob advert
+wait 3000
+expect linked 1
+expect contacts 1
+# Advertise (through the node), so Bob can message us.
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+ble off
+wait 500
+expect linked 0
+node Kim 7
+as Kim advert
+wait 2000
+as Bob dm Cardputer are you there?
+wait 3000
+shot link-down
+ble on
+wait 6000
+expect linked 1
+expect contacts 2
+expect unread 1
+shot link-back
+key enter
+wait 300
+shot conversation

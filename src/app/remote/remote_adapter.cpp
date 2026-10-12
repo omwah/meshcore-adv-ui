@@ -1,0 +1,1048 @@
+#include "app/remote/remote_adapter.h"
+#include <Arduino.h>
+#include <Utils.h>
+#include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
+#include <SHA256.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+namespace app {
+
+namespace {
+
+constexpr uint8_t REQ_GET_NEIGHBOURS = 0x06;
+constexpr uint8_t CTL_DISCOVER_REQ = 0x80;
+constexpr uint32_t DISCOVER_LISTEN_MS = 8000;
+constexpr uint32_t STATS_EVERY_MS = 30000;
+constexpr uint32_t CONTACTS_EVERY_MS = 60000;
+constexpr uint32_t POLL_EVERY_MS = 15000;
+const char* const kPeerFile = "/ui/peer.bin";
+
+struct PeerFile {
+  uint32_t magic;
+  Peer peer;
+  uint32_t pin;
+  uint8_t key[6];
+};
+constexpr uint32_t PEER_MAGIC = 0x52454550;   // "PEER"
+
+int8_t hopsOf(uint8_t pathLen) { return pathLen == 0xFF ? -1 : (int8_t)(pathLen & 63); }
+
+void toRef(const cp::Contact& c, ContactRef& r) {
+  memcpy(r.key, c.key, PUB_KEY_SIZE);
+  snprintf(r.name, sizeof r.name, "%s", c.name);
+  r.type = c.type;
+  r.flags = c.flags;
+  r.outPathLen = c.outPathLen;
+  memcpy(r.outPath, c.outPath, sizeof r.outPath);
+  r.lastmod = c.lastAdvert ? c.lastAdvert : c.lastmod;
+  r.lat = c.lat;
+  r.lon = c.lon;
+}
+
+}  // namespace
+
+RemoteAdapter::~RemoteAdapter() {
+  free(_contacts);
+  free(_chans);
+}
+
+// ------------------------------------------------------------------ setup
+
+void RemoteAdapter::begin(fs::FS& fs) {
+  resetRuntime();
+  _client.reset();
+  _wasReady = _synced = _haveSelf = false;
+  _nContacts = 0;
+  _contactsSince = _contactsAt = _contactsSoon = _pollAt = 0;
+  _histTag[0] = 0;
+  _clockOffset = 0;
+  _clockFromGps = false;
+  _nodeBattMv = 0;
+  memset(_chanSends, 0, sizeof _chanSends);
+  loadUiPrefs(fs);
+  loadPasswords();
+  loadPeer();
+  openHistory();
+  uiToPrefs();
+  _prefs.gpsEnabled = false;
+  startBootGps();
+  refreshBackupInfo();
+  if (_peerSaved) _link.connect(_peer, _pin);
+  _rev++;
+}
+
+// History per node, named by the start of its key once we know it.
+void RemoteAdapter::openHistory() {
+  const uint8_t* k = _haveSelf ? _self.key : _peerKey;
+  char tag[8];
+  snprintf(tag, sizeof tag, "r%02x%02x%02x", k[0], k[1], k[2]);
+  if (!strcmp(tag, _histTag)) return;
+  snprintf(_histTag, sizeof _histTag, "%s", tag);
+  _msgs.begin(_fs, tag);
+  _msgs.setArchive(_plat.sd());
+  _hasOpen = false;
+}
+
+void RemoteAdapter::loadPeer() {
+  PeerFile pf{};
+  File f = _fs->open(kPeerFile, "r");
+  bool ok = f && f.read((uint8_t*)&pf, sizeof pf) == sizeof pf && pf.magic == PEER_MAGIC;
+  if (f) f.close();
+  _peerSaved = ok;
+  if (!ok) return;
+  _peer = pf.peer;
+  _pin = pf.pin;
+  memcpy(_peerKey, pf.key, 6);
+}
+
+void RemoteAdapter::savePeer() {
+  PeerFile pf{};
+  pf.magic = PEER_MAGIC;
+  pf.peer = _peer;
+  pf.pin = _pin;
+  memcpy(pf.key, _haveSelf ? _self.key : _peerKey, 6);
+  File f = _fs->open(kPeerFile, "w", true);
+  if (!f) return;
+  f.write((const uint8_t*)&pf, sizeof pf);
+  f.close();
+}
+
+void RemoteAdapter::connectTo(const Peer& p, uint32_t pin) {
+  if (!_peerSaved || memcmp(p.addr, _peer.addr, 6)) {
+    // Another node: its contacts and channels are not this one's.
+    _nContacts = 0;
+    _haveSelf = false;
+    memset(_peerKey, 0, sizeof _peerKey);
+  }
+  _peer = p;
+  _pin = pin;
+  _peerSaved = true;
+  savePeer();
+  _link.connect(p, pin);
+  _rev++;
+}
+
+void RemoteAdapter::forgetPeer() {
+  if (_peerSaved) _link.forget(_peer);
+  _peerSaved = false;
+  _fs->remove(kPeerFile);
+  _rev++;
+}
+
+// ------------------------------------------------------------------ the link
+
+bool RemoteAdapter::q(const uint8_t* f, int len, uint32_t cookie) {
+  return _link.ready() && _client.queue(f, len, cookie);
+}
+
+// After connecting: who the node is, its contacts and channels, its clock,
+// then whatever messages wait for us. Each reply asks for the next.
+void RemoteAdapter::startSync() {
+  _synced = false;
+  uint8_t f[cp::MAX_FRAME];
+  q(f, cp::encDeviceQuery(f), CK_SYNC_CHAIN);
+}
+
+void RemoteAdapter::syncMessages() {
+  uint8_t f[1] = {cp::SYNC_NEXT_MESSAGE};
+  if (!_client.pending(cp::SYNC_NEXT_MESSAGE)) q(f, 1);
+}
+
+void RemoteAdapter::loop() {
+  uint32_t ms = millis();
+  _link.loop(ms);
+  bool ready = _link.ready();
+  if (ready && !_wasReady) startSync();
+  if (!ready && _wasReady) {
+    _synced = false;
+    _rev++;
+  }
+  _wasReady = ready;
+  _client.loop(ms);
+
+  retryPending(ms);
+  requestTick(ms);
+  gpsTick(ms);
+  if (_synced) {
+    uint8_t f[cp::MAX_FRAME];
+    // The node's battery, for the header and Diagnostics.
+    if (ms - _statsAt >= STATS_EVERY_MS) {
+      _statsAt = ms;
+      f[0] = cp::GET_BATT_AND_STORAGE;
+      q(f, 1);
+    }
+    // Contacts added or changed since the last list (a lost push, an advert
+    // from a node we don't have yet).
+    if ((ms - _contactsAt >= CONTACTS_EVERY_MS || (_contactsSoon && (int32_t)(ms - _contactsSoon) >= 0)) &&
+        !_client.pending(cp::GET_CONTACTS)) {
+      _contactsAt = ms;
+      _contactsSoon = 0;
+      q(f, cp::encGetContacts(f, _contactsSince), CK_CONTACTS_SINCE);
+    }
+    // Messages whose "waiting" push was lost.
+    if (ms - _pollAt >= POLL_EVERY_MS && _client.idle()) {
+      _pollAt = ms;
+      syncMessages();
+    }
+  }
+  storageTick(ms);
+}
+
+// ------------------------------------------------------------------ replies
+
+void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int len) {
+  uint8_t out[cp::MAX_FRAME];
+  uint8_t code = f ? f[0] : 0xFF;   // 0xFF: no reply
+  switch (cmd) {
+    case cp::DEVICE_QUERY:
+      if (code == cp::RC_DEVICE_INFO) {
+        cp::parseDeviceInfo(f, len, _dev);
+        int maxC = _dev.maxContacts ? _dev.maxContacts : 100;
+        if (maxC != _maxContacts) {
+          free(_contacts);
+          _contacts = (cp::Contact*)calloc(maxC, sizeof(cp::Contact));
+          _maxContacts = _contacts ? maxC : 0;
+          _nContacts = 0;
+        }
+        int maxCh = _dev.maxChannels ? _dev.maxChannels : 8;
+        if (maxCh > 16) maxCh = 16;   // what the UI's per-slot mute bits cover
+        if (maxCh != _maxChans) {
+          free(_chans);
+          _chans = (Chan*)calloc(maxCh, sizeof(Chan));
+          _maxChans = _chans ? maxCh : 0;
+        }
+        q(out, cp::encAppStart(out, "meshcore-adv-ui"), CK_SYNC_CHAIN);
+      }
+      break;
+    case cp::APP_START:
+      if (code == cp::RC_SELF_INFO && cp::parseSelfInfo(f, len, _self)) {
+        _haveSelf = true;
+        if (memcmp(_peerKey, _self.key, 6)) {
+          memcpy(_peerKey, _self.key, 6);
+          savePeer();
+        }
+        openHistory();
+        syncPrefs();
+        if (cookie == CK_SYNC_CHAIN) q(out, cp::encGetContacts(out, 0), CK_SYNC_CHAIN);
+        _rev++;
+      }
+      break;
+    case cp::GET_CONTACTS:
+      if (code == cp::RC_CONTACTS_START) {
+        if (cookie == CK_SYNC_CHAIN) _nContacts = 0;   // the whole list follows
+      } else if (code == cp::RC_CONTACT) {
+        cp::Contact c;
+        if (cp::parseContact(f, len, c)) putContact(c);
+      } else {
+        if (code == cp::RC_END_OF_CONTACTS && len >= 5) {
+          uint32_t latest = cp::rd32(f + 1);
+          if (latest > _contactsSince) _contactsSince = latest;
+          _contactsAt = millis();
+        }
+        if (cookie == CK_SYNC_CHAIN) {
+          _syncChan = 0;
+          if (_maxChans) q(out, cp::encGetChannel(out, 0), CK_SYNC_CHAIN);
+        }
+      }
+      _rev++;
+      break;
+    case cp::GET_CHANNEL: {
+      int idx = _syncChan;
+      if (code == cp::RC_CHANNEL_INFO && len >= 50 && f[1] < _maxChans) {
+        idx = f[1];
+        memcpy(_chans[idx].name, f + 2, 32);
+        _chans[idx].name[31] = 0;
+        memcpy(_chans[idx].secret, f + 34, 16);
+      }
+      if (cookie == CK_SYNC_CHAIN) {
+        if (++_syncChan < _maxChans) {
+          q(out, cp::encGetChannel(out, (uint8_t)_syncChan), CK_SYNC_CHAIN);
+        } else {
+          out[0] = cp::GET_DEVICE_TIME;
+          q(out, 1, CK_SYNC_CHAIN);
+        }
+      }
+      _rev++;
+      break;
+    }
+    case cp::GET_DEVICE_TIME:
+      if (code == cp::RC_CURR_TIME && len >= 5) {
+        uint32_t t = cp::rd32(f + 1);
+        // Our clock follows the node's, unless GPS set ours: then theirs follows.
+        if (_clockFromGps) q(out, cp::encU32(out, cp::SET_DEVICE_TIME, now()));
+        else if (t > 1600000000) _clockOffset = (int32_t)(t - millis() / 1000);
+      }
+      if (cookie == CK_SYNC_CHAIN) {
+        _synced = true;
+        _statsAt = millis() - STATS_EVERY_MS;   // battery right away
+        syncMessages();
+      }
+      _rev++;
+      break;
+    case cp::SYNC_NEXT_MESSAGE:
+      if (code == cp::RC_CONTACT_MSG_RECV_V3 || code == cp::RC_CHANNEL_MSG_RECV_V3) {
+        cp::Msg m;
+        if (cp::parseMsg(f, len, m)) gotMessage(m);
+        syncMessages();   // until NO_MORE_MESSAGES
+      }
+      break;
+    case cp::SEND_TXT_MSG: {
+      if (cookie == CK_REQUEST) {   // a CLI command
+        cp::Sent s;
+        if (code == cp::RC_SENT && cp::parseSent(f, len, s)) _req.deadline = millis() + s.timeoutMs + 4000;
+        else if (_req.state == model::Req::Busy) finishRequest(model::Req::Failed, "The node could not send it");
+        break;
+      }
+      Pending* p = pendingBySeq(cookie);
+      if (!p) break;
+      cp::Sent s;
+      if (code == cp::RC_SENT && cp::parseSent(f, len, s)) {
+        p->prevAck = p->ack;
+        p->ack = s.tag;
+        p->sentAt = millis();
+        p->timeout = s.timeoutMs + 1000;
+      } else {
+        // Refused, or no answer: retried after the timeout like a lost ACK.
+        p->sentAt = millis();
+        p->timeout = 3000;
+      }
+      break;
+    }
+    case cp::SEND_CHANNEL_TXT_MSG:
+      for (auto& cs : _chanSends) {
+        if (!cs.seq || cs.seq != cookie) continue;
+        bool ok = code == cp::RC_OK;
+        _msgs.setStatus(cs.seq, ok ? model::Delivery::Sent : model::Delivery::Failed, 0);
+        if (ok && cs.slot < _maxChans) {
+          uint8_t h[4];
+          groupHash(_chans[cs.slot], cs.ts, cs.text, h);
+          watchRepeats(cs.seq, h);
+        }
+        cs.seq = 0;
+        _rev++;
+      }
+      break;
+    case cp::GET_CONTACT_BY_KEY:
+      if (code == cp::RC_CONTACT) {
+        cp::Contact c;
+        if (cp::parseContact(f, len, c)) putContact(c);
+        _rev++;
+      }
+      break;
+    case cp::SEND_LOGIN:
+    case cp::SEND_STATUS_REQ:
+    case cp::SEND_TELEMETRY_REQ:
+    case cp::SEND_BINARY_REQ:
+    case cp::SEND_TRACE_PATH:
+    case cp::SEND_PATH_DISCOVERY_REQ: {
+      cp::Sent s;
+      if (code == cp::RC_SENT && cp::parseSent(f, len, s)) {
+        if (cmd != cp::SEND_LOGIN && cmd != cp::SEND_STATUS_REQ && cmd != cp::SEND_TRACE_PATH) _req.tag = s.tag;
+        _req.deadline = millis() + s.timeoutMs + 4000;
+      } else if (_req.state == model::Req::Busy) {
+        finishRequest(model::Req::Failed, code == 0xFF ? "No answer from the node" : "The node could not send it");
+      }
+      break;
+    }
+    case cp::GET_BATT_AND_STORAGE:
+      if (code == cp::RC_BATT_AND_STORAGE && len >= 3) {
+        _nodeBattMv = cp::rd16(f + 1);
+        _rev++;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+// ------------------------------------------------------------------ pushes
+
+void RemoteAdapter::onPush(const uint8_t* f, int len) {
+  switch (f[0]) {
+    case cp::P_MSG_WAITING:
+      if (_synced) syncMessages();
+      break;
+    case cp::P_SEND_CONFIRMED:
+      if (len >= 5) ackReceived(cp::rd32(f + 1));
+      break;
+    case cp::P_ADVERT:
+    case cp::P_PATH_UPDATED:
+    // A new node: added (auto-add), or only heard (then the fetch finds
+    // nothing, and the heard list has it from the raw packet).
+    case cp::P_NEW_ADVERT:
+      if (len >= 1 + cp::KEY && _haveSelf) refreshContact(f + 1);
+      break;
+    case cp::P_CONTACT_DELETED:
+      if (len >= 1 + cp::KEY) dropContact(f + 1);
+      break;
+    case cp::P_LOG_RX_DATA:
+      if (len > 3) {
+        int before = _nHeard;
+        uint8_t first[PUB_KEY_SIZE];
+        memcpy(first, _nHeard ? _heard[0].pubkey : first, PUB_KEY_SIZE);
+        rawRx((int8_t)f[1] / 4.0f, (int8_t)f[2], f + 3, len - 3, _haveSelf ? _self.key : nullptr);
+        // An advert from a node that isn't a contact (yet): the node may
+        // have added it; ask a little later.
+        if (_nHeard && (_nHeard != before || memcmp(first, _heard[0].pubkey, PUB_KEY_SIZE)) &&
+            !findContact(_heard[0].pubkey, PUB_KEY_SIZE) && !_contactsSoon)
+          _contactsSoon = (millis() + 2000) | 1;
+      }
+      break;
+    case cp::P_CONTROL_DATA:
+      if (len > 4) discoverReply((int8_t)f[1] / 4.0f, (int8_t)f[2], f + 4, len - 4);
+      break;
+    case cp::P_LOGIN_SUCCESS:
+      if (_req.state == model::Req::Busy && _req.kind == ReqKind::Login && len >= 8 && !memcmp(f + 2, _req.key, 6))
+        loginResult(_req.key, true, f[1] & 1, 0);   // the node keeps the session alive itself
+      break;
+    case cp::P_LOGIN_FAIL:
+      if (_req.state == model::Req::Busy && _req.kind == ReqKind::Login && len >= 8 && !memcmp(f + 2, _req.key, 6))
+        loginResult(_req.key, false, false, 0);
+      break;
+    case cp::P_STATUS_RESPONSE:
+      if (_req.state == model::Req::Busy && (_req.kind == ReqKind::Status || _req.kind == ReqKind::Ping) &&
+          len >= 8 && !memcmp(f + 2, _req.key, 6))
+        statusReply(f + 8, len - 8);
+      break;
+    case cp::P_TELEMETRY_RESPONSE:
+      if (_req.state == model::Req::Busy && _req.kind == ReqKind::Telemetry && len >= 8 && !memcmp(f + 2, _req.key, 6))
+        decodeTelemetry(f + 8, len - 8);
+      break;
+    case cp::P_BINARY_RESPONSE:
+      if (_req.state == model::Req::Busy && _req.kind == ReqKind::Neighbours && len >= 6 && cp::rd32(f + 2) == _req.tag)
+        neighboursReply(f + 6, len - 6);
+      break;
+    case cp::P_TRACE_DATA: {
+      // reserved, path length, flags, tag, auth, hashes, SNRs, final SNR
+      if (len < 12 || _req.state != model::Req::Busy || cp::rd32(f + 4) != _req.tag) break;
+      uint8_t pathLen = f[2], flags = f[3];
+      int nSnr = pathLen >> (flags & 3);
+      if (len < 12 + pathLen + nSnr + 1) break;
+      traceReply(flags, f + 12, f + 12 + pathLen, pathLen, (int8_t)f[12 + pathLen + nSnr] / 4.0f);
+      break;
+    }
+    case cp::P_PATH_DISCOVERY_RESPONSE: {
+      // reserved, key prefix, out path length + path, in path length + path
+      if (len < 9 || _req.state != model::Req::Busy || _req.kind != ReqKind::Ping || memcmp(f + 2, _req.key, 6)) break;
+      uint8_t outLen = f[8];
+      int i = 9 + (outLen & 63) * ((outLen >> 6) + 1);
+      if (i >= len) break;
+      pathReply(f[i], outLen);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// ------------------------------------------------------------------ messages
+
+void RemoteAdapter::gotMessage(const cp::Msg& m) {
+  model::Message out;
+  memset(&out, 0, sizeof out);
+  out.ts = m.ts;
+  out.snr_x4 = m.snr_x4;
+  out.hops = hopsOf(m.pathLen);
+  if (m.channel) {
+    const char* text = m.text;
+    const char* sep = strstr(text, ": ");   // channel payloads are "sender: text"
+    if (sep && sep - text < (int)sizeof out.sender) {
+      snprintf(out.sender, sizeof out.sender, "%.*s", (int)(sep - text), text);
+      text = sep + 2;
+    }
+    snprintf(out.text, sizeof out.text, "%s", text);
+    storeChannel(m.channelIdx, out);
+    return;
+  }
+  cp::Contact* from = findContact(m.keyPrefix, 6);
+  if (m.pathLen == 0 || m.pathLen == 0xFF) noteSignal(m.keyPrefix, m.snr_x4 / 4.0f, _lastRssi);
+  if (m.txtType == cp::TXT_CLI) {
+    if (_req.state == model::Req::Busy && _req.kind == ReqKind::Cli && !memcmp(_req.key, m.keyPrefix, 6))
+      finishRequest(model::Req::Ok, "%s", m.text);
+    return;   // command replies are not conversation
+  }
+  if (m.hasExtra && !contactName(m.extra, 4, out.sender, sizeof out.sender))
+    hexKey(out.sender, sizeof out.sender, m.extra, 4);   // a room post: its author
+  snprintf(out.text, sizeof out.text, "%s", m.text);
+  uint8_t key[PUB_KEY_SIZE] = {};
+  memcpy(key, from ? from->key : m.keyPrefix, from ? PUB_KEY_SIZE : 6);
+  storeDirect(key, out);
+}
+
+uint32_t RemoteAdapter::uniqueNow() {
+  uint32_t t = now();
+  if (t <= _lastTs) t = _lastTs + 1;
+  _lastTs = t;
+  return t;
+}
+
+RemoteAdapter::Pending* RemoteAdapter::pendingBySeq(uint32_t seq) {
+  for (auto& p : _pending)
+    if (p.used && p.seq == seq) return &p;
+  return nullptr;
+}
+
+bool RemoteAdapter::sendAttempt(Pending& p, const ContactRef& c, const char* text) {
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encSendText(f, cp::TXT_PLAIN, p.attempt, p.ts, c.key, text), p.seq)) return false;
+  // Until the node says how long to wait for the ACK.
+  p.sentAt = millis();
+  p.timeout = 30000;
+  return true;
+}
+
+bool RemoteAdapter::send(model::ThreadId t, const char* text) {
+  if (!text[0] || !_synced) return false;
+  messageCount(t);   // the window on this conversation
+  uint32_t ts = uniqueNow();
+  model::Message m;
+  memset(&m, 0, sizeof m);
+  m.ts = ts;
+  m.outgoing = true;
+  m.snr_x4 = INT8_MIN;
+  m.status = model::Delivery::Pending;
+  snprintf(m.text, sizeof m.text, "%s", text);
+
+  if (t.kind == model::ThreadKind::Channel) {
+    if (t.idx >= _maxChans || !_chans[t.idx].name[0]) return false;
+    ChanSend* cs = &_chanSends[0];
+    for (auto& c : _chanSends)
+      if (!c.seq) { cs = &c; break; }
+    uint32_t seq = appendOutgoing(ThreadKey::channel((uint8_t)t.idx), m);
+    if (!seq) return false;
+    uint8_t f[cp::MAX_FRAME];
+    if (!q(f, cp::encSendChannel(f, (uint8_t)t.idx, ts, text), seq)) {
+      _msgs.setStatus(seq, model::Delivery::Failed, 0);
+    } else {
+      cs->seq = seq;
+      cs->ts = ts;
+      cs->slot = (uint8_t)t.idx;
+      snprintf(cs->text, sizeof cs->text, "%s", text);
+    }
+    _rev++;
+    return true;
+  }
+
+  ContactRef c;
+  if (!contactAt(t.idx, c)) return false;
+  Pending* p = newPending();
+  if (!p) return false;
+  uint32_t seq = appendOutgoing(ThreadKey::direct(c.key), m);
+  if (!seq) return false;
+  memset(p, 0, sizeof *p);
+  p->seq = seq;
+  p->ts = ts;
+  memcpy(p->key, c.key, 6);
+  p->used = true;
+  if (!sendAttempt(*p, c, text)) {
+    p->used = false;
+    _msgs.setStatus(seq, model::Delivery::Failed, 0);
+  }
+  _rev++;
+  return true;
+}
+
+// The hash of the packet the node sends for a channel message, as MeshCore
+// builds it (BaseChatMesh::sendGroupMessage, Mesh::createGroupDatagram), so
+// repeats of it can be recognised in the node's raw RX log.
+void RemoteAdapter::groupHash(const Chan& ch, uint32_t ts, const char* text, uint8_t out[4]) const {
+  uint8_t plain[5 + MAX_TEXT_LEN + 32];
+  memcpy(plain, &ts, 4);
+  plain[4] = 0;   // TXT_TYPE_PLAIN
+  int n = snprintf((char*)plain + 5, sizeof plain - 5, "%s: ", _self.name);
+  int tl = (int)strlen(text);
+  if (tl + n > MAX_TEXT_LEN) tl = MAX_TEXT_LEN - n;
+  memcpy(plain + 5 + n, text, tl);
+  uint8_t secret[PUB_KEY_SIZE] = {};
+  memcpy(secret, ch.secret, 16);
+  uint8_t payload[MAX_PACKET_PAYLOAD];
+  mesh::Utils::sha256(payload, PATH_HASH_SIZE, secret, 16);   // the channel hash
+  int len = PATH_HASH_SIZE + mesh::Utils::encryptThenMAC(secret, payload + PATH_HASH_SIZE, plain, 5 + n + tl);
+  uint8_t type = PAYLOAD_TYPE_GRP_TXT;
+  SHA256 sha;
+  sha.update(&type, 1);
+  sha.update(payload, len);
+  uint8_t h[MAX_HASH_SIZE];
+  sha.finalize(h, MAX_HASH_SIZE);
+  memcpy(out, h, 4);
+}
+
+// ------------------------------------------------------------------ contacts
+
+cp::Contact* RemoteAdapter::findContact(const uint8_t* key, int len) const {
+  for (int i = 0; i < _nContacts; i++)
+    if (!memcmp(_contacts[i].key, key, len)) return &_contacts[i];
+  return nullptr;
+}
+
+int RemoteAdapter::contactIndex(const uint8_t* key, int len) const {
+  for (int i = 0; i < _nContacts; i++)
+    if (!memcmp(_contacts[i].key, key, len)) return i;
+  return -1;
+}
+
+bool RemoteAdapter::contactAt(int i, ContactRef& r) const {
+  if (i < 0 || i >= _nContacts) return false;
+  toRef(_contacts[i], r);
+  return true;
+}
+
+void RemoteAdapter::putContact(const cp::Contact& c) {
+  cp::Contact* have = findContact(c.key, cp::KEY);
+  if (have) *have = c;
+  else if (_nContacts < _maxContacts) _contacts[_nContacts++] = c;
+  _rev++;
+}
+
+void RemoteAdapter::dropContact(const uint8_t* key) {
+  int i = contactIndex(key, cp::KEY);
+  if (i < 0) return;
+  memmove(&_contacts[i], &_contacts[i + 1], sizeof(cp::Contact) * (_nContacts - i - 1));
+  _nContacts--;
+  _rev++;
+}
+
+void RemoteAdapter::updateContact(const cp::Contact& c) {
+  uint8_t f[cp::MAX_FRAME];
+  q(f, cp::encodeContact(f, c));
+}
+
+void RemoteAdapter::refreshContact(const uint8_t* key) {
+  uint8_t f[cp::MAX_FRAME];
+  q(f, cp::encKeyCmd(f, cp::GET_CONTACT_BY_KEY, key));
+}
+
+void RemoteAdapter::setFavourite(int i, bool fav) {
+  if (i < 0 || i >= _nContacts) return;
+  cp::Contact& c = _contacts[i];
+  if ((bool)(c.flags & 1) == fav) return;
+  c.flags = fav ? (c.flags | 1) : (c.flags & ~1);
+  updateContact(c);
+  configChanged();
+  _rev++;
+}
+
+void RemoteAdapter::setTelemetry(int i, uint8_t telem) {
+  if (i < 0 || i >= _nContacts) return;
+  cp::Contact& c = _contacts[i];
+  uint8_t flags = (uint8_t)((c.flags & ~0x0E) | ((telem & 7) << 1));
+  if (flags == c.flags) return;
+  c.flags = flags;
+  updateContact(c);
+  configChanged();
+  _rev++;
+}
+
+bool RemoteAdapter::removeContact(int i) {
+  if (i < 0 || i >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encKeyCmd(f, cp::REMOVE_CONTACT, _contacts[i].key))) return false;
+  _msgs.forget(ThreadKey::direct(_contacts[i].key));
+  dropContact(_contacts[i].key);
+  configChanged();
+  return true;
+}
+
+bool RemoteAdapter::resetPath(int i) {
+  if (i < 0 || i >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encKeyCmd(f, cp::RESET_PATH, _contacts[i].key))) return false;
+  _contacts[i].outPathLen = 0xFF;
+  configChanged();
+  _rev++;
+  return true;
+}
+
+void RemoteAdapter::forgetRoute(const uint8_t* key) {
+  cp::Contact* c = findContact(key, cp::KEY);
+  if (!c) return;
+  uint8_t f[cp::MAX_FRAME];
+  q(f, cp::encKeyCmd(f, cp::RESET_PATH, c->key));
+  c->outPathLen = 0xFF;
+}
+
+bool RemoteAdapter::addHeard(int i) {
+  if (i < 0 || i >= _nHeard) return false;
+  const Heard& h = _heard[i];
+  if (findContact(h.pubkey, PUB_KEY_SIZE)) return false;
+  cp::Contact c{};
+  memcpy(c.key, h.pubkey, PUB_KEY_SIZE);
+  if (h.name[0]) snprintf(c.name, sizeof c.name, "%s", h.name);
+  else hexKey(c.name, sizeof c.name, h.pubkey, 4);
+  c.type = h.type;
+  c.outPathLen = 0xFF;
+  c.lat = h.lat;
+  c.lon = h.lon;
+  c.lastmod = now();
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encodeContact(f, c))) return false;
+  refreshContact(c.key);   // as the node stored it
+  putContact(c);
+  configChanged();
+  return true;
+}
+
+// ------------------------------------------------------------------ channels
+
+bool RemoteAdapter::channelName(int slot, char* name, int n) const {
+  if (slot < 0 || slot >= _maxChans) return false;
+  snprintf(name, n, "%s", _chans[slot].name);
+  return true;
+}
+
+int RemoteAdapter::channelCount() const {
+  int n = 0;
+  for (int s = 0; s < _maxChans; s++)
+    if (_chans[s].name[0]) n++;
+  return n;
+}
+
+int RemoteAdapter::slotOf(int i) const {
+  for (int s = 0; s < _maxChans; s++)
+    if (_chans[s].name[0] && i-- == 0) return s;
+  return -1;
+}
+
+int RemoteAdapter::freeSlot() const {
+  for (int s = 0; s < _maxChans; s++)
+    if (!_chans[s].name[0]) return s;
+  return -1;
+}
+
+bool RemoteAdapter::channel(int i, model::Channel& out) const {
+  int s = slotOf(i);
+  if (s < 0) return false;
+  memset(&out, 0, sizeof out);
+  out.idx = (uint8_t)s;
+  snprintf(out.name, sizeof out.name, "%s", _chans[s].name);
+  out.hashtag = _chans[s].name[0] == '#';
+  out.muted = uiMuted(s);
+  return true;
+}
+
+void RemoteAdapter::setSlot(int slot, const char* name, const uint8_t secret[16]) {
+  snprintf(_chans[slot].name, sizeof _chans[slot].name, "%s", name);
+  memcpy(_chans[slot].secret, secret, 16);
+}
+
+bool RemoteAdapter::joinPrivate(const char* name, const uint8_t psk[16]) {
+  int s = freeSlot();
+  if (s < 0 || !name[0]) return false;
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encSetChannel(f, (uint8_t)s, name, psk))) return false;
+  setSlot(s, name, psk);
+  setUiMuted(s, false);
+  configChanged();
+  _rev++;
+  return true;
+}
+
+bool RemoteAdapter::joinHashtag(const char* name) {
+  // As the MeshCore apps do: the first 16 bytes of SHA-256 of "#name" (lower case).
+  char n[model::NAME_LEN];
+  int o = 0;
+  if (name[0] != '#') n[o++] = '#';
+  for (int i = 0; name[i] && o < (int)sizeof n - 1; i++) {
+    char c = name[i];
+    n[o++] = (c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c;
+  }
+  n[o] = 0;
+  uint8_t key[16];
+  mesh::Utils::sha256(key, sizeof key, (const uint8_t*)n, o);
+  return joinPrivate(n, key);
+}
+
+bool RemoteAdapter::createPrivate(const char* name) {
+  uint8_t key[16];
+  _plat.randomBytes(key, sizeof key);
+  return joinPrivate(name, key);
+}
+
+bool RemoteAdapter::channelKey(int i, uint8_t psk[16]) const {
+  int s = slotOf(i);
+  if (s < 0) return false;
+  memcpy(psk, _chans[s].secret, 16);
+  return true;
+}
+
+bool RemoteAdapter::removeChannel(int i) {
+  int s = slotOf(i);
+  if (s <= 0) return false;   // slot 0 (Public) stays
+  static const uint8_t zero[16] = {};
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encSetChannel(f, (uint8_t)s, "", zero))) return false;
+  setSlot(s, "", zero);
+  _msgs.forget(ThreadKey::channel((uint8_t)s));
+  configChanged();
+  _rev++;
+  return true;
+}
+
+void RemoteAdapter::setMuted(int i, bool muted) {
+  int s = slotOf(i);
+  if (s < 0) return;
+  setUiMuted(s, muted);
+  _rev++;
+}
+
+// ------------------------------------------------------------------ adverts, discovery
+
+bool RemoteAdapter::advert(bool flood) {
+  uint8_t f[2];
+  bool ok = q(f, cp::encU8(f, cp::SEND_SELF_ADVERT, flood ? 1 : 0));
+  _rev++;
+  return ok;
+}
+
+bool RemoteAdapter::discoverRepeaters() {
+  uint8_t data[10];
+  data[0] = CTL_DISCOVER_REQ;
+  data[1] = 1 << 2;   // ADV_TYPE_REPEATER
+  _plat.randomBytes(&data[2], 4);
+  memset(&data[6], 0, 4);   // since: everything
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encBytes(f, cp::SEND_CONTROL_DATA, data, sizeof data))) return false;
+  startDiscover(cp::rd32(&data[2]), DISCOVER_LISTEN_MS);
+  return true;
+}
+
+// ------------------------------------------------------------------ requests
+
+bool RemoteAdapter::requestSent(const uint8_t* f, int len, ReqKind kind, int ci) {
+  if (!requestIdle() || !_synced) return false;
+  if (!startRequest(kind, ci, 20000)) return false;   // the node's estimate replaces this
+  if (!q(f, len, CK_REQUEST)) {
+    finishRequest(model::Req::Failed, "Busy, try again");
+    return false;
+  }
+  return true;
+}
+
+bool RemoteAdapter::login(int ci, const char* password) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  int n = cp::encLogin(f, _contacts[ci].key, password);
+  if (!requestSent(f, n, ReqKind::Login, ci)) return false;
+  snprintf(_req.password, sizeof _req.password, "%s", password);
+  return true;
+}
+
+bool RemoteAdapter::requestStats(int ci) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  return requestSent(f, cp::encKeyCmd(f, cp::SEND_STATUS_REQ, _contacts[ci].key), ReqKind::Status, ci);
+}
+
+bool RemoteAdapter::requestTelemetry(int ci) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  return requestSent(f, cp::encTelemetryReq(f, _contacts[ci].key), ReqKind::Telemetry, ci);
+}
+
+bool RemoteAdapter::requestNeighbours(int ci) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  // version 0, count, offset (2), order (2 = strongest first), key prefix bytes, 4 random
+  uint8_t req[11] = {REQ_GET_NEIGHBOURS, 0, MAX_NEIGH, 0, 0, 2, 4};
+  _plat.randomBytes(&req[7], 4);
+  uint8_t f[cp::MAX_FRAME];
+  _nNeighbours = 0;
+  return requestSent(f, cp::encBinaryReq(f, _contacts[ci].key, req, sizeof req), ReqKind::Neighbours, ci);
+}
+
+bool RemoteAdapter::sendCommand(int ci, const char* cmd) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  uint8_t f[cp::MAX_FRAME];
+  int n = cp::encSendText(f, cp::TXT_CLI, 0, uniqueNow(), _contacts[ci].key, cmd);
+  return requestSent(f, n, ReqKind::Cli, ci);
+}
+
+bool RemoteAdapter::tracePath(int ci) {
+  if (!requestIdle() || ci < 0 || ci >= _nContacts) return false;
+  const cp::Contact& c = _contacts[ci];
+  if (c.outPathLen == 0xFF) {
+    snprintf(_req.text, sizeof _req.text, "No route known yet: send a message first");
+    _req.state = model::Req::Failed;
+    _rev++;
+    return false;
+  }
+  // Out along the stored route (plus the node itself if it relays), then
+  // back the same way: every relay appends the SNR it heard.
+  bool relays = c.type == 2 || c.type == 3;   // ADV_TYPE_REPEATER, ADV_TYPE_ROOM
+  int sz = (c.outPathLen >> 6) + 1, hops = c.outPathLen & 63;
+  uint8_t path[cp::MAX_PATH];
+  int n = 0;
+  for (int i = 0; i < hops * sz && n < cp::MAX_PATH; i++) path[n++] = c.outPath[i];
+  if (relays)
+    for (int i = 0; i < sz && n < cp::MAX_PATH; i++) path[n++] = c.key[i];
+  for (int h = hops - (relays ? 1 : 2); h >= 0; h--)
+    for (int i = 0; i < sz && n < cp::MAX_PATH; i++) path[n++] = c.outPath[h * sz + i];
+  if (n == 0) {
+    snprintf(_req.text, sizeof _req.text, "Direct neighbour: no relays to trace");
+    _req.state = model::Req::Failed;
+    _rev++;
+    return false;
+  }
+  uint32_t tag;
+  _plat.randomBytes((uint8_t*)&tag, 4);
+  uint8_t flags = (uint8_t)(sz == 1 ? 0 : sz == 2 ? 1 : sz == 4 ? 2 : 3);
+  uint8_t f[cp::MAX_FRAME];
+  if (!requestSent(f, cp::encTrace(f, tag, 0, flags, path, n), ReqKind::Trace, ci)) return false;
+  _req.tag = tag;
+  return true;
+}
+
+bool RemoteAdapter::ping(int ci) {
+  if (ci < 0 || ci >= _nContacts) return false;
+  if (_contacts[ci].type != 1) {   // not a companion: repeaters, rooms, sensors answer status requests
+    bool ok = requestStats(ci);
+    if (ok) _req.kind = ReqKind::Ping;
+    return ok;
+  }
+  // Companions: path discovery, as the MeshCore app does it.
+  uint8_t f[cp::MAX_FRAME];
+  return requestSent(f, cp::encPathDiscovery(f, _contacts[ci].key), ReqKind::Ping, ci);
+}
+
+// ------------------------------------------------------------------ radio, prefs
+
+model::Radio RemoteAdapter::radio() const {
+  model::Radio r{};
+  r.freqMHz = _self.freqKHz / 1000.0f;
+  r.bwKHz = _self.bwHz / 1000.0f;
+  r.sf = _self.sf;
+  r.cr = _self.cr;
+  r.txDbm = _self.txDbm;
+  r.txMaxDbm = _self.txMaxDbm;
+  r.repeat = _dev.repeat;
+  r.rxBoost = false;   // not something the app protocol sets
+  return r;
+}
+
+bool RemoteAdapter::setRadio(const model::Radio& r) {
+  if (r.freqMHz < 150 || r.freqMHz > 2500 || r.sf < 5 || r.sf > 12 || r.cr < 5 || r.cr > 8 || !_synced) return false;
+  uint32_t freq = (uint32_t)(r.freqMHz * 1000 + 0.5f), bw = (uint32_t)(r.bwKHz * 1000 + 0.5f);
+  uint8_t f[cp::MAX_FRAME];
+  if (!q(f, cp::encRadio(f, freq, bw, r.sf, r.cr, r.repeat))) return false;
+  int8_t tx = r.txDbm > _self.txMaxDbm ? _self.txMaxDbm : r.txDbm;
+  q(f, cp::encU8(f, cp::SET_RADIO_TX_POWER, (uint8_t)tx));
+  _self.freqKHz = freq;
+  _self.bwHz = bw;
+  _self.sf = r.sf;
+  _self.cr = r.cr;
+  _self.txDbm = tx;
+  _dev.repeat = r.repeat;
+  configChanged();
+  _rev++;
+  return true;
+}
+
+// The node's settings, as the UI's Prefs show them.
+void RemoteAdapter::syncPrefs() {
+  model::Prefs& p = _prefs;
+  bool gps = p.gpsEnabled;
+  uiToPrefs();
+  p.gpsEnabled = gps;
+  snprintf(p.nodeName, sizeof p.nodeName, "%s", _self.name);
+  p.gpsShareInAdvert = _self.advertLocPolicy != 0;
+  p.autoAddContacts = !(_self.manualAdd & 1);
+  p.blePin = _dev.blePin;
+  auto mode = [](uint8_t m) { return m == 2 ? model::TelemMode::Everyone : m == 1 ? model::TelemMode::PerContact
+                                                                                  : model::TelemMode::NoOne; };
+  p.telemBattery = mode(_self.telemModes & 3);
+  p.telemLocation = mode((_self.telemModes >> 2) & 3);
+  p.telemSensors = mode((_self.telemModes >> 4) & 3);
+}
+
+void RemoteAdapter::setPrefs(const model::Prefs& p) {
+  uint8_t f[cp::MAX_FRAME];
+  if (_synced) {
+    if (strcmp(p.nodeName, _self.name)) {
+      if (q(f, cp::encName(f, p.nodeName))) snprintf(_self.name, sizeof _self.name, "%s", p.nodeName);
+    }
+    auto mode = [](model::TelemMode m) { return (uint8_t)(m == model::TelemMode::Everyone ? 2
+                                                : m == model::TelemMode::PerContact ? 1 : 0); };
+    uint8_t telem = (uint8_t)(mode(p.telemBattery) | mode(p.telemLocation) << 2 | mode(p.telemSensors) << 4);
+    uint8_t manual = (uint8_t)((_self.manualAdd & ~1) | (p.autoAddContacts ? 0 : 1));
+    uint8_t loc = p.gpsShareInAdvert ? 1 : 0;
+    if (telem != _self.telemModes || manual != _self.manualAdd || loc != _self.advertLocPolicy) {
+      if (q(f, cp::encOtherParams(f, manual, telem, loc, _self.multiAcks))) {
+        _self.telemModes = telem;
+        _self.manualAdd = manual;
+        _self.advertLocPolicy = loc;
+      }
+    }
+    if (p.presetIdx != _ui.presetIdx && p.presetIdx < presetCount() && preset(p.presetIdx).pathHashSize) {
+      f[0] = cp::SET_PATH_HASH_MODE;
+      f[1] = 0;
+      f[2] = (uint8_t)(preset(p.presetIdx).pathHashSize - 1);
+      q(f, 3);
+    }
+  }
+  // The GPS here is this device's own.
+  if (p.gpsEnabled != _prefs.gpsEnabled) _plat.setGpsPower(p.gpsEnabled);
+  prefsToUi(p);
+  saveUiPrefs();
+  syncPrefs();
+  _prefs.gpsEnabled = p.gpsEnabled;
+  configChanged();
+  _rev++;
+}
+
+// ------------------------------------------------------------------ time
+
+uint32_t RemoteAdapter::uptimeMs() const { return millis(); }
+
+uint32_t RemoteAdapter::now() const {
+  return _clockOffset ? (uint32_t)(_clockOffset + (int32_t)(millis() / 1000)) : (uint32_t)(millis() / 1000);
+}
+
+void RemoteAdapter::setClock(uint32_t epoch) {
+  _clockOffset = (int32_t)(epoch - millis() / 1000);
+  _clockFromGps = true;
+  uint8_t f[5];
+  q(f, cp::encU32(f, cp::SET_DEVICE_TIME, epoch));   // the node goes forward only
+}
+
+// ------------------------------------------------------------------ diagnostics
+
+model::Diag RemoteAdapter::diag() const {
+  model::Diag d;
+  memset(&d, 0, sizeof d);
+  d.uptimeS = millis() / 1000;
+  d.lastRssi = _lastRssi;
+  d.lastSnr_x4 = _lastSnr;
+  d.dups = _dupsSeen;
+  d.heapFree = _plat.heapFree();
+  d.heapMin = _plat.heapMin();
+  d.heapMaxBlock = _plat.heapMaxBlock();
+  d.battMv = _nodeBattMv;
+  d.battPct = batteryPercent(d.battMv);
+  d.contacts = (uint16_t)_nContacts;
+  d.contactsMax = (uint16_t)_maxContacts;
+  d.channels = (uint8_t)channelCount();
+  d.channelsMax = (uint8_t)_maxChans;
+  return d;
+}
+
+// ------------------------------------------------------------------ backup (the node's own)
+
+bool RemoteAdapter::backupNow() {
+  snprintf(_bk.error, sizeof _bk.error, "Not yet for a remote node");
+  _cfgChangedAt = 0;
+  _rev++;
+  return false;
+}
+
+bool RemoteAdapter::restore(bool) { return false; }
+
+void RemoteAdapter::factoryReset() {
+  // This device's own data for this mode; the node is reset from its own menu.
+  _msgs.wipe();
+  _fs->remove("/ui/prefs.bin");
+  _fs->remove(kPeerFile);
+  _plat.reboot();
+}
+
+}  // namespace app
