@@ -46,7 +46,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 ## 4. GPS (ATGM336H)
 
 - [ ] **Fix.** Turn GPS on. Within a few minutes outdoors the GPS screen shows satellites and a fix. The module's TX goes to GPIO15 and its RX to GPIO13, at 115200 baud. If nothing arrives, swap `PIN_GPS_TX/RX`.
-- [ ] **Boot clock sync.** "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
+- [x] **Boot clock sync.** "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off. Works on hardware, and the GPS menu shows "off" while GPS is off.
 
 ## 5. Bluetooth (default build)
 
@@ -67,4 +67,4 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim and M5Unified do. On USB with the power switch off it reads 4.14 V, the charger's output.
 - [x] **Charging.** Pure hardware; the firmware has nothing to enable. A computer's USB port charged it little or not at all (3.5 V after hours); a standalone USB charger works. Use a wall charger.
 - [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
-- [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it, and after a re-install the restore offer appears.
+- [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it (works: installed over its WebUI), and after a re-install the restore offer appears (not yet checked).
