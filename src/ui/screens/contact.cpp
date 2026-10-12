@@ -20,7 +20,7 @@ void fmtPos(char* out, size_t n, int32_t lat, int32_t lon) {
 
 // ------------------------------------------------------------- contact
 
-enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_REMOVE, CI_N };
+enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_FORGETPW, CI_REMOVE, CI_N };
 
 class ContactScreen : public MenuScreen {
 public:
@@ -140,6 +140,7 @@ protected:
       case CI_PATH: it.label = "Reset path"; it.enabled = ct.hops >= 0; break;
       case CI_TRACE: it.label = "Trace route"; break;
       case CI_PING: it.label = "Ping"; break;
+      case CI_FORGETPW: it.label = "Forget saved password"; it.enabled = a.m().hasSavedPassword(idx); break;
       case CI_REMOVE: it.label = "Remove contact"; it.valueCol = C_ERR; break;
     }
     if (_waiting && (i == CI_TRACE || i == CI_PING) && i == _pending) snprintf(it.value, sizeof it.value, "waiting...");
@@ -172,6 +173,10 @@ protected:
         if ((i == CI_TRACE ? a.m().tracePath(idx) : a.m().ping(idx))) { _waiting = true; _pending = i; }
         else if (a.m().requestState() == model::Req::Busy) a.toast("Busy: another request is running", C_WARN);
         else a.toast(a.m().requestText()[0] ? a.m().requestText() : "Could not send", C_WARN);
+        break;
+      case CI_FORGETPW:
+        a.m().forgetPassword(idx);
+        a.toast("Password forgotten");
         break;
       case CI_REMOVE:
         a.confirm("Remove this contact?", [](App& app, int arg) {
@@ -243,14 +248,14 @@ protected:
   int count(App&) override { return AI_N; }
 
   void item(App& a, int i, MenuItem& it) override {
-    (void)a;
     static const char* const kLabels[AI_N] = {"Login", "Status", "Neighbours", "Telemetry", "Sync clock", "Send advert", "CLI command"};
     it.label = kLabels[i];
+    bool in = _loggedIn || a.m().loggedIn(idx);
     if (i == AI_LOGIN) {
-      snprintf(it.value, sizeof it.value, _loggedIn ? "logged in" : "required");
-      it.valueCol = _loggedIn ? C_OK : C_WARN;
+      snprintf(it.value, sizeof it.value, in ? "logged in" : a.m().hasSavedPassword(idx) ? "saved" : "required");
+      it.valueCol = in ? C_OK : C_WARN;
     } else {
-      it.enabled = i == AI_TELEM || _loggedIn;
+      it.enabled = i == AI_TELEM || in;
     }
     if (_pending == i) snprintf(it.value, sizeof it.value, "waiting...");
   }
@@ -260,6 +265,10 @@ protected:
     bool ok = false;
     switch (i) {
       case AI_LOGIN:
+        if (a.m().hasSavedPassword(idx)) {
+          ok = a.m().loginSaved(idx);
+          break;
+        }
         a.prompt("Password (blank: guest)", "", 15, [](App& app, int arg) {
           if (app.m().login(arg, app.promptText())) s_admin_pending(AI_LOGIN);
         }, idx, true);

@@ -418,7 +418,8 @@ void MockModel::startReq(const char* reply, uint32_t delayMs) {
   _rev++;
 }
 
-bool MockModel::login(int, const char*) {
+bool MockModel::login(int c, const char*) {
+  _loggedInto = c;
   startReq("Logged in as admin", 800);
   return true;
 }

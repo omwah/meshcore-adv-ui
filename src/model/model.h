@@ -231,7 +231,11 @@ public:
   virtual Req discoverState() const = 0;
 
   // Repeater / room admin, one request in flight at a time.
-  virtual bool login(int contact, const char* password) = 0;
+  virtual bool login(int contact, const char* password) = 0;   // remembers the password if it works
+  virtual bool loggedIn(int contact) const = 0;                  // this session
+  virtual bool hasSavedPassword(int contact) const = 0;
+  virtual bool loginSaved(int contact) = 0;                      // log in with the saved password
+  virtual void forgetPassword(int contact) = 0;
   virtual bool requestStats(int contact) = 0;
   virtual bool requestNeighbours(int contact) = 0;
   virtual bool requestTelemetry(int contact) = 0;

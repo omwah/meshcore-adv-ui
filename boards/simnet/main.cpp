@@ -7,6 +7,8 @@
 // The UI node is "Cardputer" (id 0). Commands besides runner.cpp's:
 //   node <name> [snr] [echo] [telem]   add a companion node linked to the UI node
 //   repeater <name> [snr] [password]   add a stock MeshCore repeater
+//   room <name> [snr] [password]       add a stock MeshCore room server
+//   as <name> login <room> <password>  a companion logs in to a room/repeater
 //   link <a> <b> <snr> | unlink <a> <b>
 //   as <name> advert [flood]
 //   as <name> dm <to> <text>      a direct message (to = node name)
@@ -37,6 +39,7 @@
 #include "sim_node.h"
 #include "bot.h"
 #include "sim_repeater.h"
+#include "sim_room.h"
 
 int simnetSmoke();
 
@@ -118,6 +121,7 @@ public:
       b.second.task->loop();
     }
     for (auto& r : _rpts) r.second->loop();
+    for (auto& r : _rooms) r.second->loop();
     if (_uiNode) _uiNode->select();   // the UI reads its node's globals
   }
 
@@ -140,6 +144,16 @@ public:
       _medium.link(0, id, snr);
       _ids[name] = id;
       _bots[name] = std::move(b);
+      return true;
+    }
+    if (!strcmp(cmd, "room")) {
+      char name[32] = {}, pw[32] = "password";
+      float snr = 8.0f;
+      sscanf(arg, "%31s %f %31s", name, &snr, pw);
+      int id = _nextId++;
+      _rooms[name] = SimRoom::create(_medium, id, name, _dir + "/" + name, kEpoch, pw);
+      _medium.link(0, id, snr);
+      _ids[name] = id;
       return true;
     }
     if (!strcmp(cmd, "repeater")) {
@@ -184,6 +198,13 @@ private:
     int used = 0;
     sscanf(arg, "%31s %15s %n", name, what, &used);
     const char* rest = arg + used;
+    auto rm = _rooms.find(name);
+    if (rm != _rooms.end()) {
+      if (strcmp(what, "advert")) { snprintf(err, n, "rooms only advert"); return true; }
+      rm->second->advert(strstr(rest, "flood") != nullptr);
+      if (_uiNode) _uiNode->select();
+      return true;
+    }
     auto rp = _rpts.find(name);
     if (rp != _rpts.end()) {
       if (strcmp(what, "advert")) { snprintf(err, n, "repeaters only advert"); return true; }
@@ -214,6 +235,13 @@ private:
       const char* text = rest + u;
       m.sendGroupMessage(rtcOf(node)->getCurrentTimeUnique(), d.channel, m.getNodePrefs()->node_name, text,
                          (int)strlen(text));
+    } else if (!strcmp(what, "login")) {
+      char to[32] = {}, pw[32] = {};
+      sscanf(rest, "%31s %31s", to, pw);
+      ContactInfo* c = m.searchContactsByPrefix(to);
+      if (!c) { snprintf(err, n, "%s has no contact '%s'", name, to); return true; }
+      uint32_t est;
+      m.sendLogin(*c, pw, est);
     } else if (!strcmp(what, "join")) {
       ChannelDetails d;
       memset(&d, 0, sizeof d);
@@ -300,6 +328,7 @@ private:
   std::unique_ptr<SimNode> _uiNode;
   std::map<std::string, Bot> _bots;
   std::map<std::string, std::unique_ptr<SimRepeater>> _rpts;
+  std::map<std::string, std::unique_ptr<SimRoom>> _rooms;
   std::map<std::string, int> _ids;
   bool _fresh = true;
   SimPlatform& _plat;

@@ -48,11 +48,33 @@ public:
   void onEnter(App& a) override {
     a.m().markRead(id);
     _readRev = a.m().revision();
+    // A room shows its posts only after a login: do it once per opening,
+    // with the saved password if one worked before, else ask.
+    if (_loginTried || id.kind != model::ThreadKind::Direct) return;
+    model::Contact ct;
+    if (!a.m().contact(id.idx, ct) || ct.type != model::NodeType::Room || a.m().loggedIn(id.idx)) return;
+    _loginTried = true;
+    if (a.m().hasSavedPassword(id.idx)) {
+      if (a.m().loginSaved(id.idx)) { _loggingIn = true; a.toast("Logging in to the room...", C_ACCENT); }
+    } else {
+      a.prompt("Room password (blank: guest)", "", 15, [](App& app, int ci) {
+        if (app.m().login(ci, app.promptText())) {
+          s_roomLoginStarted();
+          app.toast("Logging in to the room...", C_ACCENT);
+        }
+      }, id.idx, true);
+    }
   }
 
   bool textMode(App&) override { return _composing; }
 
   bool tick(App& a, uint32_t now) override {
+    if (_loggingIn && a.m().requestState() != model::Req::Busy) {
+      _loggingIn = false;
+      bool ok = a.m().requestState() == model::Req::Ok;
+      a.toast(ok ? "Logged in: posts will arrive" : a.m().requestText(), ok ? C_OK : C_ERR);
+      return true;
+    }
     // New messages arriving while open are read; keep the view at the bottom
     // unless the user scrolled up.
     if (a.m().revision() != _readRev) {
@@ -135,7 +157,12 @@ public:
     _scroll = 0;
     _composing = false;
     _draft[0] = 0;
+    _loginTried = false;
+    _loggingIn = false;
   }
+  static void s_roomLoginStarted();
+  void _loginTriedReset() { _loginTried = false; }
+  bool _loggingIn = false;
 
 private:
   void startCompose(App& a) {
@@ -188,7 +215,7 @@ private:
     int x = r.x + 9;
     if (m.outgoing) {
       x = c.text(x, top + 1, "me", sf, C_ACCENT) + 5;
-    } else if (chan && m.sender[0]) {
+    } else if (m.sender[0]) {   // channels and rooms carry the author
       x = c.text(x, top + 1, m.sender, sf, C_CHAT, -1, 100) + 5;
     }
     x = c.text(x, top + 1, t, sf, C_DIM) + 5;
@@ -250,16 +277,19 @@ private:
   char _draft[model::TEXT_LEN] = {};
   LineEditor _ed;
   bool _composing = false;
+  bool _loginTried = false;
   int _scroll = 0, _maxScroll = 0;
   uint32_t _readRev = 0, _blink = 0;
 };
 
 ConversationScreen s_conv;
+void ConversationScreen::s_roomLoginStarted() { s_conv._loggingIn = true; }
 
 }  // namespace
 
 void openThread(App& a, model::ThreadId t) {
   if (!(s_conv.id == t)) s_conv.reset();
+  s_conv._loginTriedReset();
   s_conv.id = t;
   a.push(&s_conv);
 }

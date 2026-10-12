@@ -94,6 +94,10 @@ public:
   model::Req discoverState() const override { return _discoverState; }
 
   bool login(int contact, const char* password) override;
+  bool loggedIn(int contact) const override;
+  bool hasSavedPassword(int contact) const override;
+  bool loginSaved(int contact) override;
+  void forgetPassword(int contact) override;
   bool requestStats(int contact) override;
   bool requestNeighbours(int contact) override;
   bool requestTelemetry(int contact) override;
@@ -169,6 +173,7 @@ private:
     uint8_t key[PUB_KEY_SIZE];
     uint32_t tag = 0, startedAt = 0, deadline = 0, rttMs = 0;
     char text[200] = {};
+    char password[16] = {};   // a login's password, saved if it works
   };
 
   // MeshCore reserves the first MAX_ANON_CONTACTS slots; UI index 0 is the
@@ -233,6 +238,13 @@ private:
   uint32_t _lastBackupAt = 0;
   int _seenContacts = -1;
   uint32_t _activePin = 0;
+  // Rooms/repeaters logged into this session, and passwords that worked.
+  uint8_t _loggedIn[8][6] = {};
+  struct SavedPassword { uint8_t key[6]; char pw[16]; };
+  SavedPassword _passwords[6] = {};
+  void loadPasswords();
+  void savePasswords();
+  const SavedPassword* passwordFor(const uint8_t* key) const;
   // Channel messages we sent recently, to count other nodes repeating them.
   struct SentChannelMsg {
     uint32_t seq, until;

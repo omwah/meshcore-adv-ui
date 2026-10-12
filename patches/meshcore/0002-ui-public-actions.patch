@@ -1,6 +1,6 @@
 diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
---- a/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:45.270407630 -0700
-+++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:45.224439780 -0700
+--- a/examples/companion_radio/MyMesh.cpp	2026-10-11 17:03:40.240696485 -0700
++++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 17:02:54.999691733 -0700
 @@ -2254,6 +2254,61 @@
  #endif
  }
@@ -65,8 +65,8 @@ diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.cpp b/example
    if (_prefs.advert_loc_policy == ADVERT_LOC_NONE) {
 diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.h
 --- a/examples/companion_radio/MyMesh.h	2026-08-14 05:19:19.000000000 -0700
-+++ b/examples/companion_radio/MyMesh.h	2026-10-11 16:26:45.223794594 -0700
-@@ -98,6 +98,18 @@
++++ b/examples/companion_radio/MyMesh.h	2026-10-11 17:03:40.194864818 -0700
+@@ -98,6 +98,20 @@
    void loop();
    void handleCmdFrame(size_t len);
    bool advert();
@@ -78,6 +78,8 @@ diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.h b/examples/
 +  void uiDeleteContactBlob(const uint8_t* pub_key); // as CMD_REMOVE_CONTACT
 +  bool uiSendAdvert(bool flood);                    // as CMD_SEND_SELF_ADVERT
 +  void uiFlushContacts();                          // write a pending lazy contacts save now
++  // After a room/server login, keep the connection alive as the app's login does.
++  bool uiStartConnection(const ContactInfo& c, uint16_t keep_alive_secs) { return startConnection(c, keep_alive_secs); }
 +  // As BaseChatMesh::sendGroupMessage, also giving the packet's hash (its
 +  // repeats by other nodes carry the same hash), so a UI can count them.
 +  bool uiSendGroupMessage(uint32_t timestamp, mesh::GroupChannel& channel, const char* sender_name,

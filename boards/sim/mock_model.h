@@ -56,6 +56,10 @@ public:
   model::Req discoverState() const override { return _discover; }
 
   bool login(int contact, const char* password) override;
+  bool loggedIn(int contact) const override { return contact == _loggedInto; }
+  bool hasSavedPassword(int) const override { return false; }
+  bool loginSaved(int contact) override { return login(contact, ""); }
+  void forgetPassword(int) override {}
   bool requestStats(int contact) override;
   bool requestNeighbours(int contact) override;
   bool requestTelemetry(int contact) override;
@@ -133,6 +137,7 @@ private:
   model::Gps _gps;
   model::RemoteStats _stats;
   bool _ble = false, _fresh = false, _pairing = false;
+  int _loggedInto = -1;
   model::Req _req = model::Req::Idle, _discover = model::Req::Idle;
   uint32_t _reqDone = 0, _discoverDone = 0;
   char _reqText[200] = {};

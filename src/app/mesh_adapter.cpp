@@ -60,6 +60,7 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   _bleBuilt = bleBuilt;
   _msgs.begin(&fs);
   loadUiPrefs();
+  loadPasswords();
   syncPrefsFromMesh();
   _fresh = freshInstall;
   // Favourites used to be kept here: move them to MeshCore's contact flag.
@@ -928,7 +929,63 @@ bool MeshAdapter::login(int ci, const char* password) {
   ContactInfo* c = contactPtr(ci);
   uint32_t est = 0;
   if (!c || _mesh->sendLogin(*c, password, est) == MSG_SEND_FAILED) return false;
-  return startRequest(ReqKind::Login, ci, est);
+  if (!startRequest(ReqKind::Login, ci, est)) return false;
+  snprintf(_req.password, sizeof _req.password, "%s", password);
+  return true;
+}
+
+bool MeshAdapter::loggedIn(int ci) const {
+  ContactInfo c;
+  if (!getContact(ci, c)) return false;
+  for (auto& k : _loggedIn)
+    if (!memcmp(k, c.id.pub_key, 6)) return true;
+  return false;
+}
+
+const MeshAdapter::SavedPassword* MeshAdapter::passwordFor(const uint8_t* key) const {
+  for (auto& p : _passwords)
+    if (p.pw[0] && !memcmp(p.key, key, 6)) return &p;
+  return nullptr;
+}
+
+bool MeshAdapter::hasSavedPassword(int ci) const {
+  ContactInfo c;
+  return getContact(ci, c) && passwordFor(c.id.pub_key);
+}
+
+bool MeshAdapter::loginSaved(int ci) {
+  ContactInfo c;
+  if (!getContact(ci, c)) return false;
+  const SavedPassword* p = passwordFor(c.id.pub_key);
+  char pw[16];
+  snprintf(pw, sizeof pw, "%s", p ? p->pw : "");
+  return login(ci, pw);
+}
+
+void MeshAdapter::forgetPassword(int ci) {
+  ContactInfo c;
+  if (!getContact(ci, c)) return;
+  for (auto& p : _passwords)
+    if (!memcmp(p.key, c.id.pub_key, 6)) memset(&p, 0, sizeof p);
+  savePasswords();
+  _rev++;
+}
+
+// Passwords that worked, so logins can be automatic. On internal flash only;
+// they are not included in SD backups.
+void MeshAdapter::loadPasswords() {
+  memset(_passwords, 0, sizeof _passwords);
+  File f = _fs->open("/ui/pw.bin", "r");
+  if (!f) return;
+  f.read((uint8_t*)_passwords, sizeof _passwords);
+  f.close();
+}
+
+void MeshAdapter::savePasswords() {
+  File f = _fs->open("/ui/pw.bin", "w", true);
+  if (!f) return;
+  f.write((const uint8_t*)_passwords, sizeof _passwords);
+  f.close();
 }
 
 bool MeshAdapter::requestStats(int ci) {
@@ -1068,12 +1125,39 @@ void MeshAdapter::onContactResponse(const ContactInfo& from, const uint8_t* data
   if (_req.state != model::Req::Busy || memcmp(from.id.pub_key, _req.key, PUB_KEY_SIZE) || len < 4) return;
   uint32_t tag = rd32(data);
   switch (_req.kind) {
-    case ReqKind::Login:
-      if (len >= 6 && !memcmp(&data[4], "OK", 2)) finishRequest(model::Req::Ok, "Logged in");
-      else if (len >= 7 && data[4] == RESP_SERVER_LOGIN_OK)
-        finishRequest(model::Req::Ok, (data[6] & 1) ? "Logged in as admin" : "Logged in as guest");
-      else finishRequest(model::Req::Failed, "Login refused");
+    case ReqKind::Login: {
+      bool ok = false;
+      if (len >= 6 && !memcmp(&data[4], "OK", 2)) {
+        ok = true;
+        finishRequest(model::Req::Ok, "Logged in");
+      } else if (len >= 7 && data[4] == RESP_SERVER_LOGIN_OK) {
+        ok = true;
+        // Keep the connection alive as the app's login does, so a room
+        // keeps pushing posts.
+        uint16_t keepAlive = (uint16_t)data[5] * 16;
+        if (keepAlive) _mesh->uiStartConnection(from, keepAlive);
+        finishRequest(model::Req::Ok, (data[6] & 1) ? "Logged in as admin" : "Logged in");
+      } else {
+        finishRequest(model::Req::Failed, "Login refused: wrong password?");
+      }
+      if (ok) {
+        uint8_t (*slot)[6] = &_loggedIn[0];
+        for (auto& k : _loggedIn)
+          if (!memcmp(k, from.id.pub_key, 6) || !k[0]) { slot = &k; break; }
+        memcpy(*slot, from.id.pub_key, 6);
+        if (_req.password[0]) {
+          SavedPassword* p = const_cast<SavedPassword*>(passwordFor(from.id.pub_key));
+          for (auto& q : _passwords)
+            if (!p && !q.pw[0]) p = &q;
+          if (!p) p = &_passwords[0];
+          memcpy(p->key, from.id.pub_key, 6);
+          snprintf(p->pw, sizeof p->pw, "%s", _req.password);
+          savePasswords();
+        }
+      }
+      memset(_req.password, 0, sizeof _req.password);
       break;
+    }
     case ReqKind::Ping:
     case ReqKind::Status: {
       if (_req.kind == ReqKind::Ping) { finishRequest(model::Req::Ok, "pong"); break; }
