@@ -357,7 +357,14 @@ void App::drawHeader() {
     x -= 10;
     _c.bitmap(x, iy, icon::gps, 8, 8, g.fix ? C_OK : C_DIM);
   }
-  if (_m.bleAvailable() && _m.prefs().bleEnabled) {
+  if (_m.mode() == model::Mode::Remote) {
+    // The link to the node: green when connected and read, amber on the way.
+    model::Link l = _m.link();
+    x -= 10;
+    _c.bitmap(x, iy, icon::ble, 8, 8,
+              l.state == model::LinkState::Ready ? (l.synced ? C_OK : C_ACCENT)
+              : l.state == model::LinkState::Idle ? C_DIM : C_WARN);
+  } else if (_m.bleAvailable() && _m.prefs().bleEnabled) {
     x -= 10;
     _c.bitmap(x, iy, icon::ble, 8, 8, _m.bleConnected() ? C_OK : C_DIM);
   }

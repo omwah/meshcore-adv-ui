@@ -48,3 +48,5 @@ fs::FS* CardputerPlatform::sd() {
 }
 
 void CardputerPlatform::reboot() { ESP.restart(); }
+
+uint16_t CardputerPlatform::batteryMv() { return board.getBattMilliVolts(); }

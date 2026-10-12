@@ -30,7 +30,12 @@ struct UiPrefs {
   uint8_t nFavourites;
   // Fields added later go here: older, shorter files load them as 0.
   uint8_t blePinRandom;
+  uint8_t deviceMode;            // model::Mode
 };
+
+// The mode the device boots in, from the UI prefs on flash (before any
+// model starts).
+model::Mode readDeviceMode(fs::FS& fs);
 
 // A contact as the shared code needs it (MeshCore's ContactInfo, or the
 // companion protocol's contact frame).

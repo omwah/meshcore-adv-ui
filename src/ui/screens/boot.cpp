@@ -20,6 +20,12 @@ public:
     if (_done || now - _start < 2000) return true;   // keep animating the dots
     _done = true;
     a.replace(home());
+#if MC_UI_REMOTE
+    if (a.m().mode() == model::Mode::Remote && !a.m().link().saved) {
+      openRemote(a);   // first, choose the node
+      return true;
+    }
+#endif
     if (a.m().restoreOffered()) {
       a.confirm("Fresh install. Restore settings, contacts and channels from the SD card backup?",
                 [](App& app, int) {
@@ -40,7 +46,8 @@ public:
     int bandY = 34, bandH = big->height + 12;
     c.fillRect(0, bandY, r.w, bandH, C_HEAD);
     c.hline(0, bandY + bandH, r.w, C_ACCENT);
-    const char* name = a.m().prefs().nodeName;
+    // Remote mode: the node's name is known once connected.
+    const char* name = a.m().prefs().nodeName[0] ? a.m().prefs().nodeName : "Remote node";
     int nw = Canvas::textWidth(name, big);
     if (nw <= r.w - 12) c.text((r.w - nw) / 2, bandY + 6, name, big, C_HTXT);
     else a.fitText(c, 6, bandY + 6, name, big, C_HTXT, r.w - 12, true);

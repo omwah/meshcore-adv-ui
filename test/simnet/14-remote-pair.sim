@@ -1,0 +1,35 @@
+# Remote node, first use: the device starts with no node chosen and opens
+# Remote node; find the node, a wrong PIN is refused, the right one
+# connects and the node's contacts appear.
+# remote-only
+nopair
+blepin 654321
+node Bob 7.5
+as Bob advert
+wait 3000
+shot remote-first-boot
+expect linked 0
+# Find nodes nearby, choose the node, type a wrong PIN over the default
+key enter
+wait 500
+shot remote-scan
+key enter
+shot remote-pin
+key bksp 6
+type 111111
+key enter
+wait 1000
+shot remote-wrong-pin
+expect linked 0
+key enter
+wait 500
+key enter
+key bksp 6
+type 654321
+key enter
+wait 4000
+shot remote-connected
+expect linked 1
+expect contacts 1
+hold esc 900
+shot remote-home

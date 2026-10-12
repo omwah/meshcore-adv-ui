@@ -129,6 +129,47 @@ void RemoteAdapter::connectTo(const Peer& p, uint32_t pin) {
   _rev++;
 }
 
+model::Link RemoteAdapter::link() const {
+  model::Link l{};
+  l.state = (model::LinkState)_link.state();
+  l.saved = _peerSaved;
+  l.synced = _synced;
+  snprintf(l.peer, sizeof l.peer, "%s", _peerSaved ? _peer.name : "");
+  snprintf(l.node, sizeof l.node, "%s", _haveSelf ? _self.name : "");
+  l.rssi = _link.rssi();
+  l.nodeBattMv = _nodeBattMv;
+  snprintf(l.error, sizeof l.error, "%s", _link.lastError());
+  return l;
+}
+
+void RemoteAdapter::scan(bool on) {
+  if (on) _link.startScan();
+  else _link.stopScan();
+  _rev++;
+}
+
+bool RemoteAdapter::found(int i, model::FoundNode& out) const {
+  Peer p;
+  if (!_link.scanResult(i, p)) return false;
+  memset(&out, 0, sizeof out);
+  snprintf(out.name, sizeof out.name, "%s", p.name);
+  out.rssi = p.rssi;
+  return true;
+}
+
+bool RemoteAdapter::connectFound(int i, uint32_t pin) {
+  Peer p;
+  if (!_link.scanResult(i, p)) return false;
+  _link.stopScan();
+  connectTo(p, pin);
+  return true;
+}
+
+void RemoteAdapter::reconnect() {
+  if (_peerSaved) _link.connect(_peer, _pin);
+  _rev++;
+}
+
 void RemoteAdapter::forgetPeer() {
   if (_peerSaved) _link.forget(_peer);
   _peerSaved = false;
@@ -158,6 +199,14 @@ void RemoteAdapter::syncMessages() {
 void RemoteAdapter::loop() {
   uint32_t ms = millis();
   _link.loop(ms);
+  // Redraw on link changes (status, header icon) and new scan results.
+  FrameLink::State st = _link.state();
+  int found = _link.scanCount();
+  if (st != _lastState || found != _lastFound) {
+    _lastState = st;
+    _lastFound = found;
+    _rev++;
+  }
   bool ready = _link.ready();
   if (ready && !_wasReady) startSync();
   if (!ready && _wasReady) {
@@ -1067,8 +1116,9 @@ model::Diag RemoteAdapter::diag() const {
   d.heapFree = _plat.heapFree();
   d.heapMin = _plat.heapMin();
   d.heapMaxBlock = _plat.heapMaxBlock();
-  d.battMv = _nodeBattMv;
+  d.battMv = _plat.batteryMv();   // this device's (the node's is in link())
   d.battPct = batteryPercent(d.battMv);
+  d.charging = _plat.charging();
   d.contacts = (uint16_t)_nContacts;
   d.contactsMax = (uint16_t)_maxContacts;
   d.channels = (uint8_t)channelCount();

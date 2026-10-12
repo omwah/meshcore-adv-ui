@@ -132,6 +132,29 @@ struct Gps {
   uint8_t hdop_x10;
 };
 
+// Which node the UI drives: the one on this device, or a companion node
+// elsewhere, over Bluetooth (the device is then that node's screen).
+enum class Mode : uint8_t { Local = 0, Remote = 1 };
+
+enum class LinkState : uint8_t { Idle, Scanning, Connecting, Pairing, Ready, Lost };
+
+// Remote mode: the Bluetooth link to the node.
+struct Link {
+  LinkState state;
+  bool saved;                     // a node is chosen (and reconnected to)
+  bool synced;                    // connected and its contacts etc. read
+  char peer[NAME_LEN];            // the node's Bluetooth name
+  char node[NAME_LEN];            // its mesh name
+  int8_t rssi;
+  uint16_t nodeBattMv;
+  char error[40];
+};
+
+struct FoundNode {                // a scan result
+  char name[NAME_LEN];
+  int8_t rssi;
+};
+
 struct Prefs {
   char nodeName[NAME_LEN];
   uint8_t theme;
@@ -153,6 +176,7 @@ struct Prefs {
   bool blePinRandom;              // a new random PIN at every boot
   uint8_t presetIdx;              // index into presets(), 0xFF custom
   TelemMode telemBattery, telemLocation, telemSensors;
+  Mode deviceMode;                // takes effect after a restart
 };
 
 struct BackupStatus {
@@ -275,6 +299,19 @@ public:
   virtual bool bleAvailable() const = 0;                  // compiled in
   virtual uint32_t bleActivePin() const = 0;              // the PIN in use since boot
   virtual bool blePairing() const = 0;                    // a phone is connected, not yet authenticated
+
+  // Remote mode (the defaults are for a model without it).
+  virtual Mode mode() const { return Mode::Local; }
+  virtual Link link() const { return Link(); }
+  virtual void scan(bool on) { (void)on; }
+  virtual int foundCount() const { return 0; }
+  virtual bool found(int i, FoundNode& out) const { (void)i; (void)out; return false; }
+  virtual bool connectFound(int i, uint32_t pin) { (void)i; (void)pin; return false; }
+  virtual void reconnect() {}
+  virtual void disconnect() {}
+  virtual void forgetNode() {}
+  virtual bool rebootNode() { return false; }
+  virtual bool resetNode() { return false; }
 
   // Backup.
   virtual BackupStatus backupStatus() const = 0;

@@ -175,8 +175,17 @@ private:
     pair(n, "battery", C_TEXT, "%u%%%s", d.battPct, d.charging ? " chg" : "");
     pair(n, "contacts", d.contacts * 10 >= d.contactsMax * 9 ? C_WARN : C_TEXT, "%u/%u", d.contacts, d.contactsMax);
     pair(n, "channels", C_TEXT, "%u/%u", d.channels, d.channelsMax);
-    pair(n, "ble", a.m().bleConnected() ? C_OK : C_TEXT, "%s",
-         a.m().bleAvailable() ? (a.m().bleConnected() ? "connected" : a.m().prefs().bleEnabled ? "on" : "off") : "none");
+    if (a.m().mode() == model::Mode::Remote) {
+      // The radio, counters and contacts above are the node's; heap and
+      // battery are this device's. The node's own battery:
+      model::Link l = a.m().link();
+      bool up = l.state == model::LinkState::Ready;
+      if (up) pair(n, "node", l.synced ? C_OK : C_ACCENT, "%u.%02uV %ddBm", l.nodeBattMv / 1000, l.nodeBattMv % 1000 / 10, l.rssi);
+      else pair(n, "node", C_WARN, "%s", l.saved ? "no link" : "none chosen");
+    } else {
+      pair(n, "ble", a.m().bleConnected() ? C_OK : C_TEXT, "%s",
+           a.m().bleAvailable() ? (a.m().bleConnected() ? "connected" : a.m().prefs().bleEnabled ? "on" : "off") : "none");
+    }
     uint8_t k[6];
     a.m().selfKey(k);
     pair(n, "node id", C_ACCENT, "%02X%02X%02X%02X", k[0], k[1], k[2], k[3]);

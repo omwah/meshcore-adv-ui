@@ -22,6 +22,8 @@
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   ble on|off                    remote mode: drop or restore the Bluetooth link
 //   nodewipe                      remote mode: erase the node (do it with the link off)
+//   nopair (before anything else) remote mode: don't connect by itself; the UI chooses the node
+//   blepin <pin>                  remote mode: the node's Bluetooth PIN (default 123456)
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
 //   expect sounds <n>          notification chimes played so far
@@ -70,6 +72,7 @@ public:
   uint32_t heapFree() override { return 118 * 1024; }
   uint32_t heapMin() override { return 96 * 1024; }
   uint32_t heapMaxBlock() override { return 64 * 1024; }
+  uint16_t batteryMv() override { return 3950; }
   void reboot() override { rebootRequested = true; }
   bool rebootRequested = false;
 };
@@ -111,12 +114,13 @@ public:
         _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/node", kEpoch, nullptr, format, &_pipe));
         _uiNode->begin();
       }
+      snprintf(_pipe.peerName, sizeof _pipe.peerName, "Cardputer");   // its Bluetooth name: MeshCore-<node name>
       _remoteFs.setRoot(_dir + "/ui");
       if (format) _remoteFs.format();
       else _remoteFs.mkdir("/");
       _remote->begin(_remoteFs);
       app::Peer p;
-      if (!_remote->hasSavedPeer() && _pipe.scanResult(0, p)) _remote->connectTo(p, _pipe.pin);
+      if (_autoPair && !_remote->hasSavedPeer() && _pipe.scanResult(0, p)) _remote->connectTo(p, _pipe.pin);
       return;
     }
     _uiNode.reset();
@@ -133,6 +137,7 @@ public:
 
   bool setup(const char* cmd, const char*) override {
     if (!strcmp(cmd, "keep")) { _fresh = false; return true; }   // reuse flash from a previous run
+    if (!strcmp(cmd, "nopair")) { _autoPair = false; return true; }   // remote mode: leave choosing the node to the UI
     return false;
   }
 
@@ -214,6 +219,7 @@ public:
     }
     if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
     if (!strcmp(cmd, "ble")) { _pipe.linkUp(!strcmp(arg, "on")); return true; }   // remote mode: the Bluetooth link
+    if (!strcmp(cmd, "blepin")) { _pipe.pin = (uint32_t)atol(arg); return true; }
     if (!strcmp(cmd, "nodewipe") && _remote) {   // remote mode: erase the node (new identity, no contacts)
       memcpy(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
       _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/node", kEpoch, nullptr, true, &_pipe));
@@ -379,6 +385,7 @@ private:
   std::map<std::string, std::unique_ptr<SimRoom>> _rooms;
   std::map<std::string, int> _ids;
   bool _fresh = true;
+  bool _autoPair = true;
   SimPlatform& _plat;
   ui::App* _app = nullptr;
   ui::Screen* _first = nullptr;

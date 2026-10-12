@@ -88,6 +88,15 @@ void AdapterBase::loadUiPrefs(fs::FS& fs) {
   }
 }
 
+model::Mode readDeviceMode(fs::FS& fs) {
+  UiPrefs u{};
+  File f = fs.open(kUiPrefsFile, "r");
+  size_t got = f ? f.read((uint8_t*)&u, sizeof u) : 0;
+  if (f) f.close();
+  bool ok = got > offsetof(UiPrefs, deviceMode) && u.magic == UI_PREFS_MAGIC && u.version == UI_PREFS_VERSION;
+  return ok && u.deviceMode == 1 ? model::Mode::Remote : model::Mode::Local;
+}
+
 void AdapterBase::saveUiPrefs() {
   File f = _fs->open(kUiPrefsFile, "w", true);
   if (!f) return;
@@ -111,6 +120,7 @@ void AdapterBase::uiToPrefs() {
   p.bleEnabled = _ui.bleEnabled;
   p.presetIdx = _ui.presetIdx;
   p.blePinRandom = _ui.blePinRandom;
+  p.deviceMode = _ui.deviceMode == 1 ? model::Mode::Remote : model::Mode::Local;
 }
 
 void AdapterBase::prefsToUi(const model::Prefs& p) {
@@ -128,6 +138,7 @@ void AdapterBase::prefsToUi(const model::Prefs& p) {
   _ui.bleEnabled = p.bleEnabled;
   _ui.presetIdx = p.presetIdx;
   _ui.blePinRandom = p.blePinRandom;
+  _ui.deviceMode = (uint8_t)p.deviceMode;
 }
 
 void AdapterBase::setUiMuted(int slot, bool muted) {

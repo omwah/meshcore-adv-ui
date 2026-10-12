@@ -16,6 +16,7 @@ public:
   virtual uint32_t heapMin() = 0;
   virtual uint32_t heapMaxBlock() = 0;
   virtual bool charging() { return false; }
+  virtual uint16_t batteryMv() { return 0; }   // this device's battery
   virtual model::Gps gps() { return model::Gps(); }
   virtual void setGpsPower(bool on) { (void)on; }
   // Removable storage for backups; null when no card is present.

@@ -3,6 +3,10 @@
 #pragma once
 #include "ui/app.h"
 
+#ifndef MC_UI_REMOTE
+#define MC_UI_REMOTE 0   // remote node mode (set by builds with Bluetooth)
+#endif
+
 namespace ui { namespace screens {
 
 Screen* home();
@@ -20,6 +24,9 @@ void openGps(App& a);
 void openHeard(App& a, bool repeatersOnly);
 void openBackup(App& a);
 void openJoinChannel(App& a);
+#if MC_UI_REMOTE
+void openRemote(App& a);   // remote mode: the link to the node
+#endif
 // Scrollable text page (results, keys, help).
 void openText(App& a, const char* title, const char* body);
 

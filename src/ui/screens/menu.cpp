@@ -16,16 +16,21 @@ const char* yesNo(bool b) { return b ? "on" : "off"; }
 
 enum MItem { M_HDR_MESH, M_JOIN, M_HEARD, M_DISCOVER, M_ADV0, M_ADVF,
              M_HDR_DEV, M_RADIO, M_DIAG, M_LOG, M_GPS,
-             M_HDR_SYS, M_SETTINGS, M_BACKUP, M_ABOUT, M_REBOOT, M_N };
+             M_HDR_SYS, M_REMOTE, M_SETTINGS, M_BACKUP, M_ABOUT, M_REBOOT, M_N };
+
+bool remoteMode(App& a) { return a.m().mode() == model::Mode::Remote; }
+
+// Row -> item: "Remote node" is only there in remote mode.
+int mItem(App& a, int i) { return !remoteMode(a) && i >= M_REMOTE ? i + 1 : i; }
 
 class MainMenu : public MenuScreen {
 public:
   const char* title(App&) override { return "Menu"; }
 
 protected:
-  int count(App&) override { return M_N; }
+  int count(App& a) override { return remoteMode(a) ? M_N : M_N - 1; }
   void item(App& a, int i, MenuItem& it) override {
-    switch (i) {
+    switch (mItem(a, i)) {
       case M_HDR_MESH: it.label = "MESH"; it.header = true; break;
       case M_JOIN: it.label = "Join channel"; break;
       case M_HEARD: it.label = "Heard adverts"; snprintf(it.value, sizeof it.value, "%d", a.m().heardCount()); it.valueCol = C_DIM; break;
@@ -49,6 +54,14 @@ protected:
         break;
       }
       case M_HDR_SYS: it.label = "SYSTEM"; it.header = true; break;
+      case M_REMOTE: {
+        it.label = "Remote node";
+        model::Link l = a.m().link();
+        bool up = l.state == model::LinkState::Ready;
+        snprintf(it.value, sizeof it.value, "%s", up ? "connected" : !l.saved ? "none" : "not connected");
+        it.valueCol = up ? C_OK : C_WARN;
+        break;
+      }
       case M_SETTINGS: it.label = "Settings"; break;
       case M_BACKUP: {
         it.label = "Backup & restore";
@@ -62,7 +75,7 @@ protected:
     }
   }
   void activate(App& a, int i) override {
-    switch (i) {
+    switch (mItem(a, i)) {
       case M_JOIN: openJoinChannel(a); break;
       case M_HEARD: openHeard(a, false); break;
       case M_DISCOVER:
@@ -75,6 +88,9 @@ protected:
       case M_DIAG: openDiag(a); break;
       case M_LOG: openPacketLog(a); break;
       case M_GPS: openGps(a); break;
+#if MC_UI_REMOTE
+      case M_REMOTE: openRemote(a); break;
+#endif
       case M_SETTINGS: openSettings(a); break;
       case M_BACKUP: openBackup(a); break;
       case M_ABOUT: {
@@ -99,7 +115,7 @@ MainMenu s_menu;
 
 // ------------------------------------------------------------- settings
 
-enum SItem { S_HDR_ID, S_NAME, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
+enum SItem { S_HDR_ID, S_NAME, S_MODE, S_REMOTE, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
              S_HDR_IN, S_LOCKOUT, S_SOUND,
              S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
@@ -130,6 +146,12 @@ protected:
     switch (i) {
       case S_HDR_ID: it.label = "IDENTITY"; it.header = true; break;
       case S_NAME: it.label = "Node name"; snprintf(it.value, sizeof it.value, "%s", p.nodeName); break;
+      case S_MODE:
+        it.label = "Mesh node"; it.choice = true;
+        it.enabled = MC_UI_REMOTE;   // a remote node needs Bluetooth
+        snprintf(it.value, sizeof it.value, "%s", p.deviceMode == model::Mode::Remote ? "remote (BLE)" : "this device");
+        break;
+      case S_REMOTE: it.label = "Remote node"; it.enabled = remoteMode(a); break;
       case S_HDR_TIME: it.label = "TIME"; it.header = true; break;
       case S_TZ: it.label = "Time zone"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", kZones[p.timeZone % kZoneCount].name); break;
       case S_HDR_DISP: it.label = "DISPLAY"; it.header = true; break;
@@ -219,10 +241,18 @@ protected:
         });
         break;
       case S_FACTORY:
+        if (remoteMode(a)) {
+          a.confirm("Erase this device's messages and settings for remote mode? The node keeps its own (erase it from Remote node).",
+                    [](App& app, int) { app.m().factoryReset(); });
+          break;
+        }
         a.confirm("Erase identity, contacts, channels and settings? This cannot be undone.", [](App& app, int) {
           app.m().factoryReset();
         });
         break;
+#if MC_UI_REMOTE
+      case S_REMOTE: openRemote(a); break;
+#endif
       default:
         adjust(a, i, 1);
     }
@@ -231,6 +261,18 @@ protected:
   void adjust(App& a, int i, int dir) override {
     model::Prefs p = a.m().prefs();
     switch (i) {
+      case S_MODE:
+        if (!MC_UI_REMOTE) return;
+        a.confirm(p.deviceMode == model::Mode::Remote
+                      ? "Restart as a node of its own (this device's radio)?"
+                      : "Restart as the screen and keyboard of a companion node, over Bluetooth? This device's own node stays off until you switch back.",
+                  [](App& app, int) {
+                    model::Prefs q = app.m().prefs();
+                    q.deviceMode = q.deviceMode == model::Mode::Remote ? model::Mode::Local : model::Mode::Remote;
+                    app.m().setPrefs(q);
+                    app.m().reboot();
+                  });
+        return;
       case S_TZ: p.timeZone = (uint8_t)((p.timeZone + kZoneCount + dir) % kZoneCount); break;
       case S_THEME: p.theme = (uint8_t)((p.theme + kThemeCount + dir) % kThemeCount); break;
       case S_BRIGHT: {
@@ -408,7 +450,8 @@ protected:
     }
     c.text(r.x + 4, r.y + 2, l, s, b.cardPresent ? C_TEXT : C_WARN, -1, r.w - 8);
     if (b.lastError[0]) c.text(r.x + 4, r.y + 2 + lh, b.lastError, s, C_ERR, -1, r.w - 8);
-    else c.text(r.x + 4, r.y + 2 + lh, "/meshcore-adv-ui/backup.bin", s, C_DIM, -1, r.w - 8);
+    else c.text(r.x + 4, r.y + 2 + lh, remoteMode(a) ? "of the remote node, on this SD card" : "/meshcore-adv-ui/backup.bin", s,
+                C_DIM, -1, r.w - 8);
     return 2 * lh + 6;
   }
   int count(App&) override { return B_N; }
@@ -432,9 +475,12 @@ protected:
         break;
       case B_RESTORE:
       case B_PREV:
-        a.confirm("Replace this device's settings with the backup and reboot?", [](App& app, int prev) {
-          if (!app.m().restore(prev != 0)) app.toast("Restore failed: backup unreadable", C_ERR);
-        }, i == B_PREV);
+        a.confirm(remoteMode(a) ? "Put this backup back on the node, replacing its settings, channels and contacts?"
+                                : "Replace this device's settings with the backup and reboot?",
+                  [](App& app, int prev) {
+                    if (!app.m().restore(prev != 0)) app.toast("Restore failed: backup unreadable", C_ERR);
+                    else if (remoteMode(app)) app.toast("Restoring to the node...", C_OK);
+                  }, i == B_PREV);
         break;
       default:
         adjust(a, i, 1);

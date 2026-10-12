@@ -63,7 +63,11 @@ public:
     out.rssi = -60;
     return true;
   }
-  void connect(const app::Peer&, uint32_t pin) override { _up = _enabled && pin == this->pin; }
+  void connect(const app::Peer&, uint32_t pin) override {
+    _up = _enabled && pin == this->pin;
+    snprintf(_err, sizeof _err, "%s", _up || !_enabled ? "" : "Pairing failed: wrong PIN?");
+  }
+  const char* lastError() const override { return _err; }
   void disconnect() override {
     _up = false;
     _toApp.clear();
@@ -80,6 +84,7 @@ public:
 
 private:
   bool _enabled = false, _up = false;
+  char _err[40] = "";
   unsigned long _lastOut = 0;
   std::deque<std::vector<uint8_t>> _toApp, _arrived, _toNode;
 };

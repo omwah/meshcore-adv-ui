@@ -30,9 +30,20 @@ public:
   void connectTo(const Peer& p, uint32_t pin);   // and remember it
   void forgetPeer();
   bool synced() const { return _synced; }
+
+  // ---- model::MeshModel: remote mode ----
+  model::Mode mode() const override { return model::Mode::Remote; }
+  model::Link link() const override;
+  void scan(bool on) override;
+  int foundCount() const override { return _link.scanCount(); }
+  bool found(int i, model::FoundNode& out) const override;
+  bool connectFound(int i, uint32_t pin) override;
+  void reconnect() override;
+  void disconnect() override { _link.disconnect(); _rev++; }
+  void forgetNode() override { forgetPeer(); }
   // The node itself: restart it, or erase it (identity, contacts, channels).
-  bool rebootNode();
-  bool resetNode();
+  bool rebootNode() override;
+  bool resetNode() override;
   const cp::DeviceInfo& deviceInfo() const { return _dev; }
 
   // ---- model::MeshModel ----
@@ -150,6 +161,8 @@ private:
   FrameLink& _link;
   CompanionClient _client;
   bool _wasReady = false, _synced = false;
+  FrameLink::State _lastState = FrameLink::State::Idle;
+  int _lastFound = 0;
   cp::DeviceInfo _dev{};
   cp::SelfInfo _self{};
   bool _haveSelf = false;

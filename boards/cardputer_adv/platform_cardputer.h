@@ -9,6 +9,7 @@ public:
   uint32_t heapFree() override;
   uint32_t heapMin() override;
   uint32_t heapMaxBlock() override;
+  uint16_t batteryMv() override;
   model::Gps gps() override;
   void setGpsPower(bool on) override;
   fs::FS* sd() override;
