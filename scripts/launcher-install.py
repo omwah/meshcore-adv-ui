@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+#
+# Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
+# (licenses/Apache-2.0.txt).
+#
+# Changes for meshcore-adv-ui: installs this project's packaged app image
+# (the newest in dist/, BLE or --usb build) under the name meshcore-adv-ui;
+# no SD runtime upload; a reboot that drops the connection counts as done.
+"""
+Install a meshcore-adv-ui build on a Cardputer running bmorcelli's Launcher,
+over Launcher's web interface (WebUI), the way its own page does.
+
+    pixi run launcher-install IP [--usb] [--boot] [--no-replace]
+    python -I scripts/launcher-install.py IP [BIN] [--name NAME] ...
+
+IP     the device's address, as Launcher's WebUI screen shows it
+BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin
+       that `pixi run package` made; never a -full.bin)
+--usb  the USB-only build instead (installed as meshcore-adv-ui-usb)
+--name the app's name in Launcher's menu (default: meshcore-adv-ui)
+--no-replace  keep an installed app of that name and add a copy; by default
+       it is deleted first. Launcher applies a partition change by restarting:
+       start its WebUI again when asked.
+--boot restart into the app once it is installed.
+
+The WebUI login is Launcher's default (admin / launcher) unless
+$LAUNCHER_USER and $LAUNCHER_PASS say otherwise.
+
+The protocol (Launcher's src/webInterface.cpp and webUi/scripts.js):
+  POST /login            username, password -> cookie ESP32SESSION
+  GET  /partitions       the table as JSON
+  POST /partitions       action=delete offset=N, then action=apply (restarts)
+  POST /OTA              command=0, size, manifest (JSON: the parts to install)
+  POST /OTAFILE          the file, multipart field "file1" -> "OK"
+  GET  /reboot
+Only standard-library Python.
+"""
+
+import argparse
+import http.cookiejar
+import json
+import os
+import struct
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def die(msg):
+    print(f"launcher-install: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def say(msg):
+    print(f"launcher-install: {msg}")
+
+
+def image_size(data):
+    """Length of the ESP app image at the start of data, as Launcher's page
+    measures it (measureEspImageSize): header, segments, checksum, hash."""
+    if len(data) < 24 or data[0] != 0xE9 or not 0 < data[1] <= 16:
+        die("not an ESP app image (no 0xE9 header): give the app .bin, not a merged one")
+    cursor = 24
+    for _ in range(data[1]):
+        (size,) = struct.unpack_from("<I", data, cursor + 4)
+        cursor += 8 + size
+        if cursor > len(data):
+            die("app image truncated")
+    end = (cursor + 15) // 16 * 16 + 1
+    if data[23]:
+        end += 32                       # SHA-256 appended
+    end = (end + 15) // 16 * 16
+    return min(end, len(data))
+
+
+def multipart(fields, files=()):
+    """(body, content type) for fields {name: value} and files
+    [(field, filename, bytes)]."""
+    boundary = uuid.uuid4().hex
+    out = []
+    for k, v in fields.items():
+        out += [f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n".encode(),
+                str(v).encode(), b"\r\n"]
+    for field, name, data in files:
+        out += [f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; "
+                f"filename=\"{name}\"\r\nContent-Type: application/octet-stream\r\n\r\n".encode(),
+                data, b"\r\n"]
+    out.append(f"--{boundary}--\r\n".encode())
+    return b"".join(out), f"multipart/form-data; boundary={boundary}"
+
+
+class Launcher:
+    def __init__(self, ip):
+        self.base = f"http://{ip}"
+        self.jar = http.cookiejar.CookieJar()
+        self.http = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
+
+    def request(self, method, path, body=None, ctype=None, timeout=30):
+        req = urllib.request.Request(self.base + path, data=body, method=method)
+        if ctype:
+            req.add_header("Content-Type", ctype)
+        try:
+            with self.http.open(req, timeout=timeout) as r:
+                return r.status, r.read().decode(errors="replace")
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode(errors="replace")
+        except (urllib.error.URLError, OSError) as e:
+            die(f"{method} {path}: {e}")
+
+    def form(self, path, fields, timeout=30):
+        body = urllib.parse.urlencode(fields).encode()
+        return self.request("POST", path, body, "application/x-www-form-urlencoded", timeout)
+
+    def alive(self):
+        try:
+            with urllib.request.urlopen(self.base + "/ping", timeout=3) as r:
+                return r.status == 200
+        except (urllib.error.URLError, OSError):
+            return False
+
+    def login(self):
+        user = os.environ.get("LAUNCHER_USER", "admin")
+        password = os.environ.get("LAUNCHER_PASS", "launcher")
+        self.form("/login", {"username": user, "password": password})
+        if not any(c.name == "ESP32SESSION" for c in self.jar):
+            die("login refused: set $LAUNCHER_USER and $LAUNCHER_PASS to the WebUI's login")
+
+    def apps_named(self, name):
+        status, text = self.request("GET", "/partitions")
+        if status != 200:
+            die(f"GET /partitions: {status} {text}")
+        table = json.loads(text)
+        return [e for e in table["entries"]
+                if e["type"] == 0 and e.get("appName") == name and not e.get("running")]
+
+    def replace(self, name):
+        old = self.apps_named(name)
+        if not old:
+            say(f"no installed '{name}' to replace")
+            return
+        for e in old:
+            say(f"deleting '{name}' ({e['label']} at {e['offset']:#x}, {e['size'] // 1024} KB)")
+            status, text = self.form("/partitions", {"action": "delete", "offset": e["offset"]})
+            if status != 200:
+                die(f"delete {e['label']}: {status} {text}")
+        status, text = self.form("/partitions", {"action": "apply"})
+        if status != 200:
+            die(f"apply: {status} {text}")
+        say("partition table written; Launcher restarts")
+        time.sleep(3)
+        say("start the WebUI on the device again (it waits up to 3 minutes)")
+        for _ in range(180):
+            if self.alive():
+                break
+            time.sleep(1)
+        else:
+            die("the WebUI didn't come back; start it and run again without --replace")
+        self.jar.clear()
+        self.login()
+
+    def reboot(self):
+        req = urllib.request.Request(self.base + "/reboot")
+        for attempt in (1, 2):
+            try:
+                with self.http.open(req, timeout=5) as r:
+                    if r.status != 401:
+                        return
+            except urllib.error.HTTPError as e:
+                if e.code != 401:
+                    return
+            except (urllib.error.URLError, OSError):
+                return                  # it went down mid-request: restarting
+            self.jar.clear()
+            self.login()
+
+    def install(self, path, name):
+        """Install, logging in again and starting over once if Launcher drops
+        the session meanwhile: it keeps one, and a login elsewhere (a browser
+        on its WebUI) ends ours."""
+        for attempt in (1, 2):
+            status, text = self.try_install(path, name)
+            if status == 200 and text == "OK":
+                say(f"installed as '{name}'")
+                return
+            if status != 401 or attempt == 2:
+                die(f"install: {status} {text}")
+            say("Launcher dropped the session (a browser on its WebUI?): logging in again")
+            self.jar.clear()
+            self.login()
+
+    def try_install(self, path, name):
+        data = path.read_bytes()
+        size = image_size(data)
+        manifest = {
+            "sourceName": f"{name}.bin",
+            "parts": [{"kind": "app", "label": "app", "subtype": 0, "sourceOffset": 0,
+                       "copySize": size, "declaredSize": size}],
+        }
+        body, ctype = multipart({"command": 0, "size": len(data), "manifest": json.dumps(manifest)})
+        # Launcher reads and plans the partition table before it answers: give
+        # it time (it took over 30 s once, straight after a large SD upload).
+        status, text = self.request("POST", "/OTA", body, ctype, timeout=120)
+        if status != 200 or text != "OK":
+            return status, f"POST /OTA: {text}"
+        say(f"sending {path.name}, {len(data)} bytes ...")
+        body, ctype = multipart({}, [("file1", f"{name}.bin", data)])
+        status, text = self.request("POST", "/OTAFILE", body, ctype, timeout=300)
+        return status, text if status == 200 else f"POST /OTAFILE: {text}"
+
+
+def newest_image(env):
+    """The app image of the newest package in dist/ for env."""
+    imgs = sorted((ROOT / "dist").glob(f"*/meshcore-adv-ui-*-{env}.bin"), key=lambda p: p.stat().st_mtime)
+    if not imgs:
+        die(f"no {env} image in dist/: run pixi run package")
+    return imgs[-1]
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.strip().split("\n\n")[0])
+    ap.add_argument("ip")
+    ap.add_argument("bin", nargs="?", type=Path)
+    ap.add_argument("--usb", action="store_true")
+    ap.add_argument("--name")
+    ap.add_argument("--no-replace", action="store_true")
+    ap.add_argument("--boot", action="store_true")
+    a = ap.parse_args()
+
+    env = "cardputer_adv_usb" if a.usb else "cardputer_adv"
+    name = a.name or ("meshcore-adv-ui-usb" if a.usb else "meshcore-adv-ui")
+    path = a.bin or newest_image(env)
+    if not path.is_file():
+        die(f"{path}: no such file")
+    if path.name.endswith("-full.bin"):
+        die(f"{path.name}: that is the merged image for 0x0; give the app image")
+
+    dev = Launcher(a.ip)
+    if not dev.alive():
+        die(f"no Launcher WebUI at {a.ip} (start it from Launcher's menu)")
+    dev.login()
+    if not a.no_replace:
+        dev.replace(name)
+    say(f"installing {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
+    dev.install(path, name)
+    if a.boot:
+        # The device restarts before answering, so no reply is the usual outcome.
+        dev.reboot()
+        say("restarting into it")
+    else:
+        say("it boots next: restart the device, or choose it in Launcher")
+
+
+if __name__ == "__main__":
+    main()

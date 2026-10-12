@@ -5,6 +5,7 @@ This project includes or derives from the following third-party work:
 
 * esp-vim (Apache License 2.0)
   - scripts/bdf2c.py (BDF font to C table converter)
+  - scripts/launcher-install.py (install over bmorcelli's Launcher WebUI)
   - src/hal/keymap/cardputer_keymap.* (Cardputer ADV TCA8418 key mapping and
     modifier logic, adapted from esp_kbd_cardputer.c)
   - TCA8418 register sequence, ST7789 panel init values, SD/LoRa shared-bus

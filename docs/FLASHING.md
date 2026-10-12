@@ -62,15 +62,24 @@ If it asks for an address, use `0x0`.
 
 ## M5Launcher (bmorcelli's Launcher)
 
+From the SD card:
 1. Copy `meshcore-adv-ui-<ver>-cardputer_adv.bin` (the app image, not `-full`)
    to the SD card.
 2. In Launcher, choose SD, then the file, and install.
 
+Over WiFi, from a source checkout: start Launcher's WebUI on the device, then
+```sh
+pixi run launcher-install <IP> --boot
+```
+This builds, packages and installs the newest BLE image, replacing an earlier
+`meshcore-adv-ui` in Launcher's menu. `--usb` installs the USB-only build as
+`meshcore-adv-ui-usb`. The WebUI login is Launcher's default unless
+`LAUNCHER_USER` and `LAUNCHER_PASS` are set.
+
 Launcher has its own partition layout, so settings stored on the internal
 flash may not survive switching apps. Turn on Settings > Backup & restore >
 Auto-backup to SD before switching. When the firmware starts with nothing on flash and finds a
-backup on the card, it offers to restore it. Running from Launcher has not
-been checked on hardware yet (see `DEVICE-TESTING.md`).
+backup on the card, it offers to restore it.
 
 ## Coming from stock MeshCore
 
