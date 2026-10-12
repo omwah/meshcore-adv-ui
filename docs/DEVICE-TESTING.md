@@ -46,7 +46,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 ## 4. GPS (ATGM336H)
 
 - [ ] **Fix.** Turn GPS on. Within a few minutes outdoors the GPS screen shows satellites and a fix. The module's TX goes to GPIO15 and its RX to GPIO13, at 115200 baud. If nothing arrives, swap `PIN_GPS_TX/RX`.
-- [x] **Boot clock sync.** Works on hardware. "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
+- [ ] **Boot clock sync.** "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
 
 ## 5. Bluetooth (default build)
 

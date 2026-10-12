@@ -76,11 +76,10 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   }
   _seenContacts = _mesh->getNumContacts();
   // "Set clock from GPS at boot": run the receiver until the first fix (at
-  // most 10 minutes) even if GPS is otherwise off.
-  if (_ui.gpsTimeSyncAtBoot) {
-    _bootGpsUntil = millis() + 600000UL;
-    if (!_prefs.gpsEnabled) _plat.setGpsPower(true);
-  }
+  // most 10 minutes) even if GPS is otherwise off. Started from the first
+  // loop(): the sensor manager starts after this and switches GPS to its
+  // saved setting.
+  _bootGpsPending = _ui.gpsTimeSyncAtBoot;
   refreshBackupInfo();
   _rev++;
 }
@@ -669,6 +668,11 @@ void MeshAdapter::loop() {
     _rev++;
   }
 
+  if (_bootGpsPending) {
+    _bootGpsPending = false;
+    _bootGpsUntil = ms + 600000UL;
+    if (!_prefs.gpsEnabled) _plat.setGpsPower(true);
+  }
   if (_bootGpsUntil) {
     model::Gps g = _plat.gps();
     bool done = g.fix && g.lastFixS;

@@ -258,6 +258,7 @@ private:
   SentChannelMsg _sentChan[4] = {};
   uint32_t _prefsCheckAt = 0;
   uint32_t _bootGpsUntil = 0;     // boot-time GPS clock sync in progress until
+  bool _bootGpsPending = false;   // ...to be started by the first loop()
 };
 
 }  // namespace app

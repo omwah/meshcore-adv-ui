@@ -10,7 +10,10 @@ uint32_t CardputerPlatform::heapMaxBlock() { return heap_caps_get_largest_free_b
 model::Gps CardputerPlatform::gps() {
   model::Gps g;
   memset(&g, 0, sizeof g);
-  g.enabled = ::gps.isEnabled();
+  // Not gps.isEnabled(): with no enable pin it always says yes. Whether the
+  // sensor manager is reading the receiver is its "gps" setting.
+  const char* on = sensors.getSettingByKey("gps");
+  g.enabled = on && !strcmp(on, "1");
   g.fix = ::gps.isValid();
   g.sats = (uint8_t)::gps.satellitesCount();
   g.lat_e6 = ::gps.getLatitude();
