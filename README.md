@@ -44,7 +44,13 @@ can be added as new board directories.
 - **Conversation:**
   - Each message shows its delivery state: sending, sent, delivered or failed, with retries and repeat counts.
   - Incoming messages show hops and SNR.
-  - You can compose replies inline.
+  - You can compose replies inline, in a word-wrapped box.
+  - History: the newest 512 messages stay on flash. With an SD card, older
+    ones move to `/meshcore-adv-ui/history/` on the card instead of being
+    lost. Up at the top of a conversation loads older messages, and Down at
+    the bottom comes back.
+  - "Clear history" on a contact or channel deletes its messages, including
+    the card's copy.
 - **Contact details:**
   - Path, hops, last heard, SNR/RSSI and position.
   - Actions: favourite, reset path, trace route, ping, remove.

@@ -77,11 +77,12 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
         kb.at(t + n, r, col, false);
         c.advance(t + n + 100);
       } else {
+        // One press at a time: the keyboard's event queue is small.
         for (int i = 0; i < n; i++, t += 160) {
           kb.at(t, r, col, true);
           kb.at(t + 40, r, col, false);
+          c.advance(t + 60);
         }
-        c.advance(t + 60);
       }
     } else if (!strcmp(cmd, "type")) {
       uint32_t t = now + 10;
@@ -99,6 +100,29 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
         c.advance(t);   // so text mode applies from the second key on
       }
       c.advance(t + 50);
+    } else if (!strcmp(cmd, "repeat")) {
+      // repeat <count> <gap ms> <command...>: '#' in the command becomes
+      // 001, 002...
+      int count = 0, gap = 0, u = 0;
+      sscanf(arg, "%d %d %n", &count, &gap, &u);
+      for (int i = 1; i <= count; i++) {
+        char sub[512], num[8], rcmd[16] = {};
+        snprintf(num, sizeof num, "%03d", i);
+        int o = 0;
+        for (const char* s = arg + u; *s && o < (int)sizeof sub - 4; s++) {
+          if (*s == '#') { memcpy(sub + o, num, 3); o += 3; }
+          else sub[o++] = *s;
+        }
+        sub[o] = 0;
+        int ru = 0;
+        sscanf(sub, "%15s %n", rcmd, &ru);
+        char err[160] = {};
+        if (!world.command(rcmd, sub + ru, err, sizeof err) || err[0]) {
+          fprintf(stderr, "line %d: %s\n", lineNo, err[0] ? err : "unknown command");
+          return 3;
+        }
+        c.advance(now + (uint32_t)gap);
+      }
     } else if (!strcmp(cmd, "wait")) {
       c.advance(now + (uint32_t)atoi(arg));
     } else if (!strcmp(cmd, "shot")) {

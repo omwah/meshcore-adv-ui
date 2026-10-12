@@ -276,6 +276,13 @@ private:
       if (strcmp(g, val)) snprintf(err, n, "request is %s (%s)", g, _ui.requestText());
       return true;
     }
+    else if (!strcmp(what, "window")) got = _ui.store().count();   // messages of the open chat in RAM
+    else if (!strcmp(what, "first") || !strcmp(what, "last")) {      // text in the window's oldest/newest
+      app::MessageStore& s = _ui.store();
+      const char* g = s.count() ? s.at(what[0] == 'f' ? 0 : s.count() - 1).text : "(none)";
+      if (!strstr(g, val)) snprintf(err, n, "%s message is '%s'", what, g);
+      return true;
+    }
     else if (!strcmp(what, "repeats")) {   // last message we sent in the open chat
       app::MessageStore& s = _ui.store();
       got = -1;

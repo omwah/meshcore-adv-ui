@@ -100,6 +100,18 @@ public:
       wrapText(msg, a.fMed(), r.w - 20, drawLine, &d);
     }
 
+    // After sliding the window, scroll so reading continues where it was:
+    // loaded newer messages wait below the one that was last; loaded older
+    // ones end at the bottom of the view, right above the one that was first.
+    if (_keepBottom > 0 || _showOlder > 0) {
+      int hidden = 0, from = _keepBottom > 0 ? n - _keepBottom : _showOlder;
+      for (int i = n - 1; i >= from && i >= 0; i--) {
+        model::Message m;
+        if (a.m().message(id, i, m)) hidden += a.mx().meta + wrapText(m.text, f, textW, nullptr, nullptr) * f->height + GAP;
+      }
+      _scroll = hidden;
+      _keepBottom = _showOlder = 0;
+    }
     // Walk from the newest message up. _scroll counts pixels hidden below.
     int bottom = mr.y + mr.h + _scroll;
     int total = 0;
@@ -115,8 +127,8 @@ public:
     }
     _maxScroll = total > mr.h ? total - mr.h : 0;
     if (_scroll > _maxScroll) _scroll = _maxScroll;
-    if (_scroll > 0) {
-      // "More below" marker.
+    if (_scroll > 0 || !a.m().atNewest(id)) {
+      // More below: in this window, or newer messages not loaded yet.
       c.fillRect(mr.x + mr.w / 2 - 12, mr.y + mr.h - 4, 24, 3, C_ACCENT);
     }
     drawScrollbar(c, mr, total, total - mr.h - _scroll, mr.h);
@@ -129,8 +141,28 @@ public:
     Rect r = a.content();
     switch (k.code) {
       case K_ESC: a.pop(); return;
-      case K_UP: _scroll += 12; if (_scroll > _maxScroll) _scroll = _maxScroll; return;
-      case K_DOWN: _scroll -= 12; if (_scroll < 0) _scroll = 0; return;
+      case K_UP:
+        if (_scroll >= _maxScroll && !k.repeat) {
+          // At the top of what's loaded: bring in older messages.
+          int n = a.m().loadOlder(id);
+          if (n) _showOlder = n;
+          else a.toast("Start of history", C_DIM);
+          return;
+        }
+        _scroll += 12;
+        if (_scroll > _maxScroll) _scroll = _maxScroll;
+        return;
+      case K_DOWN:
+        if (_scroll == 0 && !k.repeat && !a.m().atNewest(id)) {
+          // At the bottom of an older window: bring in newer messages and
+          // keep the current last message in view.
+          int n = a.m().loadNewer(id);
+          _keepBottom = n;
+          return;
+        }
+        _scroll -= 12;
+        if (_scroll < 0) _scroll = 0;
+        return;
       case K_PGUP: _scroll += r.h - 20; if (_scroll > _maxScroll) _scroll = _maxScroll; return;
       case K_PGDN: _scroll -= r.h - 20; if (_scroll < 0) _scroll = 0; return;
       case K_END: _scroll = 0; return;
@@ -190,6 +222,7 @@ private:
         _draft[0] = 0;
         _ed.attach(_draft, maxLen(a) + 1);
         _composing = false;
+        _scroll = 0;
       } else {
         a.toast("Send failed: no path or queue full", C_ERR);
       }
@@ -269,8 +302,13 @@ private:
     char cnt[12];
     int len = _ed.length(), lim = maxLen(a);
     snprintf(cnt, sizeof cnt, "%d", lim - len);
-    int w = Canvas::textWidth(cnt, a.fSmall());
-    c.text(r.x + r.w - w - 3, y + CH - a.fSmall()->height - 1, cnt, a.fSmall(), lim - len < 20 ? C_WARN : C_DIM);
+    // On a tab above the box, so it never covers the text.
+    const mc_font_t* sf = a.fSmall();
+    int w = Canvas::textWidth(cnt, sf);
+    c.fillRect(r.x + r.w - w - 7, y - sf->height - 1, w + 7, sf->height + 1, C_ZEBRA);
+    c.vline(r.x + r.w - w - 7, y - sf->height - 1, sf->height + 1, C_ACCENT);
+    c.hline(r.x + r.w - w - 7, y - sf->height - 1, w + 7, C_ACCENT);
+    c.text(r.x + r.w - w - 3, y - sf->height, cnt, sf, lim - len < 20 ? C_WARN : C_DIM);
   }
 
   char _title[model::NAME_LEN];
@@ -278,6 +316,7 @@ private:
   LineEditor _ed;
   bool _composing = false;
   bool _loginTried = false;
+  int _keepBottom = 0, _showOlder = 0;   // messages just loaded below / above
   int _scroll = 0, _maxScroll = 0;
   uint32_t _readRev = 0, _blink = 0;
 };

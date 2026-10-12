@@ -219,6 +219,12 @@ public:
   virtual int messageCount(ThreadId t) const = 0;
   virtual bool message(ThreadId t, int i, Message& out) const = 0;  // 0 = oldest kept
   virtual void markRead(ThreadId t) = 0;
+  // message() shows a window of a conversation: slide it to older or newer
+  // messages; each returns how many came in (0 = no more that way).
+  virtual int loadOlder(ThreadId t) = 0;
+  virtual int loadNewer(ThreadId t) = 0;
+  virtual bool atNewest(ThreadId t) const = 0;
+  virtual void clearHistory(ThreadId t) = 0;
   virtual uint16_t unreadTotal() const = 0;
   virtual bool send(ThreadId t, const char* text) = 0;
 

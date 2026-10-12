@@ -59,6 +59,7 @@ void MeshAdapter::begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs:
   _fs = &fs;
   _bleBuilt = bleBuilt;
   _msgs.begin(&fs);
+  _msgs.setArchive(_plat.sd());
   loadUiPrefs();
   loadPasswords();
   syncPrefsFromMesh();
@@ -503,6 +504,34 @@ bool MeshAdapter::message(model::ThreadId t, int i, model::Message& out) const {
   return true;
 }
 
+int MeshAdapter::loadOlder(model::ThreadId t) {
+  messageCount(t);   // make sure the window is on this conversation
+  int n = _msgs.older();
+  if (n) _rev++;
+  return n;
+}
+
+int MeshAdapter::loadNewer(model::ThreadId t) {
+  messageCount(t);
+  int n = _msgs.newer();
+  if (n) _rev++;
+  return n;
+}
+
+bool MeshAdapter::atNewest(model::ThreadId t) const {
+  messageCount(t);
+  return _msgs.atNewest();
+}
+
+void MeshAdapter::clearHistory(model::ThreadId t) {
+  bool ok;
+  ThreadKey k = keyFor(_mesh, t, ok);
+  if (!ok) return;
+  _msgs.clear(k);
+  _hasOpen = false;
+  _rev++;
+}
+
 void MeshAdapter::markRead(model::ThreadId t) {
   bool ok;
   ThreadKey k = keyFor(_mesh, t, ok);
@@ -539,6 +568,10 @@ bool MeshAdapter::sendDirect(Pending& p, const ContactInfo& c, const char* text)
 
 bool MeshAdapter::send(model::ThreadId t, const char* text) {
   if (!text[0]) return false;
+  // Sending from an older part of the conversation: go back to the newest
+  // messages, so what is sent shows up.
+  messageCount(t);
+  if (!_msgs.atNewest()) _msgs.open(_openKey);
   uint32_t ts = _rtc->getCurrentTimeUnique();
   model::Message m;
   memset(&m, 0, sizeof m);
@@ -661,8 +694,11 @@ void MeshAdapter::loop() {
     _seenContacts = nc;
     configChanged();
   }
-  // Card inserted or removed: refresh what the Backup screen shows.
-  if ((_plat.sd() != nullptr) != _bk.card) refreshBackupInfo();
+  // Card inserted or removed: refresh what the Backup screen shows, and
+  // where old messages are archived.
+  fs::FS* sd = _plat.sd();
+  if ((sd != nullptr) != _bk.card) refreshBackupInfo();
+  _msgs.setArchive(sd);
   // Automatic backup: 10 s after the last change, at most once a minute.
   if (_ui.autoBackup && _cfgChangedAt && _bk.card && ms - _cfgChangedAt > 10000 &&
       (!_lastBackupAt || ms - _lastBackupAt > 60000))

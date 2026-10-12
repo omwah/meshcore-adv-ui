@@ -3,7 +3,13 @@
 // A fixed-size ring of records in one file: record i lives at slot
 // seq % CAPACITY, so writes never grow the file and the oldest messages are
 // overwritten. RAM holds only a summary per conversation (built by scanning
-// the file at boot) and the messages of the conversation that is open.
+// the file at boot) and a window of messages of the conversation that is
+// open, which can slide back to older messages and forward again.
+//
+// With an archive filesystem (an SD card), a record about to be overwritten
+// in the ring is first appended to its conversation's archive file there, in
+// its final state (delivered, repeats...), so history goes back further than
+// the ring.
 #pragma once
 #include <stdint.h>
 #include <FS.h>
@@ -30,11 +36,17 @@ struct ThreadInfo {
 
 class MessageStore {
 public:
-  static constexpr int CAPACITY = 512;     // records kept on flash (~108 KB)
+#ifndef MSG_RING_RECORDS
+#define MSG_RING_RECORDS 512
+#endif
+  static constexpr int CAPACITY = MSG_RING_RECORDS;   // records kept on flash (512: ~108 KB)
   static constexpr int MAX_THREADS = 40;
   static constexpr int CACHE = 24;         // messages of the open conversation in RAM
+  static constexpr int PAGE = 12;          // messages loaded per step back or forward
 
   bool begin(fs::FS* fs);
+  // Removable storage for the archive, or null (no card).
+  void setArchive(fs::FS* sd) { _sd = sd; }
   // Append a message; returns its sequence number (0 on failure).
   uint32_t append(const ThreadKey& k, const model::Message& m, uint32_t ack = 0);
   bool setStatus(uint32_t seq, model::Delivery st, uint8_t retries);
@@ -49,16 +61,29 @@ public:
   uint16_t unreadTotal() const;
   void forget(const ThreadKey& k);                // drop a thread (contact/channel removed)
 
-  // The open conversation.
+  // The open conversation: a window of up to CACHE messages, oldest first.
   void open(const ThreadKey& k);
   int count() const { return _nCache; }
   const model::Message& at(int i) const { return _cache[i]; }  // 0 = oldest cached
+  // Slide the window: returns how many messages came in (0 = none there).
+  int older();
+  int newer();
+  bool atNewest() const;     // the window ends with the conversation's last message
+  // Delete a conversation's messages (ring and archive).
+  void clear(const ThreadKey& k);
 
   void wipe();
 
 private:
   struct Rec;
   bool readRec(int slot, Rec& r);
+  void archive(const Rec& r);
+  void archivePath(const ThreadKey& k, char* out, int n) const;
+  // Up to `max` sequence numbers of this conversation, the ones closest to
+  // `from` going back (older) or forward; from the ring, then the archive.
+  int findSeqs(const ThreadKey& k, uint32_t from, bool older, uint32_t* out, int max);
+  bool loadSeq(const ThreadKey& k, uint32_t seq, model::Message& m);
+  static void toMessage(const Rec& r, model::Message& m);
   bool writeRec(const Rec& r);
   ThreadInfo* touch(const ThreadKey& k);
   void sortThreads();
@@ -66,6 +91,7 @@ private:
   void loadRead();
 
   fs::FS* _fs = nullptr;
+  fs::FS* _sd = nullptr;
   uint32_t _nextSeq = 1;
   ThreadInfo _threads[MAX_THREADS];
   int _nThreads = 0;

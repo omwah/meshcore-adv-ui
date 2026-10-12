@@ -20,7 +20,7 @@ void fmtPos(char* out, size_t n, int32_t lat, int32_t lon) {
 
 // ------------------------------------------------------------- contact
 
-enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_FORGETPW, CI_REMOVE, CI_N };
+enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_FORGETPW, CI_CLEAR, CI_REMOVE, CI_N };
 
 class ContactScreen : public MenuScreen {
 public:
@@ -141,6 +141,7 @@ protected:
       case CI_TRACE: it.label = "Trace route"; break;
       case CI_PING: it.label = "Ping"; break;
       case CI_FORGETPW: it.label = "Forget saved password"; it.enabled = a.m().hasSavedPassword(idx); break;
+      case CI_CLEAR: it.label = "Clear history"; break;
       case CI_REMOVE: it.label = "Remove contact"; it.valueCol = C_ERR; break;
     }
     if (_waiting && (i == CI_TRACE || i == CI_PING) && i == _pending) snprintf(it.value, sizeof it.value, "waiting...");
@@ -177,6 +178,12 @@ protected:
       case CI_FORGETPW:
         a.m().forgetPassword(idx);
         a.toast("Password forgotten");
+        break;
+      case CI_CLEAR:
+        a.confirm("Delete all messages with this contact, including the SD card archive?", [](App& app, int arg) {
+          app.m().clearHistory({model::ThreadKind::Direct, (uint16_t)arg});
+          app.toast("History cleared");
+        }, idx);
         break;
       case CI_REMOVE:
         a.confirm("Remove this contact?", [](App& app, int arg) {

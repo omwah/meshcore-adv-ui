@@ -55,7 +55,7 @@ TextScreen s_text;
 
 // ------------------------------------------------------------- channel
 
-enum ChItem { CH_OPEN, CH_MUTE, CH_KEY, CH_REMOVE, CH_N };
+enum ChItem { CH_OPEN, CH_MUTE, CH_KEY, CH_CLEAR, CH_REMOVE, CH_N };
 
 int findChannel(App& a, int idx, model::Channel& out) {
   for (int i = 0, n = a.m().channelCount(); i < n; i++)
@@ -100,6 +100,7 @@ protected:
       case CH_OPEN: it.label = "Open chat"; break;
       case CH_MUTE: it.label = "Muted"; it.choice = true; snprintf(it.value, sizeof it.value, ch.muted ? "yes" : "no"); it.valueCol = ch.muted ? C_WARN : C_DIM; break;
       case CH_KEY: it.label = "Show key"; break;
+      case CH_CLEAR: it.label = "Clear history"; break;
       case CH_REMOVE: it.label = "Leave channel"; it.enabled = chIdx != 0; break;
     }
   }
@@ -121,6 +122,12 @@ protected:
         openText(a, "Channel key", body);
         break;
       }
+      case CH_CLEAR:
+        a.confirm("Delete all messages in this channel, including the SD card archive?", [](App& app, int slot) {
+          app.m().clearHistory({model::ThreadKind::Channel, (uint16_t)slot});
+          app.toast("History cleared");
+        }, chIdx);
+        break;
       case CH_REMOVE:
         a.confirm("Leave this channel? Its key is deleted from this device.", [](App& app, int arg) {
           app.m().removeChannel(arg);

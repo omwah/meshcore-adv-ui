@@ -220,36 +220,69 @@ void LineEditor::draw(App& app, Canvas& c, int x, int y, int w, const mc_font_t*
   c.fillRect(caretX, y, 1, f->height, C_ACCENT);
 }
 
+// Where the line starting at byte `start` ends: at most `cols` characters,
+// broken after the last space if a word would be cut. `*n` gets its length
+// in characters.
+static int wrapLine(const char* buf, int start, int cols, int* n) {
+  const char* p = buf + start;
+  int count = 0, spaceEnd = -1, spaceCount = 0;
+  while (*p && count < cols) {
+    if (*p == ' ') { spaceEnd = (int)(p - buf) + 1; spaceCount = count + 1; }
+    utf8Next(&p);
+    count++;
+  }
+  int end = (int)(p - buf);
+  if (*p == ' ') end++;   // a space right at the edge ends this line, not starts the next
+  else if (*p && spaceEnd > start) { end = spaceEnd; count = spaceCount; }
+  *n = count;
+  return end;
+}
+
 void LineEditor::drawWrapped(App& app, Canvas& c, const Rect& r, const mc_font_t* f, uint8_t fg) {
   int cols = r.w / f->width;
   int rows = r.h / f->height;
-  // Hard-wrap by columns (no word wrap) so the caret position is exact.
-  int before = 0, total = 0;
-  for (const char* p = _buf; *p;) {
-    if (p - _buf < _cur) before++;
-    utf8Next(&p);
-    total++;
+  if (cols < 2 || rows < 1) return;
+  // Word wrap; the caret is placed on the line that holds its byte (at the
+  // end of a full line it starts the next one, where typing will go).
+  int len = length();
+  int lines = 0, caretLine = 0, caretCol = 0;
+  for (int s = 0;;) {
+    int n, e = wrapLine(_buf, s, cols, &n);
+    if (_cur >= s && (_cur < e || (_cur == e && (e == len) && n < cols))) {
+      caretLine = lines;
+      caretCol = 0;
+      for (const char* p = _buf + s; p < _buf + _cur; utf8Next(&p)) caretCol++;
+    }
+    lines++;
+    if (e >= len) {
+      if (n == cols && _cur == len) { caretLine = lines; caretCol = 0; lines++; }
+      break;
+    }
+    s = e;
   }
-  int caretLine = before / cols;
-  int lines = total / cols + 1;
   int firstLine = lines > rows ? lines - rows : 0;
   if (caretLine < firstLine) firstLine = caretLine;
-  const char* p = _buf;
-  for (int i = 0; i < firstLine * cols && *p; i++) utf8Next(&p);
-  for (int i = firstLine * cols; i < total; i++) {
-    int line = i / cols - firstLine;
-    if (line >= rows) break;
-    const char* q = p;
-    utf8Next(&q);
-    char g[5] = {0};
-    memcpy(g, p, q - p);
-    c.text(r.x + (i % cols) * f->width, r.y + line * f->height, g, f, fg);
-    p = q;
+  if (caretLine >= firstLine + rows) firstLine = caretLine - rows + 1;
+  int line = 0;
+  for (int s = 0; s < len && line < firstLine + rows; line++) {
+    int n, e = wrapLine(_buf, s, cols, &n);
+    if (line >= firstLine) {
+      const char* p = _buf + s;
+      for (int col = 0; p < _buf + e; col++) {
+        const char* q = p;
+        utf8Next(&q);
+        char g[5] = {0};
+        memcpy(g, p, q - p);
+        c.text(r.x + col * f->width, r.y + (line - firstLine) * f->height, g, f, fg);
+        p = q;
+      }
+    }
+    s = e;
   }
   if ((app.nowMs() / 500) & 1) return;
   int cl = caretLine - firstLine;
   if (cl >= 0 && cl < rows)
-    c.fillRect(r.x + (before % cols) * f->width, r.y + cl * f->height, 1, f->height, C_ACCENT);
+    c.fillRect(r.x + caretCol * f->width, r.y + cl * f->height, 1, f->height, C_ACCENT);
 }
 
 }  // namespace ui

@@ -51,6 +51,11 @@ bool MessageStore::writeRec(const Rec& r) {
   // SPIFFS can't seek past the end of a file: grow it with empty records
   // up to this slot first.
   size_t size = f.size();
+  // A different (older) record in this slot is about to go: archive it.
+  if (_sd && at + sizeof(Rec) <= size) {
+    Rec old;
+    if (f.seek(at) && f.read((uint8_t*)&old, sizeof old) == sizeof old && old.seq && old.seq != r.seq) archive(old);
+  }
   bool ok = true;
   if (at > size) {
     static const uint8_t zeros[64] = {};
@@ -152,6 +157,9 @@ uint32_t MessageStore::append(const ThreadKey& k, const model::Message& m, uint3
   r.ack = ack;
   snprintf(r.sender, sizeof r.sender, "%s", m.sender);
   snprintf(r.text, sizeof r.text, "%s", m.text);
+  // Is the open window showing this conversation's newest message? (Checked
+  // before the new message updates the summary.)
+  bool wasNewest = _hasOpen && _open == k && atNewest();
   if (!writeRec(r)) return 0;
 
   ThreadInfo* t = touch(k);
@@ -167,7 +175,9 @@ uint32_t MessageStore::append(const ThreadKey& k, const model::Message& m, uint3
   snprintf(t->preview, sizeof t->preview, "%s%s%s", m.sender, m.sender[0] ? ": " : "", m.text);
   sortThreads();
 
-  if (_hasOpen && _open == k) {
+  // Add to the open window only if it shows the newest messages; when the
+  // user has scrolled back, the new message waits below (newer()).
+  if (wasNewest) {
     if (_nCache == CACHE) {
       memmove(_cache, _cache + 1, sizeof(_cache[0]) * (CACHE - 1));
       memmove(_cacheSeq, _cacheSeq + 1, sizeof(_cacheSeq[0]) * (CACHE - 1));
@@ -234,21 +244,159 @@ void MessageStore::open(const ThreadKey& k) {
       _cacheSeq[pos] = _cacheSeq[pos - 1];
       pos--;
     }
-    model::Message& m = _cache[pos];
-    memset(&m, 0, sizeof m);
-    m.ts = r.ts;
-    m.outgoing = r.flags & 1;
-    m.status = (model::Delivery)r.status;
-    m.retries = r.retries;
-    m.repeats = r.repeats;
-    m.snr_x4 = r.snr_x4;
-    m.hops = r.hops;
-    snprintf(m.sender, sizeof m.sender, "%s", r.sender);
-    snprintf(m.text, sizeof m.text, "%s", r.text);
+    toMessage(r, _cache[pos]);
     _cacheSeq[pos] = r.seq;
     _nCache++;
   }
   f.close();
+}
+
+void MessageStore::toMessage(const Rec& r, model::Message& m) {
+  memset(&m, 0, sizeof m);
+  m.ts = r.ts;
+  m.outgoing = r.flags & 1;
+  m.status = (model::Delivery)r.status;
+  m.retries = r.retries;
+  m.repeats = r.repeats;
+  m.snr_x4 = r.snr_x4;
+  m.hops = r.hops;
+  snprintf(m.sender, sizeof m.sender, "%s", r.sender);
+  snprintf(m.text, sizeof m.text, "%s", r.text);
+}
+
+// ---- archive (SD card)
+
+void MessageStore::archivePath(const ThreadKey& k, char* out, int n) const {
+  snprintf(out, n, "/meshcore-adv-ui/history/%c%02x%02x%02x%02x%02x%02x.bin", k.kind ? 'c' : 'd', k.id[0], k.id[1],
+           k.id[2], k.id[3], k.id[4], k.id[5]);
+}
+
+void MessageStore::archive(const Rec& r) {
+  char path[64];
+  archivePath(r.key, path, sizeof path);
+  _sd->mkdir("/meshcore-adv-ui");
+  _sd->mkdir("/meshcore-adv-ui/history");
+  File f = _sd->open(path, "a", true);
+  if (!f) return;
+  f.write((const uint8_t*)&r, sizeof r);   // appended in order: the file is sorted by seq
+  f.close();
+}
+
+// ---- the window
+
+int MessageStore::findSeqs(const ThreadKey& k, uint32_t from, bool older, uint32_t* out, int max) {
+  // Keep the `max` candidates closest to `from`, sorted ascending.
+  int n = 0;
+  auto offer = [&](uint32_t seq) {
+    if (older ? seq >= from : seq <= from) return;
+    for (int i = 0; i < n; i++)
+      if (out[i] == seq) return;
+    if (n == max) {
+      // Older: drop the smallest (furthest back); newer: drop the largest.
+      if (older ? seq < out[0] : seq > out[n - 1]) return;
+      if (older) memmove(out, out + 1, sizeof(uint32_t) * --n);
+      else n--;
+    }
+    int p = n++;
+    while (p > 0 && out[p - 1] > seq) { out[p] = out[p - 1]; p--; }
+    out[p] = seq;
+  };
+  Rec r;
+  File f = _fs->open(kFile, "r");
+  if (f) {
+    while (f.read((uint8_t*)&r, sizeof r) == sizeof r)
+      if (r.seq && r.key == k) offer(r.seq);
+    f.close();
+  }
+  if (older && n < max && _sd) {
+    char path[64];
+    archivePath(k, path, sizeof path);
+    File a = _sd->exists(path) ? _sd->open(path, "r") : File();
+    if (a) {
+      while (a.read((uint8_t*)&r, sizeof r) == sizeof r)
+        if (r.seq && r.key == k) offer(r.seq);
+      a.close();
+    }
+  }
+  return n;
+}
+
+bool MessageStore::loadSeq(const ThreadKey& k, uint32_t seq, model::Message& m) {
+  Rec r;
+  if (readRec(seq % CAPACITY, r) && r.seq == seq && r.key == k) {
+    toMessage(r, m);
+    return true;
+  }
+  if (!_sd) return false;
+  char path[64];
+  archivePath(k, path, sizeof path);
+  File a = _sd->exists(path) ? _sd->open(path, "r") : File();
+  bool found = false;
+  while (a && !found && a.read((uint8_t*)&r, sizeof r) == sizeof r)
+    if (r.seq == seq) { toMessage(r, m); found = true; }
+  if (a) a.close();
+  return found;
+}
+
+int MessageStore::older() {
+  if (!_hasOpen || !_nCache) return 0;
+  uint32_t seqs[PAGE];
+  int n = findSeqs(_open, _cacheSeq[0], true, seqs, PAGE);
+  if (!n) return 0;
+  // Make room at the front, dropping the newest messages off the end.
+  int keep = _nCache + n > CACHE ? CACHE - n : _nCache;
+  memmove(_cache + n, _cache, sizeof(_cache[0]) * keep);
+  memmove(_cacheSeq + n, _cacheSeq, sizeof(_cacheSeq[0]) * keep);
+  int got = 0;
+  for (int i = 0; i < n; i++)
+    if (loadSeq(_open, seqs[i], _cache[got])) _cacheSeq[got++] = seqs[i];
+  if (got < n) {   // a record vanished between the scans: close the gap
+    memmove(_cache + got, _cache + n, sizeof(_cache[0]) * keep);
+    memmove(_cacheSeq + got, _cacheSeq + n, sizeof(_cacheSeq[0]) * keep);
+  }
+  _nCache = got + keep;
+  return got;
+}
+
+int MessageStore::newer() {
+  if (!_hasOpen || !_nCache || atNewest()) return 0;
+  uint32_t seqs[PAGE];
+  int n = findSeqs(_open, _cacheSeq[_nCache - 1], false, seqs, PAGE);
+  if (!n) return 0;
+  // Drop the oldest messages off the front to make room at the end.
+  int drop = _nCache + n > CACHE ? _nCache + n - CACHE : 0;
+  memmove(_cache, _cache + drop, sizeof(_cache[0]) * (_nCache - drop));
+  memmove(_cacheSeq, _cacheSeq + drop, sizeof(_cacheSeq[0]) * (_nCache - drop));
+  _nCache -= drop;
+  int got = 0;
+  for (int i = 0; i < n; i++)
+    if (loadSeq(_open, seqs[i], _cache[_nCache])) { _cacheSeq[_nCache++] = seqs[i]; got++; }
+  return got;
+}
+
+bool MessageStore::atNewest() const {
+  const ThreadInfo* t = find(_open);
+  return !t || !_nCache || _cacheSeq[_nCache - 1] >= t->lastSeq;
+}
+
+void MessageStore::clear(const ThreadKey& k) {
+  File f = _fs->exists(kFile) ? _fs->open(kFile, "r+") : File();
+  if (f) {
+    Rec r;
+    for (uint32_t slot = 0; f.seek(slot * sizeof(Rec)) && f.read((uint8_t*)&r, sizeof r) == sizeof r; slot++) {
+      if (!r.seq || !(r.key == k)) continue;
+      r.seq = 0;   // an empty slot
+      if (f.seek(slot * sizeof(Rec))) f.write((const uint8_t*)&r, sizeof r);
+    }
+    f.close();
+  }
+  if (_sd) {
+    char path[64];
+    archivePath(k, path, sizeof path);
+    _sd->remove(path);
+  }
+  if (_hasOpen && _open == k) _nCache = 0;
+  forget(k);
 }
 
 void MessageStore::markRead(const ThreadKey& k) {

@@ -358,6 +358,14 @@ bool MockModel::message(ThreadId t, int i, Message& out) const {
   return false;
 }
 
+void MockModel::clearHistory(ThreadId t) {
+  int w = 0;
+  for (int r = 0; r < _nMsgs; r++)
+    if (!(_msgs[r].t == t)) _msgs[w++] = _msgs[r];
+  _nMsgs = w;
+  _rev++;
+}
+
 void MockModel::markRead(ThreadId t) {
   for (auto& s : _threads)
     if (s.used && s.id == t && s.unread) { s.unread = 0; _rev++; }

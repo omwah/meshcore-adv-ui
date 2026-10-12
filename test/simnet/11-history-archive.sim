@@ -1,0 +1,36 @@
+# Conversation history beyond the flash ring (40 records in simnet): the
+# messages it overwrites go to the SD card archive, and scrolling up past
+# the oldest loaded message brings them back, page by page. Down at the
+# bottom of an older page loads newer ones; sending returns to the newest.
+# Clear history removes ring and archive.
+node Kim 8
+repeat 70 1500 as Kim chan 0 m#
+wait 3000
+expect threads 1
+key enter
+expect window 24
+expect first m047
+expect last m070
+key up 300
+expect first m001
+shot history-start
+key up
+shot history-start-toast
+key down 300
+expect last m070
+type Back at the newest
+key enter
+wait 2000
+expect last Back at the newest
+shot history-newest
+# Clear it from the channel's screen.
+key tab
+key down 3
+key enter
+key y
+wait 500
+expect threads 0
+hold esc 900
+key right 3
+key enter
+expect window 0
