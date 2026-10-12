@@ -52,7 +52,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 - [x] **Pairing and key import.** Pairing works, and so does the app's private key import (after enabling ENABLE_PRIVATE_KEY_IMPORT/EXPORT as stock does).
 - [x] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse. Works on hardware.
-- [ ] **Bluetooth toggle.** Settings > Bluetooth off stops advertising.
+- [x] **Bluetooth toggle.** Settings > Bluetooth off stops advertising. Works on hardware.
 
 ## 6. Sound
 
