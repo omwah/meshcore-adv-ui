@@ -28,7 +28,11 @@ bool matches(const char* name, const char* q) {
 
 class HomeScreen : public Screen {
 public:
-  const char* title(App&) override { return "MeshCore"; }
+  const char* title(App& a) override {
+    // Remote mode: whose screen this is.
+    if (a.m().mode() != model::Mode::Remote) return "MeshCore";
+    return a.m().prefs().nodeName[0] ? a.m().prefs().nodeName : "Remote node";
+  }
 
   void onHome(App&) override {
     _tab = T_CHATS;

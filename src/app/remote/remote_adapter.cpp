@@ -45,6 +45,75 @@ void toRef(const cp::Contact& c, ContactRef& r) {
 RemoteAdapter::~RemoteAdapter() {
   free(_contacts);
   free(_chans);
+  free(_seen);
+}
+
+bool RemoteAdapter::allocTables(int maxC, int maxCh) {
+  if (maxCh > 16) maxCh = 16;   // what the UI's per-slot mute bits cover
+  if (maxC != _maxContacts) {
+    free(_contacts);
+    free(_seen);
+    _contacts = (cp::Contact*)calloc(maxC, sizeof(cp::Contact));
+    _seen = (uint8_t*)calloc(maxC / 8 + 1, 1);
+    _maxContacts = _contacts && _seen ? maxC : 0;
+    _nContacts = 0;
+  }
+  if (maxCh != _maxChans) {
+    free(_chans);
+    _chans = (Chan*)calloc(maxCh, sizeof(Chan));
+    _maxChans = _chans ? maxCh : 0;
+  }
+  return _maxContacts && _maxChans;
+}
+
+namespace {
+struct CacheHeader {
+  uint32_t magic;
+  uint16_t maxContacts, nContacts;
+  uint8_t maxChans, pad[3];
+};
+constexpr uint32_t CACHE_MAGIC = 0x4E434D52;   // "RMCN"
+}  // namespace
+
+void RemoteAdapter::loadCache() {
+  char path[32];
+  snprintf(path, sizeof path, "/ui/%s-node.bin", _histTag);
+  File f = _fs->open(path, "r");
+  if (!f) return;
+  CacheHeader h{};
+  bool ok = f.read((uint8_t*)&h, sizeof h) == sizeof h && h.magic == CACHE_MAGIC && h.nContacts <= h.maxContacts &&
+            allocTables(h.maxContacts, h.maxChans) && h.maxChans == _maxChans &&
+            f.read((uint8_t*)&_self, sizeof _self) == sizeof _self && f.read((uint8_t*)&_dev, sizeof _dev) == sizeof _dev &&
+            f.read((uint8_t*)_chans, _maxChans * sizeof(Chan)) == _maxChans * sizeof(Chan) &&
+            f.read((uint8_t*)_contacts, h.nContacts * sizeof(cp::Contact)) == h.nContacts * sizeof(cp::Contact);
+  f.close();
+  _nContacts = ok ? h.nContacts : 0;
+  if (ok) {
+    _haveSelf = true;
+    syncPrefs();
+  }
+}
+
+void RemoteAdapter::markCacheDirty() {
+  _cacheDirty = true;
+  _cacheChangedAt = millis();
+}
+
+void RemoteAdapter::saveCache() {
+  if (!_maxContacts || !_haveSelf) return;
+  char path[32];
+  snprintf(path, sizeof path, "/ui/%s-node.bin", _histTag);
+  File f = _fs->open(path, "w", true);
+  if (!f) return;
+  CacheHeader h{CACHE_MAGIC, (uint16_t)_maxContacts, (uint16_t)_nContacts, (uint8_t)_maxChans, {}};
+  f.write((const uint8_t*)&h, sizeof h);
+  f.write((const uint8_t*)&_self, sizeof _self);
+  f.write((const uint8_t*)&_dev, sizeof _dev);
+  f.write((const uint8_t*)_chans, _maxChans * sizeof(Chan));
+  f.write((const uint8_t*)_contacts, _nContacts * sizeof(cp::Contact));
+  f.close();
+  _cacheDirty = false;
+  _cacheSavedAt = millis() | 1;
 }
 
 // ------------------------------------------------------------------ setup
@@ -55,6 +124,8 @@ void RemoteAdapter::begin(fs::FS& fs) {
   _wasReady = _synced = _haveSelf = false;
   _nContacts = 0;
   _contactsSince = _contactsAt = _contactsSoon = _pollAt = 0;
+  _cacheDirty = _fullSync = false;
+  _cacheSavedAt = 0;
   _histTag[0] = 0;
   _clockOffset = 0;
   _clockFromGps = false;
@@ -90,6 +161,7 @@ void RemoteAdapter::openHistory() {
   _msgs.begin(_fs, tag);
   _msgs.setArchive(_plat.sd());
   _hasOpen = false;
+  loadCache();
 }
 
 void RemoteAdapter::loadPeer() {
@@ -239,6 +311,9 @@ void RemoteAdapter::loop() {
       _contactsSoon = 0;
       q(f, cp::encGetContacts(f, _contactsSince), CK_CONTACTS_SINCE);
     }
+    // The flash copy: 10 s after the last change, at most every 2 minutes
+    // (the table can be tens of KB: spare the flash).
+    if (_cacheDirty && ms - _cacheChangedAt > 10000 && (!_cacheSavedAt || ms - _cacheSavedAt > 120000)) saveCache();
     // Messages whose "waiting" push was lost.
     if (ms - _pollAt >= POLL_EVERY_MS && _client.idle()) {
       _pollAt = ms;
@@ -257,20 +332,7 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
     case cp::DEVICE_QUERY:
       if (code == cp::RC_DEVICE_INFO) {
         cp::parseDeviceInfo(f, len, _dev);
-        int maxC = _dev.maxContacts ? _dev.maxContacts : 100;
-        if (maxC != _maxContacts) {
-          free(_contacts);
-          _contacts = (cp::Contact*)calloc(maxC, sizeof(cp::Contact));
-          _maxContacts = _contacts ? maxC : 0;
-          _nContacts = 0;
-        }
-        int maxCh = _dev.maxChannels ? _dev.maxChannels : 8;
-        if (maxCh > 16) maxCh = 16;   // what the UI's per-slot mute bits cover
-        if (maxCh != _maxChans) {
-          free(_chans);
-          _chans = (Chan*)calloc(maxCh, sizeof(Chan));
-          _maxChans = _chans ? maxCh : 0;
-        }
+        allocTables(_dev.maxContacts ? _dev.maxContacts : 100, _dev.maxChannels ? _dev.maxChannels : 8);
         q(out, cp::encAppStart(out, "meshcore-adv-ui"), CK_SYNC_CHAIN);
       }
       break;
@@ -284,11 +346,24 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
       break;
     case cp::GET_CONTACTS:
       if (code == cp::RC_CONTACTS_START) {
-        if (cookie == CK_SYNC_CHAIN) _nContacts = 0;   // the whole list follows
+        if (cookie == CK_SYNC_CHAIN && _seen) {   // the whole list follows
+          memset(_seen, 0, _maxContacts / 8 + 1);
+          _fullSync = true;
+        }
       } else if (code == cp::RC_CONTACT) {
         cp::Contact c;
         if (cp::parseContact(f, len, c)) putContact(c);
       } else {
+        if (_fullSync) {   // contacts the node no longer has
+          _fullSync = false;
+          if (code == cp::RC_END_OF_CONTACTS)
+            for (int i = _nContacts - 1; i >= 0; i--)
+              if (!(_seen[i / 8] & (1 << (i % 8)))) {
+                memmove(&_contacts[i], &_contacts[i + 1], sizeof(cp::Contact) * (_nContacts - i - 1));
+                _nContacts--;
+              }
+          markCacheDirty();
+        }
         if (code == cp::RC_END_OF_CONTACTS && len >= 5) {
           uint32_t latest = cp::rd32(f + 1);
           if (latest > _contactsSince) _contactsSince = latest;
@@ -677,9 +752,14 @@ bool RemoteAdapter::contactAt(int i, ContactRef& r) const {
 }
 
 void RemoteAdapter::putContact(const cp::Contact& c) {
-  cp::Contact* have = findContact(c.key, cp::KEY);
-  if (have) *have = c;
-  else if (_nContacts < _maxContacts) _contacts[_nContacts++] = c;
+  int i = contactIndex(c.key, cp::KEY);
+  if (i >= 0) _contacts[i] = c;
+  else if (_nContacts < _maxContacts) _contacts[i = _nContacts++] = c;
+  else return;
+  // During a full list, mark it as still there. (Insertion order keeps the
+  // marks valid: new contacts go at the end.)
+  if (_fullSync) _seen[i / 8] |= (uint8_t)(1 << (i % 8));
+  markCacheDirty();
   _rev++;
 }
 
@@ -688,6 +768,7 @@ void RemoteAdapter::dropContact(const uint8_t* key) {
   if (i < 0) return;
   memmove(&_contacts[i], &_contacts[i + 1], sizeof(cp::Contact) * (_nContacts - i - 1));
   _nContacts--;
+  markCacheDirty();
   _rev++;
 }
 

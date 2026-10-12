@@ -70,7 +70,7 @@ public:
     return true;
   }
   void connect(const app::Peer&, uint32_t pin) override {
-    _up = _enabled && pin == this->pin;
+    _up = _enabled && !_blocked && pin == this->pin;
     snprintf(_err, sizeof _err, "%s", _up || !_enabled ? "" : "Pairing failed: wrong PIN?");
   }
   const char* lastError() const override { return _err; }
@@ -83,13 +83,18 @@ public:
   int8_t rssi() const override { return _up ? -60 : 0; }
 
   // Scenario controls.
-  void linkUp(bool up) { if (up) _up = _enabled; else disconnect(); }
+  // Out of range (off) or back (on); while off, connecting fails.
+  void linkUp(bool up) {
+    _blocked = !up;
+    if (up) _up = _enabled;
+    else disconnect();
+  }
   char peerName[32] = "Base";
   uint32_t pin = 123456;
   uint32_t dropped = 0;    // node frames lost to a full queue
 
 private:
-  bool _enabled = false, _up = false, _scanning = false;
+  bool _enabled = false, _up = false, _scanning = false, _blocked = false;
   unsigned long _scanStart = 0;
   char _err[40] = "";
   unsigned long _lastOut = 0;

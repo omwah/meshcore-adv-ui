@@ -223,6 +223,8 @@ private:
         _ed.attach(_draft, maxLen(a) + 1);
         _composing = false;
         _scroll = 0;
+      } else if (a.m().mode() == model::Mode::Remote && !a.m().link().synced) {
+        a.toast("Node not connected: try later", C_WARN);   // the draft stays
       } else {
         a.toast("Send failed: no path or queue full", C_ERR);
       }

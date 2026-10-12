@@ -151,6 +151,12 @@ private:
   bool requestSent(const uint8_t* f, int len, ReqKind kind, int contact);
   void syncPrefs();
   void openHistory();
+  // This node's contacts, channels and self info on flash, so they show
+  // before the link is up.
+  void loadCache();
+  void saveCache();
+  void markCacheDirty();
+  bool allocTables(int maxContacts, int maxChans);
   static bool readBackupSection(void* ctx, const char* name, File& f, uint32_t len);
   void restoreStep();
   void positionTick(uint32_t ms);
@@ -192,6 +198,12 @@ private:
   } _rs{};
   char _bkPath[2][48] = {};
   bool _historyRestored = false;
+  bool _cacheDirty = false;
+  uint32_t _cacheSavedAt = 0, _cacheChangedAt = 0;
+  // A full contact list replaces ours: contacts not in it go at its end
+  // (rather than the list emptying while it comes in).
+  uint8_t* _seen = nullptr;
+  bool _fullSync = false;
   uint32_t _positionAt = 0;
   int32_t _sentLat = 0, _sentLon = 0;
   int32_t _clockOffset = 0;        // epoch - uptime seconds; 0: not set yet

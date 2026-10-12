@@ -108,8 +108,11 @@ public:
   void bootUiNode(bool format) {
     _plat.rebootRequested = false;
     if (_remote) {
-      // This device restarts; the node it is connected to keeps running.
+      // This device restarts; the node it is connected to keeps running
+      // (and stays out of reach if the scenario said "ble off").
+      bool reachable = !_bleOff;
       _pipe.linkUp(false);
+      if (reachable) _pipe.linkUp(true), _pipe.disconnect();
       if (!_uiNode) {
         _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/node", kEpoch, nullptr, format, &_pipe));
         _uiNode->begin();
@@ -218,7 +221,11 @@ public:
       return true;
     }
     if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
-    if (!strcmp(cmd, "ble")) { _pipe.linkUp(!strcmp(arg, "on")); return true; }   // remote mode: the Bluetooth link
+    if (!strcmp(cmd, "ble")) {   // remote mode: the Bluetooth link
+      _bleOff = strcmp(arg, "on") != 0;
+      _pipe.linkUp(!_bleOff);
+      return true;
+    }
     if (!strcmp(cmd, "blepin")) { _pipe.pin = (uint32_t)atol(arg); return true; }
     if (!strcmp(cmd, "nodewipe") && _remote) {   // remote mode: erase the node (new identity, no contacts)
       memcpy(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
@@ -386,6 +393,7 @@ private:
   std::map<std::string, int> _ids;
   bool _fresh = true;
   bool _autoPair = true;
+  bool _bleOff = false;
   SimPlatform& _plat;
   ui::App* _app = nullptr;
   ui::Screen* _first = nullptr;
