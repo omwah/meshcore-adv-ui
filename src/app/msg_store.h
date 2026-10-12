@@ -44,7 +44,9 @@ public:
   static constexpr int CACHE = 24;         // messages of the open conversation in RAM
   static constexpr int PAGE = 12;          // messages loaded per step back or forward
 
-  bool begin(fs::FS* fs);
+  // `tag` names a separate history (a remote node's: files /ui/<tag>-*.bin and
+  // an archive folder <tag>/ on the card); null for the local node's.
+  bool begin(fs::FS* fs, const char* tag = nullptr);
   // Removable storage for the archive, or null (no card).
   void setArchive(fs::FS* sd) { _sd = sd; }
   // Append a message; returns its sequence number (0 on failure).
@@ -92,6 +94,8 @@ private:
 
   fs::FS* _fs = nullptr;
   fs::FS* _sd = nullptr;
+  char _file[32] = "/ui/msgs.bin", _readFile[32] = "/ui/read.bin";
+  char _archDir[48] = "/meshcore-adv-ui/history";
   uint32_t _nextSeq = 1;
   ThreadInfo _threads[MAX_THREADS];
   int _nThreads = 0;

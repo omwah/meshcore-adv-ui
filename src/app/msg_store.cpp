@@ -4,8 +4,6 @@
 
 namespace app {
 
-static const char* const kFile = "/ui/msgs.bin";
-static const char* const kReadFile = "/ui/read.bin";
 
 struct __attribute__((packed)) MessageStore::Rec {
   uint32_t seq;          // 0 = empty slot
@@ -36,7 +34,7 @@ ThreadKey ThreadKey::channel(uint8_t slot) {
 }
 
 bool MessageStore::readRec(int slot, Rec& r) {
-  File f = _fs->open(kFile, "r");
+  File f = _fs->open(_file, "r");
   if (!f || !f.seek((uint32_t)slot * sizeof(Rec))) return false;
   bool ok = f.read((uint8_t*)&r, sizeof r) == sizeof r;
   f.close();
@@ -45,7 +43,7 @@ bool MessageStore::readRec(int slot, Rec& r) {
 
 bool MessageStore::writeRec(const Rec& r) {
   // Open read/write so the rest of the ring is kept; create on first use.
-  File f = _fs->exists(kFile) ? _fs->open(kFile, "r+") : _fs->open(kFile, "w", true);
+  File f = _fs->exists(_file) ? _fs->open(_file, "r+") : _fs->open(_file, "w", true);
   if (!f) return false;
   uint32_t at = (uint32_t)(r.seq % CAPACITY) * sizeof(Rec);
   // SPIFFS can't seek past the end of a file: grow it with empty records
@@ -71,13 +69,23 @@ bool MessageStore::writeRec(const Rec& r) {
   return ok;
 }
 
-bool MessageStore::begin(fs::FS* fs) {
+bool MessageStore::begin(fs::FS* fs, const char* tag) {
   _fs = fs;
+  // The local node's history keeps its original file names.
+  if (tag && tag[0]) {
+    snprintf(_file, sizeof _file, "/ui/%s-msgs.bin", tag);
+    snprintf(_readFile, sizeof _readFile, "/ui/%s-read.bin", tag);
+    snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history/%s", tag);
+  } else {
+    snprintf(_file, sizeof _file, "/ui/msgs.bin");
+    snprintf(_readFile, sizeof _readFile, "/ui/read.bin");
+    snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history");
+  }
   _nThreads = 0;
   _nextSeq = 1;
   _fs->mkdir("/ui");
   loadRead();
-  File f = _fs->open(kFile, "r");
+  File f = _fs->open(_file, "r");
   if (f) {
     Rec r;
     while (f.read((uint8_t*)&r, sizeof r) == sizeof r) {
@@ -226,7 +234,7 @@ void MessageStore::open(const ThreadKey& k) {
   _open = k;
   _hasOpen = true;
   _nCache = 0;
-  File f = _fs->open(kFile, "r");
+  File f = _fs->open(_file, "r");
   if (!f) return;
   // Keep the newest CACHE records of this thread, in sequence order.
   Rec r;
@@ -267,8 +275,8 @@ void MessageStore::toMessage(const Rec& r, model::Message& m) {
 // ---- archive (SD card)
 
 void MessageStore::archivePath(const ThreadKey& k, char* out, int n) const {
-  snprintf(out, n, "/meshcore-adv-ui/history/%c%02x%02x%02x%02x%02x%02x.bin", k.kind ? 'c' : 'd', k.id[0], k.id[1],
-           k.id[2], k.id[3], k.id[4], k.id[5]);
+  snprintf(out, n, "%s/%c%02x%02x%02x%02x%02x%02x.bin", _archDir, k.kind ? 'c' : 'd', k.id[0], k.id[1], k.id[2],
+           k.id[3], k.id[4], k.id[5]);
 }
 
 void MessageStore::archive(const Rec& r) {
@@ -276,6 +284,7 @@ void MessageStore::archive(const Rec& r) {
   archivePath(r.key, path, sizeof path);
   _sd->mkdir("/meshcore-adv-ui");
   _sd->mkdir("/meshcore-adv-ui/history");
+  _sd->mkdir(_archDir);
   File f = _sd->open(path, "a", true);
   if (!f) return;
   f.write((const uint8_t*)&r, sizeof r);   // appended in order: the file is sorted by seq
@@ -302,7 +311,7 @@ int MessageStore::findSeqs(const ThreadKey& k, uint32_t from, bool older, uint32
     out[p] = seq;
   };
   Rec r;
-  File f = _fs->open(kFile, "r");
+  File f = _fs->open(_file, "r");
   if (f) {
     while (f.read((uint8_t*)&r, sizeof r) == sizeof r)
       if (r.seq && r.key == k) offer(r.seq);
@@ -380,7 +389,7 @@ bool MessageStore::atNewest() const {
 }
 
 void MessageStore::clear(const ThreadKey& k) {
-  File f = _fs->exists(kFile) ? _fs->open(kFile, "r+") : File();
+  File f = _fs->exists(_file) ? _fs->open(_file, "r+") : File();
   if (f) {
     Rec r;
     for (uint32_t slot = 0; f.seek(slot * sizeof(Rec)) && f.read((uint8_t*)&r, sizeof r) == sizeof r; slot++) {
@@ -421,7 +430,7 @@ void MessageStore::forget(const ThreadKey& k) {
 
 // Read positions: one (key, seq) pair per thread.
 void MessageStore::saveRead() {
-  File f = _fs->open(kReadFile, "w", true);
+  File f = _fs->open(_readFile, "w", true);
   if (!f) return;
   for (int i = 0; i < _nThreads; i++) {
     f.write((const uint8_t*)&_threads[i].key, sizeof(ThreadKey));
@@ -431,7 +440,7 @@ void MessageStore::saveRead() {
 }
 
 void MessageStore::loadRead() {
-  File f = _fs->open(kReadFile, "r");
+  File f = _fs->open(_readFile, "r");
   if (!f) return;
   ThreadKey k;
   uint32_t seq;
@@ -443,8 +452,8 @@ void MessageStore::loadRead() {
 }
 
 void MessageStore::wipe() {
-  _fs->remove(kFile);
-  _fs->remove(kReadFile);
+  _fs->remove(_file);
+  _fs->remove(_readFile);
   _nThreads = 0;
   _nCache = 0;
   _nextSeq = 1;
