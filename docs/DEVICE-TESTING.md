@@ -69,9 +69,9 @@ Earlier, with Bluedroid:
 Needs a second MeshCore node with stock **companion** firmware over BLE (a
 Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 
-- [ ] **Switch.** Settings > Mesh node > remote: the device restarts on the Remote node screen (no node chosen yet). The LoRa Cap may be attached or not.
-- [ ] **Find.** Find nodes nearby lists the companion by its Bluetooth name (MeshCore-<name>) with a signal level.
-- [ ] **Pair.** Choosing it asks for the PIN (123456 prefilled); the right PIN connects ("Connected", node name, battery), a wrong one says so and stops.
+- [x] **Switch.** Settings > Mesh node > remote: the device restarts on the Remote node screen (no node chosen yet). The LoRa Cap may be attached or not. Works on hardware.
+- [x] **Find.** Find nodes nearby lists the companion by its Bluetooth name (MeshCore-<name>) with a signal level. Works on hardware.
+- [x] **Pair.** Choosing it asks for the PIN (123456 prefilled); the right PIN connects ("Connected", node name, battery), a wrong one says so and stops. Works on hardware (after two fixes: the scan list was cleared under the PIN prompt, and the address was used byte-reversed).
 - [ ] **Sync.** Home fills with the node's contacts and channels; messages that waited on the node arrive.
 - [ ] **Messages.** A DM out shows delivered; a channel post shows "heard N repeats" when a repeater is near; incoming DMs and channel posts appear and chime.
 - [ ] **Reconnect.** Restart the node (Remote node > Restart the node), then the Cardputer: both times the link comes back by itself without the PIN.
