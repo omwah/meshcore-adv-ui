@@ -3,6 +3,7 @@
 //
 //   simnet [-s script] [-o outdir] [--data dir]
 //   simnet --smoke
+//   simnet --remote-smoke
 //
 // The UI node is "Cardputer" (id 0). Commands besides runner.cpp's:
 //   node <name> [snr] [echo] [telem]   add a companion node linked to the UI node
@@ -42,6 +43,7 @@
 #include "sim_room.h"
 
 int simnetSmoke();
+int simnetRemoteSmoke();
 
 namespace {
 
@@ -355,6 +357,7 @@ int main(int argc, char** argv) {
   std::string data = "sim-data/simnet";
   for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--smoke")) return simnetSmoke();
+    if (!strcmp(argv[i], "--remote-smoke")) return simnetRemoteSmoke();
     if (!strcmp(argv[i], "-s") && i + 1 < argc) script = argv[++i];
     else if (!strcmp(argv[i], "-o") && i + 1 < argc) out = argv[++i];
     else if (!strcmp(argv[i], "--data") && i + 1 < argc) data = argv[++i];

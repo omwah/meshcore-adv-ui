@@ -39,8 +39,9 @@ private:
 class SimNode {
 public:
   // `dir` holds this node's flash (wiped first when `fresh`).
+  // `serial`: the app link (none: a node with no app connected).
   SimNode(SimMedium& medium, int id, const std::string& name, const std::string& dir, uint32_t epoch,
-          AbstractUITask* ui = nullptr, bool fresh = true);
+          AbstractUITask* ui = nullptr, bool fresh = true, BaseSerialInterface* serial = nullptr);
   ~SimNode();
   void begin();
   void loop();                 // run one iteration as the current node
@@ -63,5 +64,6 @@ private:
   fs::FS _fs;
   DataStore* _store;
   MyMesh* _mesh;
-  NullSerial _serial;
+  NullSerial _null;
+  BaseSerialInterface* _serial;
 };
