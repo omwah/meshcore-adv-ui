@@ -24,7 +24,8 @@ public:
   virtual bool blePairing() { return false; }
 };
 
-// Battery percentage from a Li-ion cell voltage (open-circuit curve).
+// Battery percentage from a Li-ion cell voltage: M5Unified's straight line,
+// so it matches Launcher and other M5Stack firmware.
 uint8_t batteryPercent(uint16_t mv);
 
 }  // namespace app
