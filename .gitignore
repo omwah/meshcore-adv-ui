@@ -5,6 +5,9 @@
 /.pio/
 /platformio.local.ini
 
+# Release images (scripts/package.py)
+/dist/
+
 # Generated sources (fonts etc.)
 /src/gen/
 

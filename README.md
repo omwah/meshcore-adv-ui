@@ -90,16 +90,18 @@ pixi run simnet-test         # UI on real MeshCore nodes in a simulated mesh
 pixi run ci                  # everything, including size budgets
 ```
 
-Flash with `pio run -e cardputer_adv -t upload`. See `docs/DEVICE-TESTING.md` for the
-first-flash checklist.
+Flash with `pio run -e cardputer_adv -t upload`. `pixi run package` writes
+release images for esptool, web flashers, M5Burner and M5Launcher to `dist/`.
+See `docs/FLASHING.md` for how to install them, and `docs/DEVICE-TESTING.md`
+for the first-flash checklist.
 
 | Build | What | Flash | Static RAM |
 |---|---|---|---|
-| `cardputer_adv` | UI + Bluetooth phone companion (default) | ~1.25 MB | ~123 KB |
-| `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.66 MB | ~98 KB |
+| `cardputer_adv` | UI + Bluetooth phone companion (default) | ~1.27 MB | ~127 KB |
+| `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.68 MB | ~101 KB |
 
 The stock MeshCore companion builds are about 1.25 MB with Bluetooth and
-0.64 MB without, so the keyboard UI adds roughly 40 KB.
+0.64 MB without. The keyboard UI and its diagnostics add about 45 KB.
 
 ### Simulators
 
