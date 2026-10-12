@@ -23,7 +23,6 @@ struct PeerFile {
   uint32_t magic;
   Peer peer;
   uint32_t pin;
-  uint8_t key[6];
 };
 constexpr uint32_t PEER_MAGIC = 0x52454550;   // "PEER"
 
@@ -60,11 +59,15 @@ void RemoteAdapter::begin(fs::FS& fs) {
   _clockOffset = 0;
   _clockFromGps = false;
   _nodeBattMv = 0;
+  memset(&_stats, 0, sizeof _stats);
+  _havePrivKey = false;
+  memset(&_rs, 0, sizeof _rs);
+  _positionAt = 0;
   memset(_chanSends, 0, sizeof _chanSends);
   loadUiPrefs(fs);
   loadPasswords();
   loadPeer();
-  openHistory();
+  openHistory();   // with no node saved yet, an empty placeholder
   uiToPrefs();
   _prefs.gpsEnabled = false;
   startBootGps();
@@ -73,13 +76,16 @@ void RemoteAdapter::begin(fs::FS& fs) {
   _rev++;
 }
 
-// History per node, named by the start of its key once we know it.
+// History and backups per node, named by its Bluetooth address: they stay
+// with the device even if it is erased and gets a new identity.
 void RemoteAdapter::openHistory() {
-  const uint8_t* k = _haveSelf ? _self.key : _peerKey;
+  const uint8_t* a = _peer.addr;
   char tag[8];
-  snprintf(tag, sizeof tag, "r%02x%02x%02x", k[0], k[1], k[2]);
+  snprintf(tag, sizeof tag, "r%02x%02x%02x", a[2], a[1], a[0]);
   if (!strcmp(tag, _histTag)) return;
   snprintf(_histTag, sizeof _histTag, "%s", tag);
+  snprintf(_bkPath[0], sizeof _bkPath[0], "%s/remote-%s.bin", Backup::DIR, tag);
+  snprintf(_bkPath[1], sizeof _bkPath[1], "%s/remote-%s.bak", Backup::DIR, tag);
   _msgs.begin(_fs, tag);
   _msgs.setArchive(_plat.sd());
   _hasOpen = false;
@@ -94,7 +100,6 @@ void RemoteAdapter::loadPeer() {
   if (!ok) return;
   _peer = pf.peer;
   _pin = pf.pin;
-  memcpy(_peerKey, pf.key, 6);
 }
 
 void RemoteAdapter::savePeer() {
@@ -102,7 +107,6 @@ void RemoteAdapter::savePeer() {
   pf.magic = PEER_MAGIC;
   pf.peer = _peer;
   pf.pin = _pin;
-  memcpy(pf.key, _haveSelf ? _self.key : _peerKey, 6);
   File f = _fs->open(kPeerFile, "w", true);
   if (!f) return;
   f.write((const uint8_t*)&pf, sizeof pf);
@@ -114,12 +118,13 @@ void RemoteAdapter::connectTo(const Peer& p, uint32_t pin) {
     // Another node: its contacts and channels are not this one's.
     _nContacts = 0;
     _haveSelf = false;
-    memset(_peerKey, 0, sizeof _peerKey);
   }
   _peer = p;
   _pin = pin;
   _peerSaved = true;
   savePeer();
+  openHistory();
+  refreshBackupInfo();
   _link.connect(p, pin);
   _rev++;
 }
@@ -162,9 +167,11 @@ void RemoteAdapter::loop() {
   _wasReady = ready;
   _client.loop(ms);
 
+  if (_rs.active) restoreStep();
   retryPending(ms);
   requestTick(ms);
   gpsTick(ms);
+  positionTick(ms);
   if (_synced) {
     uint8_t f[cp::MAX_FRAME];
     // The node's battery, for the header and Diagnostics.
@@ -172,6 +179,7 @@ void RemoteAdapter::loop() {
       _statsAt = ms;
       f[0] = cp::GET_BATT_AND_STORAGE;
       q(f, 1);
+      for (uint8_t t = cp::STATS_CORE; t <= cp::STATS_PACKETS; t++) q(f, cp::encU8(f, cp::GET_STATS, t));
     }
     // Contacts added or changed since the last list (a lost push, an advert
     // from a node we don't have yet).
@@ -219,11 +227,6 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
     case cp::APP_START:
       if (code == cp::RC_SELF_INFO && cp::parseSelfInfo(f, len, _self)) {
         _haveSelf = true;
-        if (memcmp(_peerKey, _self.key, 6)) {
-          memcpy(_peerKey, _self.key, 6);
-          savePeer();
-        }
-        openHistory();
         syncPrefs();
         if (cookie == CK_SYNC_CHAIN) q(out, cp::encGetContacts(out, 0), CK_SYNC_CHAIN);
         _rev++;
@@ -278,6 +281,11 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
         _synced = true;
         _statsAt = millis() - STATS_EVERY_MS;   // battery right away
         syncMessages();
+        // For backups that include the identity (if the node allows exporting it).
+        if (_ui.backupIdentity && !_havePrivKey) {
+          out[0] = cp::EXPORT_PRIVATE_KEY;
+          q(out, 1);
+        }
       }
       _rev++;
       break;
@@ -346,6 +354,35 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
       }
       break;
     }
+    case cp::EXPORT_PRIVATE_KEY:
+      if (code == cp::RC_PRIVATE_KEY && len >= 65) {
+        memcpy(_privKey, f + 1, 64);
+        _havePrivKey = true;
+      }
+      break;
+    case cp::GET_STATS:
+      if (code != cp::RC_STATS || len < 2) break;
+      if (f[1] == cp::STATS_CORE && len >= 11) {
+        _nodeBattMv = cp::rd16(f + 2);
+        _stats.uptimeS = cp::rd32(f + 4);
+        _stats.queueLen = f[10];
+      } else if (f[1] == cp::STATS_RADIO && len >= 14) {
+        _stats.noiseFloor = (int16_t)cp::rd16(f + 2);
+        _stats.lastRssi = (int8_t)f[4];
+        _stats.lastSnr_x4 = (int8_t)f[5];
+        _stats.txAirS = cp::rd32(f + 6);
+        _stats.rxAirS = cp::rd32(f + 10);
+      } else if (f[1] == cp::STATS_PACKETS && len >= 30) {
+        _stats.recv = cp::rd32(f + 2);
+        _stats.sent = cp::rd32(f + 6);
+        _stats.sentFlood = cp::rd32(f + 10);
+        _stats.sentDirect = cp::rd32(f + 14);
+        _stats.recvFlood = cp::rd32(f + 18);
+        _stats.recvDirect = cp::rd32(f + 22);
+        _stats.recvErrors = cp::rd32(f + 26);
+      }
+      _rev++;
+      break;
     case cp::GET_BATT_AND_STORAGE:
       if (code == cp::RC_BATT_AND_STORAGE && len >= 3) {
         _nodeBattMv = cp::rd16(f + 1);
@@ -1010,9 +1047,22 @@ void RemoteAdapter::setClock(uint32_t epoch) {
 model::Diag RemoteAdapter::diag() const {
   model::Diag d;
   memset(&d, 0, sizeof d);
-  d.uptimeS = millis() / 1000;
-  d.lastRssi = _lastRssi;
-  d.lastSnr_x4 = _lastSnr;
+  // The node's radio and counters (CMD_GET_STATS), this device's heap.
+  d.uptimeS = _stats.uptimeS;
+  d.noiseFloor = _stats.noiseFloor;
+  d.lastRssi = _stats.lastRssi ? _stats.lastRssi : _lastRssi;
+  d.lastSnr_x4 = _stats.lastSnr_x4 ? _stats.lastSnr_x4 : _lastSnr;
+  d.rxPackets = _stats.recv;
+  d.txPackets = _stats.sent;
+  d.rxFlood = _stats.recvFlood;
+  d.rxDirect = _stats.recvDirect;
+  d.txFlood = _stats.sentFlood;
+  d.txDirect = _stats.sentDirect;
+  d.rxErrors = _stats.recvErrors;
+  d.airTxMs = _stats.txAirS * 1000;
+  d.airRxMs = _stats.rxAirS * 1000;
+  d.dutyPct = _stats.uptimeS ? (uint8_t)(_stats.txAirS * 100ULL / _stats.uptimeS) : 0;
+  d.queueLen = _stats.queueLen;
   d.dups = _dupsSeen;
   d.heapFree = _plat.heapFree();
   d.heapMin = _plat.heapMin();
@@ -1028,21 +1078,185 @@ model::Diag RemoteAdapter::diag() const {
 
 // ------------------------------------------------------------------ backup (the node's own)
 
-bool RemoteAdapter::backupNow() {
-  snprintf(_bk.error, sizeof _bk.error, "Not yet for a remote node");
-  _cfgChangedAt = 0;
-  _rev++;
-  return false;
+const char* RemoteAdapter::backupPath(bool previous) const {
+  return _bkPath[previous][0] ? _bkPath[previous] : (previous ? "/meshcore-adv-ui/remote.bak" : "/meshcore-adv-ui/remote.bin");
 }
 
-bool RemoteAdapter::restore(bool) { return false; }
+// What the node holds (settings, channels with their keys, contacts as the
+// node keeps them, its identity if it lets us export it) plus our UI prefs,
+// in a backup file of this node's own.
+bool RemoteAdapter::backupNow() {
+  fs::FS* sd = _plat.sd();
+  _cfgChangedAt = 0;
+  _lastBackupAt = millis() | 1;
+  if (!sd) {
+    snprintf(_bk.error, sizeof _bk.error, "No SD card");
+    _bk.card = false;
+    return false;
+  }
+  if (!_synced) {
+    snprintf(_bk.error, sizeof _bk.error, "Node not connected");
+    _rev++;
+    return false;
+  }
+  NodeSettings ns{};
+  snprintf(ns.name, sizeof ns.name, "%s", _self.name);
+  ns.freqKHz = _self.freqKHz;
+  ns.bwHz = _self.bwHz;
+  ns.sf = _self.sf;
+  ns.cr = _self.cr;
+  ns.txDbm = _self.txDbm;
+  ns.manualAdd = _self.manualAdd;
+  ns.telemModes = _self.telemModes;
+  ns.advertLocPolicy = _self.advertLocPolicy;
+  ns.multiAcks = _self.multiAcks;
+  ns.pathHashMode = _dev.pathHashMode;
+  ns.repeat = _dev.repeat;
+  Backup::Section sec[5];
+  int n = 0;
+  sec[n++] = {"node", (const uint8_t*)&ns, sizeof ns};
+  sec[n++] = {"channels", (const uint8_t*)_chans, (uint32_t)(_maxChans * sizeof(Chan))};
+  sec[n++] = {"contacts", (const uint8_t*)_contacts, (uint32_t)(_nContacts * sizeof(cp::Contact))};
+  if (_ui.backupIdentity && _havePrivKey) sec[n++] = {"identity", _privKey, sizeof _privKey};
+  sec[n++] = {"/ui/prefs.bin", (const uint8_t*)&_ui, sizeof _ui};
+  bool ok = Backup::writeSections(*sd, backupPath(false), backupPath(true), sec, n, now(), _dev.version, _bk.error,
+                                  sizeof _bk.error);
+  if (ok) _bk.error[0] = 0;
+  refreshBackupInfo();
+  return ok;
+}
+
+bool RemoteAdapter::readBackupSection(void* ctx, const char* name, File& f, uint32_t len) {
+  RemoteAdapter& a = *(RemoteAdapter*)ctx;
+  if (!strcmp(name, "node") && len == sizeof(NodeSettings)) {
+    a._rs.haveSet = f.read((uint8_t*)&a._rs.set, len) == len;
+  } else if (!strcmp(name, "channels")) {
+    memset(a._chans, 0, a._maxChans * sizeof(Chan));
+    uint32_t n = len < a._maxChans * sizeof(Chan) ? len : a._maxChans * sizeof(Chan);
+    return f.read((uint8_t*)a._chans, n) == n;
+  } else if (!strcmp(name, "contacts")) {
+    int count = (int)(len / sizeof(cp::Contact));
+    if (count > a._maxContacts) count = a._maxContacts;
+    a._nContacts = 0;
+    if (count && f.read((uint8_t*)a._contacts, count * sizeof(cp::Contact)) != count * sizeof(cp::Contact)) return false;
+    a._nContacts = count;
+  } else if (!strcmp(name, "identity") && len == 64) {
+    a._rs.haveKey = f.read(a._rs.key, 64) == 64;
+  } else if (!strcmp(name, "/ui/prefs.bin")) {
+    UiPrefs u{};
+    uint32_t n = len < sizeof u ? len : sizeof u;
+    if (f.read((uint8_t*)&u, n) == n && u.magic == a._ui.magic) {
+      a._ui = u;
+      a.saveUiPrefs();
+    }
+  }
+  return true;   // a section we don't know: skipped
+}
+
+// Put a backup back on the node: identity first (the node reloads its
+// contacts for it), then settings, channels, contacts; then sync again.
+bool RemoteAdapter::restore(bool previous) {
+  fs::FS* sd = _plat.sd();
+  if (!sd || !_synced) {
+    snprintf(_bk.error, sizeof _bk.error, sd ? "Node not connected" : "No SD card");
+    _rev++;
+    return false;
+  }
+  memset(&_rs, 0, sizeof _rs);
+  if (!Backup::readSections(*sd, backupPath(previous), readBackupSection, this, _bk.error, sizeof _bk.error)) {
+    _rev++;
+    return false;
+  }
+  _rs.active = true;
+  _bk.error[0] = 0;
+  uiToPrefs();
+  _rev++;
+  return true;
+}
+
+void RemoteAdapter::restoreStep() {
+  uint8_t f[cp::MAX_FRAME];
+  const NodeSettings& ns = _rs.set;
+  while (_rs.active && _client.queued() < CompanionClient::QUEUE / 2) {
+    switch (_rs.step) {
+      case 0:
+        if (_rs.haveKey) q(f, cp::encBytes(f, cp::IMPORT_PRIVATE_KEY, _rs.key, 64));
+        memset(_rs.key, 0, sizeof _rs.key);
+        break;
+      case 1: if (_rs.haveSet) q(f, cp::encName(f, ns.name)); break;
+      case 2: if (_rs.haveSet) q(f, cp::encRadio(f, ns.freqKHz, ns.bwHz, ns.sf, ns.cr, ns.repeat)); break;
+      case 3: if (_rs.haveSet) q(f, cp::encU8(f, cp::SET_RADIO_TX_POWER, (uint8_t)ns.txDbm)); break;
+      case 4:
+        if (_rs.haveSet) q(f, cp::encOtherParams(f, ns.manualAdd, ns.telemModes, ns.advertLocPolicy, ns.multiAcks));
+        break;
+      case 5:
+        if (_rs.haveSet) {
+          f[0] = cp::SET_PATH_HASH_MODE;
+          f[1] = 0;
+          f[2] = ns.pathHashMode;
+          q(f, 3);
+        }
+        break;
+      case 6:   // every channel slot, empty ones too
+        if (_rs.idx < _maxChans) {
+          q(f, cp::encSetChannel(f, (uint8_t)_rs.idx, _chans[_rs.idx].name, _chans[_rs.idx].secret));
+          _rs.idx++;
+          continue;
+        }
+        _rs.idx = 0;
+        break;
+      case 7:
+        if (_rs.idx < _nContacts) {
+          q(f, cp::encodeContact(f, _contacts[_rs.idx]));
+          _rs.idx++;
+          continue;
+        }
+        break;
+      default:
+        _rs.active = false;
+        _havePrivKey = false;
+        startSync();   // read it all back as the node now has it
+        _rev++;
+        return;
+    }
+    _rs.step++;
+  }
+}
+
+bool RemoteAdapter::rebootNode() {
+  uint8_t f[8];
+  return q(f, cp::encText(f, cp::REBOOT, "reboot"));
+}
+
+bool RemoteAdapter::resetNode() {
+  uint8_t f[8];
+  return q(f, cp::encText(f, cp::FACTORY_RESET, "reset"));
+}
 
 void RemoteAdapter::factoryReset() {
-  // This device's own data for this mode; the node is reset from its own menu.
+  // This device's own data for this mode; the node is reset separately
+  // (resetNode).
   _msgs.wipe();
   _fs->remove("/ui/prefs.bin");
   _fs->remove(kPeerFile);
   _plat.reboot();
+}
+
+// Share this device's GPS position as the node's, when the node shares its
+// position in adverts: on a fix, then when it moves or every 10 minutes.
+void RemoteAdapter::positionTick(uint32_t ms) {
+  if (!_synced || !_self.advertLocPolicy || ms - _positionAt < 30000) return;
+  model::Gps g = _plat.gps();
+  if (!g.fix) return;
+  int32_t dLat = g.lat_e6 - _sentLat, dLon = g.lon_e6 - _sentLon;
+  bool moved = dLat > 1000 || dLat < -1000 || dLon > 1000 || dLon < -1000;   // ~100 m
+  if (!moved && _positionAt && ms - _positionAt < 600000) return;
+  uint8_t f[cp::MAX_FRAME];
+  if (q(f, cp::encLatLon(f, g.lat_e6, g.lon_e6))) {
+    _positionAt = ms | 1;
+    _sentLat = g.lat_e6;
+    _sentLon = g.lon_e6;
+  }
 }
 
 }  // namespace app

@@ -817,8 +817,8 @@ void AdapterBase::refreshBackupInfo() {
   memset(&_bk.cur, 0, sizeof _bk.cur);
   memset(&_bk.prev, 0, sizeof _bk.prev);
   if (sd) {
-    _bk.cur = Backup::info(*sd, false);
-    _bk.prev = Backup::info(*sd, true);
+    _bk.cur = Backup::infoAt(*sd, backupPath(false));
+    _bk.prev = Backup::infoAt(*sd, backupPath(true));
   }
   _rev++;
 }

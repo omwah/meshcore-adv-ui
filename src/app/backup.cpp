@@ -140,10 +140,11 @@ bool Backup::write(fs::FS& flash, fs::FS& sd, const Options& o, uint32_t now, co
   return true;
 }
 
-Backup::Info Backup::info(fs::FS& sd, bool previous) {
+Backup::Info Backup::info(fs::FS& sd, bool previous) { return infoAt(sd, previous ? PREV_PATH : PATH); }
+
+Backup::Info Backup::infoAt(fs::FS& sd, const char* path) {
   Info i;
   memset(&i, 0, sizeof i);
-  const char* path = previous ? PREV_PATH : PATH;
   if (!sd.exists(path)) return i;
   File f = sd.open(path, "r");
   Header h;
@@ -179,6 +180,55 @@ bool Backup::restore(fs::FS& flash, fs::FS& sd, bool previous, char* err, size_t
   });
   f.close();
   if (!ok) setErr(err, n, "Restore failed while writing");
+  return ok;
+}
+
+bool Backup::writeSections(fs::FS& sd, const char* path, const char* prevPath, const Section* s, int count,
+                           uint32_t now, const char* fw, char* err, size_t n) {
+  char tmp[72];
+  snprintf(tmp, sizeof tmp, "%s.tmp", path);
+  sd.mkdir(DIR);
+  File out = sd.open(tmp, "w", true);
+  if (!out) { setErr(err, n, "Cannot write to SD card"); return false; }
+  Header h;
+  memcpy(h.magic, "MCBK", 4);
+  h.format = FORMAT;
+  h.sections = (uint16_t)count;
+  h.created = now;
+  memset(h.fw, 0, sizeof h.fw);
+  snprintf(h.fw, sizeof h.fw, "%s", fw);
+  bool ok = put(out, h);
+  for (int i = 0; ok && i < count; i++) {
+    uint8_t plen = (uint8_t)strlen(s[i].name);
+    uint32_t crc = crc32(0, s[i].data, s[i].len);
+    ok = put(out, plen) && out.write((const uint8_t*)s[i].name, plen) == plen && put(out, s[i].len) && put(out, crc) &&
+         out.write(s[i].data, s[i].len) == s[i].len;
+  }
+  out.close();
+  if (!ok) {
+    sd.remove(tmp);
+    setErr(err, n, "SD card write failed");
+    return false;
+  }
+  if (sd.exists(path)) {
+    sd.remove(prevPath);
+    sd.rename(path, prevPath);
+  }
+  if (!sd.rename(tmp, path)) { setErr(err, n, "Could not finish the backup file"); return false; }
+  return true;
+}
+
+bool Backup::readSections(fs::FS& sd, const char* path, SectionFn fn, void* ctx, char* err, size_t n) {
+  if (!infoAt(sd, path).valid) { setErr(err, n, "Backup is missing or damaged"); return false; }
+  File f = sd.open(path, "r");
+  Header h;
+  if (!f || !get(f, h)) { setErr(err, n, "Cannot read backup"); return false; }
+  bool ok = walk(f, h.sections, [&](File& in, const char* name, size_t start, uint32_t len) {
+    in.seek(start);
+    return fn(ctx, name, in, len);
+  });
+  f.close();
+  if (!ok) setErr(err, n, "Backup does not fit this node");
   return ok;
 }
 

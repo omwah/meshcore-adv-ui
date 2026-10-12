@@ -30,6 +30,9 @@ public:
   void connectTo(const Peer& p, uint32_t pin);   // and remember it
   void forgetPeer();
   bool synced() const { return _synced; }
+  // The node itself: restart it, or erase it (identity, contacts, channels).
+  bool rebootNode();
+  bool resetNode();
   const cp::DeviceInfo& deviceInfo() const { return _dev; }
 
   // ---- model::MeshModel ----
@@ -90,11 +93,27 @@ protected:
   void setClock(uint32_t epoch) override;
   bool sendAttempt(Pending& p, const ContactRef& c, const char* text) override;
   void forgetRoute(const uint8_t* key) override;
+  const char* backupPath(bool previous) const override;
 
 private:
   struct Chan {
     char name[32];
     uint8_t secret[16];
+  };
+  // The node's own settings, as a backup holds them.
+  struct NodeSettings {
+    char name[32];
+    uint32_t freqKHz, bwHz;
+    uint8_t sf, cr;
+    int8_t txDbm;
+    uint8_t manualAdd, telemModes, advertLocPolicy, multiAcks, pathHashMode, repeat;
+  } __attribute__((packed));
+  struct Stats {
+    uint32_t uptimeS, txAirS, rxAirS;
+    uint16_t queueLen;
+    int16_t noiseFloor;
+    int8_t lastRssi, lastSnr_x4;
+    uint32_t recv, sent, sentFlood, sentDirect, recvFlood, recvDirect, recvErrors;
   };
   // Cookies tell replies apart: what a command was for.
   // Message sends use the message's sequence number, far below these.
@@ -121,6 +140,9 @@ private:
   bool requestSent(const uint8_t* f, int len, ReqKind kind, int contact);
   void syncPrefs();
   void openHistory();
+  static bool readBackupSection(void* ctx, const char* name, File& f, uint32_t len);
+  void restoreStep();
+  void positionTick(uint32_t ms);
   void loadPeer();
   void savePeer();
   Pending* pendingBySeq(uint32_t seq);
@@ -143,13 +165,27 @@ private:
   // The node's battery and stats, refreshed now and then.
   uint16_t _nodeBattMv = 0;
   uint32_t _statsAt = 0;
+  Stats _stats{};
+  // The node's private key, for backups (if it lets us export it).
+  uint8_t _privKey[64];
+  bool _havePrivKey = false;
+  // A restore in progress: commands go out a few at a time.
+  struct {
+    bool active;
+    int step, idx;
+    NodeSettings set;
+    bool haveSet, haveKey;
+    uint8_t key[64];
+  } _rs{};
+  char _bkPath[2][48] = {};
+  uint32_t _positionAt = 0;
+  int32_t _sentLat = 0, _sentLon = 0;
   int32_t _clockOffset = 0;        // epoch - uptime seconds; 0: not set yet
   bool _clockFromGps = false;
   uint32_t _lastTs = 0;
   // The saved node.
   Peer _peer{};
   uint32_t _pin = 123456;
-  uint8_t _peerKey[6] = {};
   bool _peerSaved = false;
   char _histTag[8] = "";
   // Channel sends waiting for the node's OK: seq -> slot, timestamp.

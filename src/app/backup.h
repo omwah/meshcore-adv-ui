@@ -39,6 +39,22 @@ public:
   static bool restore(fs::FS& flash, fs::FS& sd, bool previous, char* err, size_t n);
   static Info info(fs::FS& sd, bool previous);   // header plus a full CRC check
 
+  // The same container holding named blobs rather than files: a remote
+  // node's settings, which live on that node (RemoteAdapter). `path` is
+  // replaced; the old one is kept as `prevPath`.
+  struct Section {
+    const char* name;
+    const uint8_t* data;
+    uint32_t len;
+  };
+  static bool writeSections(fs::FS& sd, const char* path, const char* prevPath, const Section* s, int n, uint32_t now,
+                            const char* fw, char* err, size_t en);
+  static Info infoAt(fs::FS& sd, const char* path);
+  // Every section of a valid backup, CRC-checked first; `fn` reads `len`
+  // bytes of the section from `f`.
+  typedef bool (*SectionFn)(void* ctx, const char* name, File& f, uint32_t len);
+  static bool readSections(fs::FS& sd, const char* path, SectionFn fn, void* ctx, char* err, size_t en);
+
   static uint32_t crc32(uint32_t crc, const uint8_t* p, size_t n);
 };
 

@@ -1,0 +1,39 @@
+# Remote node: back the node up to SD, erase the node, restore: its identity,
+# contacts and channels are back on it.
+# remote-only
+node Gus 7
+as Gus advert
+wait 3000
+key menu
+key enter
+key enter
+type backuptest
+key enter
+wait 500
+expect contacts 1
+expect channels 2
+# Menu > Backup & restore > Back up now
+key menu
+key down 10
+key enter
+key down 3
+key enter
+wait 500
+shot remote-backup-written
+ble off
+wait 500
+nodewipe
+ble on
+wait 5000
+expect identity new
+expect contacts 0
+expect channels 1
+# Restore from SD, confirm
+key down
+key enter
+key y
+wait 8000
+shot remote-restored
+expect identity same
+expect contacts 1
+expect channels 2

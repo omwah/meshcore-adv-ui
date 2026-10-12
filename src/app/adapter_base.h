@@ -146,6 +146,8 @@ protected:
   virtual bool sendAttempt(Pending& p, const ContactRef& c, const char* text) = 0;
   // Before the last attempt of a DM: forget its route, so it floods.
   virtual void forgetRoute(const uint8_t* key) = 0;
+  // Where this model's backup lives on the SD card (and its previous one).
+  virtual const char* backupPath(bool previous) const { return previous ? Backup::PREV_PATH : Backup::PATH; }
   // A login worked; `keepAliveS` (0: none) as the server asked.
   virtual void onLoggedIn(const uint8_t* key, uint16_t keepAliveS) { (void)key; (void)keepAliveS; }
 

@@ -21,6 +21,7 @@
 //   wipe                          erase the UI node's flash and reboot (fresh install)
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   ble on|off                    remote mode: drop or restore the Bluetooth link
+//   nodewipe                      remote mode: erase the node (do it with the link off)
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
 //   expect sounds <n>          notification chimes played so far
@@ -213,6 +214,12 @@ public:
     }
     if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
     if (!strcmp(cmd, "ble")) { _pipe.linkUp(!strcmp(arg, "on")); return true; }   // remote mode: the Bluetooth link
+    if (!strcmp(cmd, "nodewipe") && _remote) {   // remote mode: erase the node (new identity, no contacts)
+      memcpy(_keyBeforeWipe, _uiNode->mesh().self_id.pub_key, sizeof _keyBeforeWipe);
+      _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/node", kEpoch, nullptr, true, &_pipe));
+      _uiNode->begin();
+      return true;
+    }
     if (!strcmp(cmd, "expect")) return expect(arg, err, n);
     if (!strcmp(cmd, "dump")) { dump(); return true; }
     return false;
