@@ -46,6 +46,7 @@ public:
     const char* name;
     const uint8_t* data;
     uint32_t len;
+    fs::FS* file = nullptr;   // or: the contents of file `name` on this filesystem
   };
   static bool writeSections(fs::FS& sd, const char* path, const char* prevPath, const Section* s, int n, uint32_t now,
                             const char* fw, char* err, size_t en);

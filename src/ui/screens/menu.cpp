@@ -242,7 +242,7 @@ protected:
         break;
       case S_FACTORY:
         if (remoteMode(a)) {
-          a.confirm("Erase this device's messages and settings for remote mode? The node keeps its own (erase it from Remote node).",
+          a.confirm("Erase this device's messages and settings? The node keeps its own.",
                     [](App& app, int) { app.m().factoryReset(); });
           break;
         }
@@ -264,8 +264,8 @@ protected:
       case S_MODE:
         if (!MC_UI_REMOTE) return;
         a.confirm(p.deviceMode == model::Mode::Remote
-                      ? "Restart as a node of its own (this device's radio)?"
-                      : "Restart as the screen and keyboard of a companion node, over Bluetooth? This device's own node stays off until you switch back.",
+                      ? "Restart as its own node, on this device's radio?"
+                      : "Restart as the screen of another node, over Bluetooth? This device's own node pauses.",
                   [](App& app, int) {
                     model::Prefs q = app.m().prefs();
                     q.deviceMode = q.deviceMode == model::Mode::Remote ? model::Mode::Local : model::Mode::Remote;

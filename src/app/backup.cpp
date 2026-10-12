@@ -198,12 +198,25 @@ bool Backup::writeSections(fs::FS& sd, const char* path, const char* prevPath, c
   memset(h.fw, 0, sizeof h.fw);
   snprintf(h.fw, sizeof h.fw, "%s", fw);
   bool ok = put(out, h);
+  uint8_t buf[CHUNK];
   for (int i = 0; ok && i < count; i++) {
     uint8_t plen = (uint8_t)strlen(s[i].name);
+    if (s[i].file) {   // streamed from flash: too big to hold in RAM
+      File in = s[i].file->open(s[i].name, "r");
+      if (!in) { h.sections--; continue; }
+      uint32_t len = (uint32_t)in.size(), crc = 0;
+      for (int r; (r = (int)in.read(buf, CHUNK)) > 0;) crc = crc32(crc, buf, r);
+      in.seek(0);
+      ok = put(out, plen) && out.write((const uint8_t*)s[i].name, plen) == plen && put(out, len) && put(out, crc);
+      for (int r; ok && (r = (int)in.read(buf, CHUNK)) > 0;) ok = out.write(buf, r) == (size_t)r;
+      in.close();
+      continue;
+    }
     uint32_t crc = crc32(0, s[i].data, s[i].len);
     ok = put(out, plen) && out.write((const uint8_t*)s[i].name, plen) == plen && put(out, s[i].len) && put(out, crc) &&
          out.write(s[i].data, s[i].len) == s[i].len;
   }
+  ok = ok && out.seek(0) && put(out, h);   // the section count, less any file that was missing
   out.close();
   if (!ok) {
     sd.remove(tmp);

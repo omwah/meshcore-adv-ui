@@ -40,9 +40,13 @@ int NimbleCentral::recv(uint8_t* buf) {
 }
 
 void NimbleCentral::startScan() {
-  portENTER_CRITICAL(&_mux);
-  _nFound = 0;
-  portEXIT_CRITICAL(&_mux);
+  // A new search starts with an empty list; asking again while one runs
+  // (a screen coming back to the front) keeps what was found.
+  if (!_scanWanted) {
+    portENTER_CRITICAL(&_mux);
+    _nFound = 0;
+    portEXIT_CRITICAL(&_mux);
+  }
   _scanWanted = true;
 }
 

@@ -191,6 +191,7 @@ private:
     uint8_t key[64];
   } _rs{};
   char _bkPath[2][48] = {};
+  bool _historyRestored = false;
   uint32_t _positionAt = 0;
   int32_t _sentLat = 0, _sentLon = 0;
   int32_t _clockOffset = 0;        // epoch - uptime seconds; 0: not set yet

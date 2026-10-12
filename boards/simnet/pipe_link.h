@@ -54,9 +54,15 @@ public:
     memcpy(buf, f.data(), f.size());
     return (int)f.size();
   }
-  int scanCount() const override { return _enabled ? 1 : 0; }
+  // Like a real scan: a new one starts empty, the node shows up a moment later.
+  void startScan() override {
+    if (!_scanning) _scanStart = millis();
+    _scanning = true;
+  }
+  void stopScan() override { _scanning = false; }
+  int scanCount() const override { return _enabled && (!_scanning || millis() - _scanStart >= 300) ? 1 : 0; }
   bool scanResult(int i, app::Peer& out) const override {
-    if (i != 0 || !_enabled) return false;
+    if (i != 0 || scanCount() == 0) return false;
     memset(&out, 0, sizeof out);
     snprintf(out.name, sizeof out.name, "MeshCore-%s", peerName);
     out.addr[5] = 0xA0;
@@ -83,7 +89,8 @@ public:
   uint32_t dropped = 0;    // node frames lost to a full queue
 
 private:
-  bool _enabled = false, _up = false;
+  bool _enabled = false, _up = false, _scanning = false;
+  unsigned long _scanStart = 0;
   char _err[40] = "";
   unsigned long _lastOut = 0;
   std::deque<std::vector<uint8_t>> _toApp, _arrived, _toNode;

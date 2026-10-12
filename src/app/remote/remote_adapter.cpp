@@ -1164,8 +1164,16 @@ bool RemoteAdapter::backupNow() {
   ns.multiAcks = _self.multiAcks;
   ns.pathHashMode = _dev.pathHashMode;
   ns.repeat = _dev.repeat;
-  Backup::Section sec[5];
+  Backup::Section sec[7];
   int n = 0;
+  // This node's message history, streamed from flash, if asked for.
+  char msgsPath[32], readPath[32];
+  snprintf(msgsPath, sizeof msgsPath, "/ui/%s-msgs.bin", _histTag);
+  snprintf(readPath, sizeof readPath, "/ui/%s-read.bin", _histTag);
+  if (_ui.backupMessages) {
+    sec[n++] = {msgsPath, nullptr, 0, _fs};
+    sec[n++] = {readPath, nullptr, 0, _fs};
+  }
   sec[n++] = {"node", (const uint8_t*)&ns, sizeof ns};
   sec[n++] = {"channels", (const uint8_t*)_chans, (uint32_t)(_maxChans * sizeof(Chan))};
   sec[n++] = {"contacts", (const uint8_t*)_contacts, (uint32_t)(_nContacts * sizeof(cp::Contact))};
@@ -1194,6 +1202,21 @@ bool RemoteAdapter::readBackupSection(void* ctx, const char* name, File& f, uint
     a._nContacts = count;
   } else if (!strcmp(name, "identity") && len == 64) {
     a._rs.haveKey = f.read(a._rs.key, 64) == 64;
+  } else if (!strncmp(name, "/ui/r", 5) && (strstr(name, "-msgs.bin") || strstr(name, "-read.bin"))) {
+    // Message history: to this node's files (the backup may be from a node
+    // with another address).
+    char path[32];
+    snprintf(path, sizeof path, "/ui/%s%s", a._histTag, strstr(name, "-msgs.bin") ? "-msgs.bin" : "-read.bin");
+    File out = a._fs->open(path, "w", true);
+    if (!out) return false;
+    uint8_t buf[256];
+    for (uint32_t done = 0; done < len;) {
+      int c = len - done > sizeof buf ? (int)sizeof buf : (int)(len - done);
+      if ((int)f.read(buf, c) != c || out.write(buf, c) != (size_t)c) { out.close(); return false; }
+      done += c;
+    }
+    out.close();
+    a._historyRestored = true;
   } else if (!strcmp(name, "/ui/prefs.bin")) {
     UiPrefs u{};
     uint32_t n = len < sizeof u ? len : sizeof u;
@@ -1215,9 +1238,14 @@ bool RemoteAdapter::restore(bool previous) {
     return false;
   }
   memset(&_rs, 0, sizeof _rs);
+  _historyRestored = false;
   if (!Backup::readSections(*sd, backupPath(previous), readBackupSection, this, _bk.error, sizeof _bk.error)) {
     _rev++;
     return false;
+  }
+  if (_historyRestored) {   // read the restored history afresh
+    _histTag[0] = 0;
+    openHistory();
   }
   _rs.active = true;
   _bk.error[0] = 0;

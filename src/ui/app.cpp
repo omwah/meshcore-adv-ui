@@ -19,30 +19,43 @@ public:
   int arg = 0;
   const char* title(App&) override { return "Confirm"; }
   void draw(App& a, Canvas& c, const Rect& r) override {
-    const mc_font_t* f = a.fMed();
-    const int lh = f->height + 1, bh_btn = f->height + 2;
+    const mc_font_t* bf = a.fMed();   // buttons
+    const int bh_btn = bf->height + 2;
     int bx = r.x + 6, bw = r.w - 12;
+    // The question in the medium font, or a smaller one if it doesn't fit;
+    // lines that still don't fit stop above the buttons.
+    const int pt = 5, gap = 3, pb = 4;   // padding: top, above the buttons, bottom
+    const mc_font_t* f = bf;
     int lines = wrapText(question, f, bw - 12, nullptr, nullptr);
-    int bh = 6 + lines * lh + 4 + bh_btn + 5;
-    if (bh > r.h - 2) bh = r.h - 2;
+    const mc_font_t* smaller[] = {a.fSmall(), &font_small};   // at the large text size, small isn't
+    for (const mc_font_t* g : smaller) {
+      if (pt + lines * (f->height + 1) + gap + bh_btn + pb <= r.h || g == f) continue;
+      f = g;
+      lines = wrapText(question, f, bw - 12, nullptr, nullptr);
+    }
+    const int lh = f->height + 1;
+    int bh = pt + lines * lh + gap + bh_btn + pb;
+    if (bh > r.h) bh = r.h;
     int by = r.y + (r.h - bh) / 2;
+    int btnY = by + bh - bh_btn - pb;
     c.fillRect(bx, by, bw, bh, C_ZEBRA);
     c.rect(bx, by, bw, bh, C_WARN);
-    struct Ctx { Canvas* c; int x, y, lh; const mc_font_t* f; } ctx{&c, bx + 6, by + 6, lh, f};
+    struct Ctx { Canvas* c; int x, y, lh, maxY; const mc_font_t* f; } ctx{&c, bx + 6, by + pt, lh, btnY - 1, f};
     wrapText(question, f, bw - 12, [](void* p, const char* s, int len, int line) {
       Ctx* x = (Ctx*)p;
+      int y = x->y + line * x->lh;
+      if (y + x->f->height > x->maxY) return;
       char tmp[64];
       if (len > 63) len = 63;
       memcpy(tmp, s, len);
       tmp[len] = 0;
-      x->c->text(x->x, x->y + line * x->lh, tmp, x->f, C_TEXT);
+      x->c->text(x->x, y, tmp, x->f, C_TEXT);
     }, &ctx);
-    int btnY = by + bh - bh_btn - 5;
-    int btnW = Canvas::textWidth("Y: Yes", f) + 16;
+    int btnW = Canvas::textWidth("Y: Yes", bf) + 16;
     c.pill(bx + bw / 4 - btnW / 2, btnY, btnW, bh_btn, C_OK);
-    c.text(bx + bw / 4 - btnW / 2 + 8, btnY + 1, "Y: Yes", f, C_BG);
+    c.text(bx + bw / 4 - btnW / 2 + 8, btnY + 1, "Y: Yes", bf, C_BG);
     c.pill(bx + 3 * bw / 4 - btnW / 2, btnY, btnW, bh_btn, C_DIM);
-    c.text(bx + 3 * bw / 4 - btnW / 2 + 8, btnY + 1, "N: No", f, C_BG);
+    c.text(bx + 3 * bw / 4 - btnW / 2 + 8, btnY + 1, "N: No", bf, C_BG);
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == 'y' || k.code == 'Y' || k.code == K_ENTER) {
