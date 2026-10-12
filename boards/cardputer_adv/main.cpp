@@ -15,6 +15,7 @@
 #include "st7789_display.h"
 #include "tca8418_keyboard.h"
 #include "platform_cardputer.h"
+#include "es8311_sound.h"
 #if !defined(ENABLE_USB_INTERFACE)
   #include "diag.h"
 #endif
@@ -62,7 +63,8 @@ static SimpleMeshTables tables;
 MyMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables, store, &adapter);
 static St7789Display display;
 static Tca8418Keyboard keyboard;
-static ui::App ui_app(adapter, display, keyboard);
+static Es8311Sound sound;
+static ui::App ui_app(adapter, display, keyboard, &sound);
 
 static void halt(const char* why) {
   Serial.printf("halt: %s\n", why);
@@ -85,6 +87,7 @@ void setup() {
   adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
   // Show the splash now: Bluetooth and sensors take a while to start.
   keyboard.begin();
+  sound.begin();
   ui_app.begin(ui::screens::boot());
   ui_app.loop(millis());
 #if defined(BLE_PIN_CODE)
@@ -104,9 +107,16 @@ void setup() {
 
   if (!adapter.prefs().bleEnabled) adapter.disableBluetooth();
   board.onBootComplete();
+#if !defined(ENABLE_USB_INTERFACE)
+  g_diagBeep = [] {
+    static const hal::Tone t[] = {{1760, 70}, {0, 40}, {2349, 110}};
+    sound.play(t, 3);
+  };
+#endif
   // One status line for bring-up (no keys, names or addresses).
-  Serial.printf("meshcore-adv-ui %s: lora-cap %s, keyboard %s, sd %s, contacts %d, heap %u (min %u)\n",
+  Serial.printf("meshcore-adv-ui %s: lora-cap %s, keyboard %s, speaker %s, sd %s, contacts %d, heap %u (min %u)\n",
                 MC_UI_VERSION, board.loraCapPresent() ? "ok" : "MISSING", keyboard.present() ? "ok" : "MISSING",
+                sound.present() ? "ok" : "MISSING",
                 platform.sd() ? "yes" : "no", the_mesh.getNumContacts(), (unsigned)platform.heapFree(),
                 (unsigned)platform.heapMin());
 }

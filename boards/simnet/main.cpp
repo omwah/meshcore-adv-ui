@@ -17,6 +17,7 @@
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
+//   expect sounds <n>          notification chimes played so far
 //   expect request idle|busy|ok|failed|timeout
 //   expect repeats <n>         repeats heard of the last message we sent in the open chat
 //   expect contacts|unread|heard|threads <n>
@@ -42,6 +43,13 @@ int simnetSmoke();
 namespace {
 
 constexpr uint32_t kEpoch = 1791727500;   // 2026-10-11 14:05 UTC
+
+class SimSound : public hal::Sound {
+public:
+  void play(const hal::Tone*, int) override { played++; }
+  int played = 0;
+};
+SimSound g_sound;
 
 class SimPlatform : public app::Platform {
 public:
@@ -233,6 +241,7 @@ private:
     else if (!strcmp(what, "heard")) got = _ui.heardCount();
     else if (!strcmp(what, "threads")) got = _ui.threadCount();
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
+    else if (!strcmp(what, "sounds")) got = g_sound.played;
     else if (!strcmp(what, "request")) {
       static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};
       const char* g = st[(int)_ui.requestState()];
@@ -322,7 +331,7 @@ int main(int argc, char** argv) {
   static app::MeshAdapter adapter(&board, &ifaces, platform);
   static sim::SimDisplay display;
   static sim::SimKeyboard kb(&g_now);
-  static ui::App ui(adapter, display, kb);
+  static ui::App ui(adapter, display, kb, &g_sound);
   static NetWorld world(data, adapter, ifaces, platform);
   return sim::runScript(in, out, ui, ui::screens::boot(), kb, display, g_now, world);
 }

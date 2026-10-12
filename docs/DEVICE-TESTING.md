@@ -53,7 +53,12 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [ ] **Phone app.** The MeshCore phone app pairs using the PIN from Settings. Messages sent from the phone appear in the device's history too, and the reverse.
 - [ ] **Bluetooth toggle.** Settings > Bluetooth off stops advertising.
 
-## 6. Power and memory
+## 6. Sound
+
+- [ ] **Chime.** Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.
+- [ ] **No chime when muted.** No chime for messages in muted channels, or with Sound off.
+
+## 7. Power and memory
 
 - [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim does. With the power switch off on USB it reads 4.14 V (full). With the switch on it read 3.48 V after an evening on USB: the battery itself, which appears not to charge fully while the device runs.
 - [ ] **Charging.** Find out whether the Cardputer ADV charges with the power switch on, or only with it off.

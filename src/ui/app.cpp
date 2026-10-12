@@ -136,12 +136,14 @@ static const Metrics kMetrics[3] = {
   /* large  */ {&font_large,  &font_large,  &font_xlarge, &font_xlarge, &font_xlarge, 17, 18, 18, 26, 34, 27, 17},
 };
 
-App::App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k) : _m(m), _d(d), _k(k), _mx(&kMetrics[1]) {}
+App::App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k, hal::Sound* sound)
+    : _m(m), _d(d), _k(k), _sound(sound), _mx(&kMetrics[1]) {}
 
 void App::begin(Screen* root) {
   _d.begin();
   _k.begin();
   applyPrefs();
+  _lastUnread = _m.unreadTotal();   // messages already waiting don't chime at boot
   _stack[0] = root;
   _depth = 1;
   entered();
@@ -260,6 +262,10 @@ uint32_t App::loop(uint32_t now) {
   if (unread > _lastUnread) {
     _lastInput = now;
     wake();
+    if (_sound && _m.prefs().sound) {
+      static const hal::Tone kChime[] = {{1760, 70}, {0, 40}, {2349, 110}};
+      _sound->play(kChime, 3);
+    }
   }
   _lastUnread = unread;
   // Screen timeout.

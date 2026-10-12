@@ -20,4 +20,6 @@ shot net-dm-delivered
 wait 4000
 shot net-dm-reply
 expect threads 1
+# Bob's reply arrived while the chat was open: still one chime for it.
+expect sounds 1
 dump

@@ -8,6 +8,7 @@
 #include "MyMesh.h"
 #include <SPIFFS.h>
 
+void (*g_diagBeep)() = nullptr;
 static char s_line[64];
 static int s_len = 0;
 
@@ -30,6 +31,9 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     for (File f = root.openNextFile(); f; f = root.openNextFile()) Serial.printf("file %s %u\n", f.path(), (unsigned)f.size());
     const uint8_t* k = the_mesh.self_id.pub_key;
     Serial.printf("node key starts %02X%02X%02X%02X\n", k[0], k[1], k[2], k[3]);
+  } else if (!strcmp(c, "beep")) {
+    if (g_diagBeep) g_diagBeep();
+    Serial.println(g_diagBeep ? "ok" : "no speaker");
   } else if (!strcmp(c, "txtest")) {
     // One 4-byte packet that is not valid MeshCore (nodes ignore it): shows
     // whether the transmitter works and RadioLib's error code if not.
@@ -75,7 +79,7 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
     k.inject(r, col, false);
     Serial.println("ok");
   } else if (c[0]) {
-    Serial.println("? stat | radio | files | txtest | bl <n>|gpio | blf <hz> <duty> | fill <rrggbb> | init | shot | key <row> <col>");
+    Serial.println("? stat | radio | files | beep | txtest | bl <n>|gpio | blf <hz> <duty> | fill <rrggbb> | init | shot | key <row> <col>");
   }
 }
 

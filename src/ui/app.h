@@ -12,6 +12,7 @@
 #include "model/model.h"
 #include "hal/display.h"
 #include "hal/keyboard.h"
+#include "hal/sound.h"
 #include "gen/fonts.h"
 
 namespace ui {
@@ -67,7 +68,7 @@ class App {
 public:
   static constexpr int MAX_DEPTH = 8;
 
-  App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k);
+  App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k, hal::Sound* sound = nullptr);
 
   void begin(Screen* root);
   // Run one iteration: read keys, update, redraw if needed. Returns the
@@ -123,6 +124,7 @@ private:
   model::MeshModel& _m;
   hal::Display& _d;
   hal::Keyboard& _k;
+  hal::Sound* _sound;
   Canvas _c;
   Input _in;
   Screen* _stack[MAX_DEPTH] = {};
