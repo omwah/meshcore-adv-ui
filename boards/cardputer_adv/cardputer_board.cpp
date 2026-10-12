@@ -51,7 +51,19 @@ uint16_t CardputerBoard::getBattMilliVolts() {
     esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &chars);
     ready = true;
   }
+  // The voltage moves with the load (radio, backlight) and the ADC is noisy:
+  // a new reading at most every 2 s, smoothed (each one moves the result a
+  // quarter of the way), so the percentage doesn't jump about. A large step
+  // (charger plugged in or out) is taken at once.
+  static uint32_t lastAt = 0;
+  static uint32_t smooth = 0;   // mV * 4
+  uint32_t now = millis();
+  if (smooth && now - lastAt < 2000) return (uint16_t)(smooth / 4);
+  lastAt = now;
   uint32_t sum = 0;
   for (int i = 0; i < 8; i++) sum += esp_adc_cal_raw_to_voltage(adc1_get_raw(ADC1_CHANNEL_9), &chars);
-  return (uint16_t)(sum / 8 * 2);
+  uint32_t mv = sum / 8 * 2;
+  if (!smooth || mv * 4 > smooth + 4 * 150 || mv * 4 + 4 * 150 < smooth) smooth = mv * 4;
+  else smooth = (smooth * 3 + mv * 4) / 4;
+  return (uint16_t)(smooth / 4);
 }
