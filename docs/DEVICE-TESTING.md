@@ -46,7 +46,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 ## 4. GPS (ATGM336H)
 
 - [ ] **Fix.** Turn GPS on. Within a few minutes outdoors the GPS screen shows satellites and a fix. The module's TX goes to GPIO15 and its RX to GPIO13, at 115200 baud. If nothing arrives, swap `PIN_GPS_TX/RX`.
-- [ ] **Boot clock sync.** "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
+- [x] **Boot clock sync.** Works on hardware. "Set clock from GPS at boot" sets the clock and then turns the receiver off again, when GPS itself is off.
 
 ## 5. Bluetooth (default build)
 
@@ -56,7 +56,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 ## 6. Sound
 
-- [ ] **Chime.** Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.
+- [x] **Chime.** Works on hardware. Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.
 - [ ] **No chime when muted.** No chime for messages in muted channels, or with Sound off.
 
 ## 7. Power and memory
@@ -64,7 +64,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [ ] **Battery drain.** With the idle sleep in the main loop: note the voltage on Diagnostics > System, run an hour on battery with the screen timing out, and note it again. Compare with an older build if possible.
 - [ ] **Lower CPU clock.** Build with `-D ESP32_CPU_FREQ=80` (or 160): check that Bluetooth with the phone, radio receive and the UI still work, then repeat the drain test.
 
-- [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim does. With the power switch off on USB it reads 4.14 V (full). With the switch on it read 3.48 V after an evening on USB: the battery itself, which appears not to charge fully while the device runs.
-- [ ] **Charging.** Find out whether the Cardputer ADV charges with the power switch on, or only with it off.
+- [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim and M5Unified do. On USB with the power switch off it reads 4.14 V, the charger's output.
+- [x] **Charging.** Pure hardware; the firmware has nothing to enable. A computer's USB port charged it little or not at all (3.5 V after hours); a standalone USB charger works. Use a wall charger.
 - [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
 - [ ] **Launcher.** If you use bmorcelli's Launcher: the app runs from it, and after a re-install the restore offer appears.
