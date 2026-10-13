@@ -89,6 +89,8 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 - [x] **No chime when muted.** No chime for messages in muted channels, or with Sound off. Works on hardware for both.
 
 - [x] **New-message LED.** Settings > New message: Enter plays the colour burst (red to violet, about 2 s). With "LED only", let the screen time out and send a DM from another node: the LED flashes. Also try "screen on", "stay dark" and "screen + LED". Works on hardware. Findings: the LED (WS2812, GPIO21) runs on the backlight's power, which the backlight PWM chops, and the LED forgets its colour at each drop. So the burst holds that power fully on: the screen glows during a flash with the screen off, and jumps to full brightness for it with the screen on. Showing black on the panel instead of sleeping glowed more. Brightness 128/255 (32 was too dim).
+- [x] **Chat preview.** On the Chats tab, the selected chat's long last message scrolls through to its end (Settings > Chat preview: whole message). Works on hardware.
+- [x] **Show in Chats.** Hiding a DM, then a message from that contact brings it back with an alert; a hidden muted channel stays off while its dimmed count rises on the Channels tab. Works on hardware.
 
 ## 7. Power and memory
 
