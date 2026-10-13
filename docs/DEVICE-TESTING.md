@@ -41,7 +41,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 
 - [x] **Backup works.** "Back up now" succeeded on hardware.
 - [x] **Card detection.** Insert a FAT32 card. Backup & restore shows "SD card ready". Works on hardware (backups are written).
-- [ ] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12).
+- [x] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12). Works on hardware: messages arriving during backups all showed delivered.
 - [ ] **History archive.** With a card in, after more than 512 messages in all, scrolling up past the oldest flash message loads older ones from `/meshcore-adv-ui/history/`. "Clear history" removes that thread's file. (Covered in simnet with a 40-record ring.)
 - [x] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back. Works on hardware (a fresh Launcher install).
 
@@ -55,11 +55,11 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 The items below passed with stock's Bluedroid stack. Bluetooth now runs on
 NimBLE (`boards/cardputer_adv/nimble_serial.*`), so they need checking again:
 
-- [ ] **NimBLE: pairing.** On the phone, forget the old pairing first. The app finds the device, the PIN shows on screen while pairing, and pairing with it succeeds. A wrong PIN is refused and the device advertises again.
-- [ ] **NimBLE: reconnect.** After a reboot of either side, the phone reconnects without asking for the PIN again.
-- [ ] **NimBLE: phone app.** Contacts and channels sync, and messages go both ways, including long ones (the app's whole frame in one notify).
-- [ ] **NimBLE: toggle.** Settings > Bluetooth off disconnects the phone and stops advertising; on, it advertises again.
-- [ ] **NimBLE: heap.** Diagnostics > System shows more free heap than the Bluedroid build, with a phone connected.
+- [x] **NimBLE: pairing.** On the phone, forget the old pairing first. The app finds the device, the PIN shows on screen while pairing, and pairing with it succeeds. A wrong PIN is refused and the device advertises again. Works on hardware.
+- [x] **NimBLE: reconnect.** After a reboot of either side, the phone reconnects without asking for the PIN again. Works on hardware.
+- [x] **NimBLE: phone app.** Contacts and channels sync, and messages go both ways, including long ones (the app's whole frame in one notify). Works on hardware.
+- [x] **NimBLE: toggle.** Settings > Bluetooth off disconnects the phone and stops advertising; on, it advertises again. Works on hardware.
+- [x] **NimBLE: heap.** Diagnostics > System shows more free heap than the Bluedroid build, with a phone connected. Works on hardware: 143 KB free with a phone connected.
 
 Earlier, with Bluedroid:
 - [x] **Pairing and key import.** Pairing works, and so does the app's private key import (after enabling ENABLE_PRIVATE_KEY_IMPORT/EXPORT as stock does).
@@ -74,14 +74,14 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 - [x] **Switch.** Settings > Mesh node > remote: the device restarts on the Remote node screen (no node chosen yet). The LoRa Cap may be attached or not. Works on hardware.
 - [x] **Find.** Find nodes nearby lists the companion by its Bluetooth name (MeshCore-<name>) with a signal level. Works on hardware.
 - [x] **Pair.** Choosing it asks for the PIN (123456 prefilled); the right PIN connects ("Connected", node name, battery), a wrong one says so and stops. Works on hardware (after two fixes: the scan list was cleared under the PIN prompt, and the address was used byte-reversed).
-- [ ] **Sync.** Home fills with the node's contacts and channels; messages that waited on the node arrive.
-- [ ] **Messages.** A DM out shows delivered; a channel post shows "heard N repeats" when a repeater is near; incoming DMs and channel posts appear and chime.
-- [ ] **Reconnect.** Restart the node (Remote node > Restart the node), then the Cardputer: both times the link comes back by itself without the PIN.
-- [ ] **Admin.** Log in to a repeater or room through the node; status and neighbours come back.
-- [ ] **Settings.** Rename the node, change a radio setting: the node keeps them (check with the phone app or after a node restart).
-- [ ] **Backup.** Back up now with an SD card in; Restore puts it back (try after changing a channel).
-- [ ] **Battery, heap.** Header shows the Cardputer's battery; Diagnostics shows the node's battery, and free heap stays healthy.
-- [ ] **Back to local.** Settings > Mesh node > this device: the own node, its contacts and history are as before.
+- [x] **Sync.** Home fills with the node's contacts and channels; messages that waited on the node arrive. Works on hardware.
+- [x] **Messages.** A DM out shows delivered; a channel post shows "heard N repeats" when a repeater is near; incoming DMs and channel posts appear and chime. Works on hardware.
+- [x] **Reconnect.** Restart the node (Remote node > Restart the node), then the Cardputer: both times the link comes back by itself without the PIN. Works on hardware.
+- [x] **Admin.** Log in to a repeater or room through the node; status and neighbours come back. Works on hardware.
+- [x] **Settings.** Rename the node, change a radio setting: the node keeps them (check with the phone app or after a node restart). Works on hardware.
+- [x] **Backup.** Back up now with an SD card in; Restore puts it back (try after changing a channel). Works on hardware.
+- [x] **Battery, heap.** Header shows the Cardputer's battery; Diagnostics shows the node's battery, and free heap stays healthy. Works on hardware.
+- [x] **Back to local.** Settings > Mesh node > this device: the own node, its contacts and history are as before. Works on hardware.
 
 ## 6. Sound
 
