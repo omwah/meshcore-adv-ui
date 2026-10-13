@@ -94,10 +94,10 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 
 ## 7. Power and memory
 
-- [ ] **Battery drain.** With the idle sleep in the main loop: note the voltage on Diagnostics > System, run an hour on battery with the screen timing out, and note it again. Compare with an older build if possible.
+- [x] **Battery drain.** With the idle sleep in the main loop: note the voltage on Diagnostics > System, run an hour on battery with the screen timing out, and note it again. Compare with an older build if possible. On hardware: 94% to 84% in an hour with Bluetooth connected, so roughly 9 to 10 hours per charge. Percentages only; no voltage or older-build comparison yet.
 - [ ] **Lower CPU clock.** Build with `-D ESP32_CPU_FREQ=80` (or 160): check that Bluetooth with the phone, radio receive and the UI still work, then repeat the drain test.
 
 - [x] **Battery reading.** GPIO10 through a 2:1 divider, measured as esp-vim and M5Unified do. On USB with the power switch off it reads 4.14 V, the charger's output.
 - [x] **Charging.** Pure hardware; the firmware has nothing to enable. A computer's USB port charged it little or not at all (3.5 V after hours); a standalone USB charger works. Use a wall charger. The power switch only disconnects the battery: with USB in, the firmware runs with the switch off too, and the battery still charges, slowly.
-- [ ] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB.
+- [x] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB. On hardware: free heap went from 148 KB to 140 KB over the hour (the minimum wasn't read).
 - [x] **Launcher.** If you use bmorcelli's Launcher: the app runs from it (installed over its WebUI), and on first start the restore offer appears and brings back the identity, contacts and settings. Works on hardware.
