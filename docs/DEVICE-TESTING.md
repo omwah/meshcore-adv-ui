@@ -35,7 +35,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [x] **Transmit.** Another node hears our adverts and DMs (serial `radio`: tx count). Works on hardware.
 - [x] **Interop.** Exchange adverts and a DM with a stock MeshCore node or the phone app on the same preset (default "USA", 910.525 MHz / 62.5 kHz / SF7 / CR5). Works on hardware, direct and through a one-hop repeater.
 
-- [ ] **Ping bot.** Turn on Settings > Answer "ping" DMs, then send `ping` from a phone app on another node through a repeater. The reply names the repeater, or shows its hash if it isn't a contact. Send `ping` again straight away: no second reply.
+- [x] **Ping bot.** Turn on Settings > Answer "ping" DMs, then send `ping` from a phone app on another node through a repeater. The reply names the repeater, or shows its hash if it isn't a contact. Send `ping` again straight away: no second reply. Works on hardware.
 
 ## 3. SD card (shares the LoRa SPI bus)
 
