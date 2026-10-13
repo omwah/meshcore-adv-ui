@@ -345,6 +345,7 @@ private:
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
     else if (!strcmp(what, "linked")) got = _ui.bleConnected();   // remote mode: link up (1) or not (0)
     else if (!strcmp(what, "sounds")) got = g_sound.played;
+    else if (!strcmp(what, "divider")) got = _app ? ui::screens::chatNewCount(*_app) : -1;   // from the "New" line down
     else if (!strcmp(what, "request")) {
       static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};
       const char* g = st[(int)_ui.requestState()];

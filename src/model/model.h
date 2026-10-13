@@ -72,6 +72,7 @@ struct Message {
   int8_t snr_x4;                  // incoming only, INT8_MIN unknown
   int8_t hops;                    // incoming: path length, -1 direct-unknown
   uint8_t repeats;                // outgoing channel msgs: times heard repeated
+  uint32_t seq;                   // order in the history (newer is higher), 0 unknown
   char sender[NAME_LEN];          // channel messages: who sent it
   char text[TEXT_LEN];
 };
@@ -244,6 +245,9 @@ public:
   virtual int messageCount(ThreadId t) const = 0;
   virtual bool message(ThreadId t, int i, Message& out) const = 0;  // 0 = oldest kept
   virtual void markRead(ThreadId t) = 0;
+  // Unread messages in `t`: true, with `readSeq` the seq of the last one read
+  // (messages after it are new).
+  virtual bool unreadSince(ThreadId t, uint32_t& readSeq) const { (void)t; (void)readSeq; return false; }
   // message() shows a window of a conversation: slide it to older or newer
   // messages; each returns how many came in (0 = no more that way).
   virtual int loadOlder(ThreadId t) = 0;

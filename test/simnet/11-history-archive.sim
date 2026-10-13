@@ -9,9 +9,14 @@ repeat 70 1500 as Kim chan 0 m#
 wait 3000
 expect threads 1
 key enter
+# All 70 unread: it opens on the "New" line, at the start of history.
+expect first m001
+expect divider 24
+# Read now: opened again, no line, and it is where it was left.
+key esc
+key enter
+expect divider -1
 expect window 24
-expect first m047
-expect last m070
 key up 300
 expect first m001
 shot history-start

@@ -65,6 +65,7 @@ public:
   int messageCount(model::ThreadId t) const override;
   bool message(model::ThreadId t, int i, model::Message& out) const override;
   void markRead(model::ThreadId t) override;
+  bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
   int loadOlder(model::ThreadId t) override;
   int loadNewer(model::ThreadId t) override;
   bool atNewest(model::ThreadId t) const override;

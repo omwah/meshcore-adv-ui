@@ -326,6 +326,15 @@ void AdapterBase::clearHistory(model::ThreadId t) {
   _rev++;
 }
 
+bool AdapterBase::unreadSince(model::ThreadId t, uint32_t& readSeq) const {
+  ThreadKey k;
+  if (!threadKeyFor(t, k)) return false;
+  const ThreadInfo* ti = _msgs.find(k);
+  if (!ti || !ti->unread) return false;
+  readSeq = ti->readSeq;
+  return true;
+}
+
 void AdapterBase::markRead(model::ThreadId t) {
   ThreadKey k;
   if (!threadKeyFor(t, k)) return;

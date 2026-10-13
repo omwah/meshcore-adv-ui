@@ -1,6 +1,7 @@
 // A conversation (DM, room or channel): messages bottom-anchored like a chat
 // app, a meta line per message (sender, time, delivery or signal), and a
-// compose box. Up/Down scroll; Enter or typing starts composing.
+// compose box. Up/Down scroll; Enter or typing starts composing. A "New" line
+// marks where the messages that came in since the last visit begin.
 #include "ui/screens/screens.h"
 #include "ui/widgets.h"
 #include "ui/icons.h"
@@ -107,10 +108,22 @@ public:
       int hidden = 0, from = _keepBottom > 0 ? n - _keepBottom : _showOlder;
       for (int i = n - 1; i >= from && i >= 0; i--) {
         model::Message m;
-        if (a.m().message(id, i, m)) hidden += a.mx().meta + wrapText(m.text, f, textW, nullptr, nullptr) * f->height + GAP;
+        if (a.m().message(id, i, m)) hidden += rowH(a, m, f, textW);
       }
       _scroll = hidden;
       _keepBottom = _showOlder = 0;
+    }
+    // Just opened with new messages: start with the "New" line at the top
+    // (or as high as it goes).
+    if (_toDivider) {
+      _toDivider = false;
+      int below = 0;
+      for (int i = n - 1; i >= 0; i--) {
+        model::Message m;
+        if (!a.m().message(id, i, m)) continue;
+        below += rowH(a, m, f, textW);
+        if (_divSeq && m.seq == _divSeq) { _scroll = below > mr.h ? below - mr.h : 0; break; }
+      }
     }
     // Walk from the newest message up. _scroll counts pixels hidden below.
     int bottom = mr.y + mr.h + _scroll;
@@ -118,12 +131,17 @@ public:
     for (int i = n - 1; i >= 0; i--) {
       model::Message m;
       if (!a.m().message(id, i, m)) continue;
-      int lines = wrapText(m.text, f, textW, nullptr, nullptr);
-      int h = a.mx().meta + lines * f->height + GAP;
+      int h = rowH(a, m, f, textW);
       total += h;
       int top = bottom - h;
-      if (top < mr.y + mr.h && bottom > mr.y) drawMessage(a, c, m, mr, top, f, textW);
-      bottom = top;
+      if (top < mr.y + mr.h && bottom > mr.y) {
+        if (_divSeq && m.seq == _divSeq) {
+          drawDivider(a, c, mr, top);
+          top += divH(a);
+        }
+        drawMessage(a, c, m, mr, top, f, textW);
+      }
+      bottom = bottom - h;
     }
     _maxScroll = total > mr.h ? total - mr.h : 0;
     if (_scroll > _maxScroll) _scroll = _maxScroll;
@@ -185,7 +203,40 @@ public:
     return _composing ? comp : view;
   }
 
+  // Where the new messages begin, as the chat opens (before it is marked
+  // read). The line stays until the chat is left.
+  void markNew(App& a) {
+    _divSeq = 0;
+    _toDivider = false;
+    uint32_t readSeq;
+    if (!a.m().unreadSince(id, readSeq)) return;
+    // Bring in older messages until the window reaches the last one read,
+    // within reason: a long backlog starts at the oldest of these.
+    for (int page = 0; page < 4; page++) {
+      model::Message m;
+      if (!a.m().message(id, 0, m) || m.seq <= readSeq || !a.m().loadOlder(id)) break;
+    }
+    for (int i = 0, n = a.m().messageCount(id); i < n; i++) {
+      model::Message m;
+      if (a.m().message(id, i, m) && m.seq > readSeq) { _divSeq = m.seq; break; }
+    }
+    _toDivider = _divSeq != 0;
+    _scroll = 0;
+  }
+
+  int newCount(App& a) {
+    if (!_divSeq) return -1;
+    int got = 0;
+    for (int i = 0, n = a.m().messageCount(id); i < n; i++) {
+      model::Message m;
+      if (a.m().message(id, i, m) && m.seq >= _divSeq) got++;
+    }
+    return got;
+  }
+
   void reset() {
+    _divSeq = 0;
+    _toDivider = false;
     _scroll = 0;
     _composing = false;
     _draft[0] = 0;
@@ -232,6 +283,23 @@ private:
     }
     if (k.code == K_UP || k.code == K_DOWN) return;
     _ed.key(k);
+  }
+
+  int divH(App& a) const { return a.fSmall()->height + 4; }
+
+  // A message's height in the list, with the "New" line if it sits above it.
+  int rowH(App& a, const model::Message& m, const mc_font_t* f, int textW) const {
+    int h = a.mx().meta + wrapText(m.text, f, textW, nullptr, nullptr) * f->height + GAP;
+    return m.seq == _divSeq && _divSeq ? h + divH(a) : h;
+  }
+
+  void drawDivider(App& a, Canvas& c, const Rect& r, int top) {
+    const mc_font_t* sf = a.fSmall();
+    int y = top + divH(a) / 2 - 1;
+    int x = r.x + 14;
+    c.hline(r.x + 4, y, x - r.x - 7, C_BADGE);
+    x = c.text(x, top + 1, "New", sf, C_BADGE) + 3;
+    c.hline(x, y, r.x + r.w - 4 - x, C_BADGE);
   }
 
   void drawMessage(App& a, Canvas& c, const model::Message& m, const Rect& r, int top,
@@ -321,6 +389,8 @@ private:
   int _keepBottom = 0, _showOlder = 0;   // messages just loaded below / above
   int _scroll = 0, _maxScroll = 0;
   uint32_t _readRev = 0, _blink = 0;
+  uint32_t _divSeq = 0;                  // the first new message (0: no "New" line)
+  bool _toDivider = false;               // scroll to it on the next draw
 };
 
 ConversationScreen s_conv;
@@ -332,7 +402,10 @@ void openThread(App& a, model::ThreadId t) {
   if (!(s_conv.id == t)) s_conv.reset();
   s_conv._loginTriedReset();
   s_conv.id = t;
+  s_conv.markNew(a);
   a.push(&s_conv);
 }
+
+int chatNewCount(App& a) { return s_conv.newCount(a); }
 
 }}  // namespace ui::screens

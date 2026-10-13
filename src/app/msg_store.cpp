@@ -192,6 +192,7 @@ uint32_t MessageStore::append(const ThreadKey& k, const model::Message& m, uint3
       _nCache--;
     }
     _cache[_nCache] = m;
+    _cache[_nCache].seq = r.seq;
     _cacheSeq[_nCache++] = r.seq;
   }
   return r.seq;
@@ -268,6 +269,7 @@ void MessageStore::toMessage(const Rec& r, model::Message& m) {
   m.repeats = r.repeats;
   m.snr_x4 = r.snr_x4;
   m.hops = r.hops;
+  m.seq = r.seq;
   snprintf(m.sender, sizeof m.sender, "%s", r.sender);
   snprintf(m.text, sizeof m.text, "%s", r.text);
 }

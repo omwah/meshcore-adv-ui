@@ -12,6 +12,8 @@ namespace ui { namespace screens {
 Screen* home();
 Screen* boot();
 void openThread(App& a, model::ThreadId t);
+// The open chat's messages from the "New" line down (-1: no line). For tests.
+int chatNewCount(App& a);
 void openContact(App& a, int contactIdx);
 void openChannel(App& a, int channelIdx);
 void openAdmin(App& a, int contactIdx);

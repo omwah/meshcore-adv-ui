@@ -186,6 +186,7 @@ void MockModel::addMsg(ThreadId t, uint32_t ts, bool out, const char* sender, co
   Msg& m = _msgs[_nMsgs++];
   memset(&m, 0, sizeof m);
   m.t = t;
+  m.m.seq = ++_lastSeq;
   m.m.ts = ts;
   m.m.outgoing = out;
   m.m.status = st;
@@ -364,6 +365,19 @@ void MockModel::clearHistory(ThreadId t) {
     if (!(_msgs[r].t == t)) _msgs[w++] = _msgs[r];
   _nMsgs = w;
   _rev++;
+}
+
+bool MockModel::unreadSince(ThreadId t, uint32_t& readSeq) const {
+  int unread = 0;
+  for (auto& s : _threads)
+    if (s.used && s.id == t) unread = s.unread;
+  if (!unread) return false;
+  // The thread's last `unread` messages are the new ones.
+  int n = messageCount(t), i = 0;
+  readSeq = 0;
+  for (int j = 0; j < _nMsgs; j++)
+    if (_msgs[j].t == t && i++ < n - unread) readSeq = _msgs[j].m.seq;
+  return true;
 }
 
 void MockModel::markRead(ThreadId t) {

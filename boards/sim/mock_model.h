@@ -45,6 +45,7 @@ public:
   int messageCount(model::ThreadId t) const override;
   bool message(model::ThreadId t, int i, model::Message& out) const override;
   void markRead(model::ThreadId t) override;
+  bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
   int loadOlder(model::ThreadId) override { return 0; }   // the mock shows everything at once
   int loadNewer(model::ThreadId) override { return 0; }
   bool atNewest(model::ThreadId) const override { return true; }
@@ -132,6 +133,7 @@ private:
   int _nChannels = 0;
   Msg _msgs[MAX_MSG];
   int _nMsgs = 0;
+  uint32_t _lastSeq = 0;
   ThreadState _threads[MAX_T];
   model::Contact _heard[MAX_H];
   int _nHeard = 0;

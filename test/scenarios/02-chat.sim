@@ -12,6 +12,12 @@ wait 200
 shot chat-pending
 wait 2500
 shot chat-delivered
+# Left and opened again: nothing new, so no "New" line.
+key esc
+type ali
+key enter
+shot chat-dm-reopened
+key esc
 hold esc 900
 type pub
 key enter

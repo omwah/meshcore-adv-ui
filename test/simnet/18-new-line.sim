@@ -1,0 +1,43 @@
+# The "New" line: where the messages since the last visit begin.
+# both-modes
+node Bob 7.5
+as Bob advert
+wait 3000
+# Advertise ourselves (zero hop) from the menu so Bob can message us.
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+as Bob dm Card first
+wait 2000
+as Bob dm Card second
+wait 2000
+as Bob dm Card third
+wait 2000
+expect unread 3
+key enter
+expect divider 3
+shot new-line
+# One more while the chat is open: below the line, which stays.
+as Bob dm Card fourth
+wait 2000
+expect divider 4
+expect unread 0
+# Left and opened again with nothing new: no line.
+key esc
+key enter
+expect divider -1
+key esc
+# A long backlog (more than the 24 messages a chat holds in memory): it
+# opens on the line, above the newest, with the read ones just above it.
+repeat 30 1500 as Bob dm Card backlog #
+expect unread 30
+key enter
+expect divider 20
+expect first first
+shot new-line-backlog
+# Reading down brings in the newer ones, to the last.
+key down 80
+expect last backlog 030
+shot new-line-backlog-end

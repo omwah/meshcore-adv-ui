@@ -64,6 +64,7 @@ The Bluetooth build only: the USB-only build has no remote mode.
 - **Conversation:**
   - Each message shows its delivery state: sending, sent, delivered or failed, with retries and repeat counts.
   - Incoming messages show hops and SNR.
+  - A "New" line marks where the messages that arrived since you last opened the chat begin, and the chat opens scrolled to it.
   - You can compose replies inline, in a word-wrapped box.
   - History: the newest 512 messages stay on flash. With an SD card, older
     ones move to `/meshcore-adv-ui/history/` on the card instead of being
