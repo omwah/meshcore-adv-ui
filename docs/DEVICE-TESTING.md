@@ -88,6 +88,8 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 - [x] **Chime.** Works on hardware. Serial `beep` (or a new message with Settings > Sound on) plays two rising notes. Is the volume and tone OK? The codec is ES8311 at 0x18; I2S pins 41/43/42, as in M5Unified.
 - [x] **No chime when muted.** No chime for messages in muted channels, or with Sound off. Works on hardware for both.
 
+- [x] **New-message LED.** Settings > New message: Enter plays the colour burst (red to violet, about 2 s). With "LED only", let the screen time out and send a DM from another node: the LED flashes. Also try "screen on", "stay dark" and "screen + LED". Works on hardware. Findings: the LED (WS2812, GPIO21) runs on the backlight's power, which the backlight PWM chops, and the LED forgets its colour at each drop. So the burst holds that power fully on: the screen glows during a flash with the screen off, and jumps to full brightness for it with the screen on. Showing black on the panel instead of sleeping glowed more. Brightness 128/255 (32 was too dim).
+
 ## 7. Power and memory
 
 - [ ] **Battery drain.** With the idle sleep in the main loop: note the voltage on Diagnostics > System, run an hour on battery with the screen timing out, and note it again. Compare with an older build if possible.

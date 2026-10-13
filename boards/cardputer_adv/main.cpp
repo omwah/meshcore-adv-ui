@@ -16,6 +16,7 @@
 #include "tca8418_keyboard.h"
 #include "platform_cardputer.h"
 #include "es8311_sound.h"
+#include "ws2812_led.h"
 #include <new>
 #if !defined(ENABLE_USB_INTERFACE)
   #include "diag.h"
@@ -53,6 +54,7 @@ MyMesh the_mesh(radio_driver, fast_rng, rtc_clock, tables, store, &adapter);
 static St7789Display display;
 static Tca8418Keyboard keyboard;
 static Es8311Sound sound;
+static Ws2812Led led(display);
 // The UI, built in setup() on the local or the remote model.
 alignas(ui::App) static uint8_t ui_storage[sizeof(ui::App)];
 static ui::App* ui_app = nullptr;
@@ -76,6 +78,8 @@ static void setupRemote() {
   ui_app = new (ui_storage) ui::App(*remote, display, keyboard, &sound);
   keyboard.begin();
   sound.begin();
+  led.begin();
+  ui_app->setLed(&led);
   ui_app->begin(ui::screens::boot());
   board.onBootComplete();
   Serial.printf("meshcore-adv-ui %s (remote node mode): keyboard %s, speaker %s, sd %s, heap %u (min %u)\n",
@@ -109,6 +113,8 @@ void setup() {
   // Show the splash now: Bluetooth and sensors take a while to start.
   keyboard.begin();
   sound.begin();
+  led.begin();
+  ui_app->setLed(&led);
   ui_app->begin(ui::screens::boot());
   ui_app->loop(millis());
 #if defined(BLE_PIN_CODE)

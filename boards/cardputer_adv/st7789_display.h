@@ -17,6 +17,11 @@ public:
   void backlightRaw(int level);   // diagnostics: <0 = plain GPIO high, else PWM duty
   void backlightPwm(uint32_t hz, uint8_t duty);   // diagnostics: try a PWM frequency
   void reinit() { _ready = false; begin(); }
+  // The backlight pin also switches the power the RGB LED runs on. Dimming
+  // chops that power, and the LED forgets its colour each time it drops:
+  // hold it fully on while the LED shows something (the backlight goes to
+  // full meanwhile; a sleeping panel lets the least of it through).
+  void ledPower(bool on);
 
 private:
   void cmd(uint8_t c);
@@ -24,4 +29,6 @@ private:
   void window(int x0, int y0, int x1, int y1);
   SPIClass _spi{FSPI};
   bool _ready = false;
+  uint8_t _level = 0;        // the backlight as last set
+  bool _railHeld = false;    // the pin is held high for it
 };

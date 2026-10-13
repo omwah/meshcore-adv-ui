@@ -89,7 +89,8 @@ The Bluetooth build only: the USB-only build has no remote mode.
 - **GPS:**
   - The receiver is off by default.
   - Sharing your position in adverts and setting the clock at boot are separate options, also off by default.
-- **Settings:** node name, theme, brightness, screen timeout, text size, key filter, sound, auto-add, ping bot, Bluetooth and PIN, factory reset.
+- **Settings:** node name, theme, brightness, screen timeout, text size, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and PIN, factory reset.
+- **New-message alert:** a 2-second burst of colours on the RGB LED with the screen left off (the default, easiest on the battery), the screen turning on, both, or neither. The chime follows the Sound setting either way. Enter on the setting previews the colours. The LED runs on the backlight's power, so the screen glows briefly while it flashes.
 - **Ping bot** (local node mode, off by default):
   - A direct message that is just `ping` or `test` gets an automatic reply with the path it took, for example `pong: 2 hops a1>Hilltop, SNR 6.5`.
   - Relays are named when their hash matches exactly one repeater or room contact.

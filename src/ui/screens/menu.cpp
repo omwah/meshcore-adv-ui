@@ -116,7 +116,7 @@ MainMenu s_menu;
 // ------------------------------------------------------------- settings
 
 enum SItem { S_HDR_ID, S_NAME, S_MODE, S_REMOTE, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
-             S_HDR_IN, S_LOCKOUT, S_SOUND,
+             S_HDR_IN, S_LOCKOUT, S_SOUND, S_NOTIFY,
              S_HDR_MESH, S_AUTOADD, S_PINGBOT, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
              S_HDR_TELEM, S_TBATT, S_TLOC, S_TENV,
@@ -170,6 +170,12 @@ protected:
       case S_HDR_IN: it.label = "INPUT & SOUND"; it.header = true; break;
       case S_LOCKOUT: it.label = "Key filter"; it.choice = true; snprintf(it.value, sizeof it.value, "%u ms", p.inputLockoutMs); break;
       case S_SOUND: it.label = "Sound"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.sound)); break;
+      case S_NOTIFY: {
+        static const char* const kModes[] = {"LED only", "screen on", "stay dark", "screen + LED"};
+        it.label = "New message"; it.choice = true;
+        snprintf(it.value, sizeof it.value, "%s", kModes[(int)p.notify % 4]);
+        break;
+      }
       case S_HDR_MESH: it.label = "MESH & BLUETOOTH"; it.header = true; break;
       case S_AUTOADD: it.label = "Auto-add contacts"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.autoAddContacts)); break;
       case S_PINGBOT:
@@ -258,6 +264,7 @@ protected:
 #if MC_UI_REMOTE
       case S_REMOTE: openRemote(a); break;
 #endif
+      case S_NOTIFY: a.flashLed(); break;   // a preview of the colours
       default:
         adjust(a, i, 1);
     }
@@ -289,6 +296,7 @@ protected:
       case S_TEXT: p.textSize = (uint8_t)((p.textSize + 3 + dir) % 3); break;
       case S_LOCKOUT: p.inputLockoutMs = (uint16_t)stepIn(kLockouts, p.inputLockoutMs, dir); break;
       case S_SOUND: p.sound = !p.sound; break;
+      case S_NOTIFY: p.notify = (model::NotifyMode)(((int)p.notify + 4 + dir) % 4); break;
       case S_AUTOADD: p.autoAddContacts = !p.autoAddContacts; break;
       case S_PINGBOT: p.pingBot = !p.pingBot; break;
       case S_BLE: p.bleEnabled = !p.bleEnabled; break;

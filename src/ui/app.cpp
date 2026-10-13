@@ -270,11 +270,15 @@ uint32_t App::loop(uint32_t now) {
     if (pairing) { _lastInput = now; wake(); }
   }
 
-  // A new unread message turns the screen on.
+  // A new unread message: the screen, the light, both or neither, as set.
   uint16_t unread = _m.unreadTotal();
   if (unread > _lastUnread) {
-    _lastInput = now;
-    wake();
+    model::NotifyMode nm = _m.prefs().notify;
+    if (nm == model::NotifyMode::Screen || nm == model::NotifyMode::ScreenLed) {
+      _lastInput = now;
+      wake();
+    }
+    if (nm == model::NotifyMode::Led || nm == model::NotifyMode::ScreenLed) flashLed();
     if (_sound && _m.prefs().sound) {
       static const hal::Tone kChime[] = {{1760, 70}, {0, 40}, {2349, 110}};
       _sound->play(kChime, 3);
@@ -326,7 +330,48 @@ uint32_t App::loop(uint32_t now) {
   }
 
   uint32_t wait = _in.wakeIn(now);
+  uint32_t led = ledTick(now);
+  if (led && (!wait || led < wait)) wait = led;
   return wait ? wait : 50;
+}
+
+// ---- the status light
+
+namespace {
+
+// One pass through these, dimmed, then dark.
+const uint8_t kLedColours[][3] = {{255, 0, 0},   {255, 110, 0}, {255, 220, 0}, {0, 255, 0},
+                                  {0, 220, 255}, {0, 40, 255},  {170, 0, 255}};
+constexpr int kLedSteps = sizeof kLedColours / sizeof kLedColours[0];
+constexpr uint32_t kLedStepMs = 280;
+constexpr uint8_t kLedLevel = 128;  // of 255: 32 was too dim to notice on the device
+
+}  // namespace
+
+void App::flashLed() {
+  if (!_led) return;
+  _ledStart = _now;
+  _ledOn = true;
+  _ledStep = -1;
+  ledTick(_now);
+}
+
+uint32_t App::ledTick(uint32_t now) {
+  if (!_led || !_ledOn) return 0;
+  uint32_t t = now - _ledStart;
+  int step = (int)(t / kLedStepMs);
+  if (step >= kLedSteps) {
+    _led->set(0, 0, 0);
+    _ledOn = false;
+    _ledStep = -1;
+    return 0;
+  }
+  if (step != _ledStep) {
+    _ledStep = step;
+    const uint8_t* c = kLedColours[step];
+    _led->set(c[0] * kLedLevel / 255, c[1] * kLedLevel / 255, c[2] * kLedLevel / 255);
+  }
+  return kLedStepMs - t % kLedStepMs;
 }
 
 void App::render() {

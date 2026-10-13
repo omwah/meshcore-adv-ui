@@ -156,6 +156,9 @@ struct FoundNode {                // a scan result
   int8_t rssi;
 };
 
+// What a new message does (besides the chime, which follows Prefs::sound).
+enum class NotifyMode : uint8_t { Led, Screen, Blank, ScreenLed };
+
 struct Prefs {
   char nodeName[NAME_LEN];
   uint8_t theme;
@@ -179,6 +182,7 @@ struct Prefs {
   TelemMode telemBattery, telemLocation, telemSensors;
   Mode deviceMode;                // takes effect after a restart
   bool pingBot;                   // answer "ping" DMs with the path they took
+  NotifyMode notify;              // what a new message does
 };
 
 struct BackupStatus {

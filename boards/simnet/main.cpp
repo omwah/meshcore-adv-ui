@@ -64,6 +64,21 @@ public:
 };
 SimSound g_sound;
 
+// Counts bursts: each time it lights up from dark.
+class SimLed : public hal::Led {
+public:
+  void set(uint8_t r, uint8_t g, uint8_t b) override {
+    bool lit = r || g || b;
+    if (lit && !_lit) bursts++;
+    _lit = lit;
+  }
+  int bursts = 0;
+
+private:
+  bool _lit = false;
+};
+SimLed g_led;
+
 class SimPlatform : public app::Platform {
 public:
   fs::FS* sd() override { return card ? &sdFs : nullptr; }
@@ -233,11 +248,18 @@ public:
       _uiNode->begin();
       return true;
     }
-    if (!strcmp(cmd, "pref")) {   // pref pingbot on|off
+    if (!strcmp(cmd, "pref")) {   // pref pingbot on|off, pref notify <mode>
       char what[16] = {}, val[8] = {};
       sscanf(arg, "%15s %7s", what, val);
       model::Prefs p = _ui.prefs();
       if (!strcmp(what, "pingbot")) p.pingBot = !strcmp(val, "on");
+      else if (!strcmp(what, "notify")) {   // pref notify led|screen|dark|both
+        static const char* const modes[] = {"led", "screen", "dark", "both"};
+        int m = 0;
+        while (m < 4 && strcmp(val, modes[m])) m++;
+        if (m == 4) { snprintf(err, n, "unknown notify mode '%s'", val); return true; }
+        p.notify = (model::NotifyMode)m;
+      }
       else { snprintf(err, n, "unknown pref '%s'", what); return true; }
       _ui.setPrefs(p);
       return true;
@@ -345,6 +367,7 @@ private:
     else if (!strcmp(what, "channels")) got = _ui.channelCount();
     else if (!strcmp(what, "linked")) got = _ui.bleConnected();   // remote mode: link up (1) or not (0)
     else if (!strcmp(what, "sounds")) got = g_sound.played;
+    else if (!strcmp(what, "leds")) got = g_led.bursts;   // LED bursts since the start
     else if (!strcmp(what, "divider")) got = _app ? ui::screens::chatNewCount(*_app) : -1;   // from the "New" line down
     else if (!strcmp(what, "request")) {
       static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};
@@ -458,6 +481,7 @@ int main(int argc, char** argv) {
   static sim::SimDisplay display;
   static sim::SimKeyboard kb(&g_now);
   static ui::App ui(model, display, kb, &g_sound);
+  ui.setLed(&g_led);
   static NetWorld world(data, adapter, remote, pipe, ifaces, platform);
   return sim::runScript(in, out, ui, ui::screens::boot(), kb, display, g_now, world);
 }

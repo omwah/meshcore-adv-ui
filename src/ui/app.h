@@ -13,6 +13,7 @@
 #include "hal/display.h"
 #include "hal/keyboard.h"
 #include "hal/sound.h"
+#include "hal/led.h"
 #include "gen/fonts.h"
 
 namespace ui {
@@ -97,6 +98,10 @@ public:
   int fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, bool scroll);
   bool asleep() const { return _asleep; }
   void wake();
+  // The status light, if the board has one (set before begin()).
+  void setLed(hal::Led* led) { _led = led; }
+  // Play the new-message colours once (a preview, or an alert).
+  void flashLed();
   void applyPrefs();               // theme, lockout, brightness from model prefs
   void previewTheme(uint8_t idx);  // apply a theme without saving it
 
@@ -120,6 +125,7 @@ private:
   void drawFooter();
   void drawPairing();
   void entered();
+  uint32_t ledTick(uint32_t now);   // ms until the next colour, 0: idle
 
   model::MeshModel& _m;
   hal::Display& _d;
@@ -138,6 +144,10 @@ private:
   uint32_t _toastUntil = 0;
   uint32_t _lastInput = 0;
   uint16_t _lastUnread = 0;
+  hal::Led* _led = nullptr;
+  uint32_t _ledStart = 0;        // when the burst started
+  bool _ledOn = false;           // a burst is playing
+  int _ledStep = -1;             // the colour showing (-1: off)
   bool _asleep = false;
   uint32_t _marqueeStart = 0;   // restarts on every key, so a new selection starts at its beginning
   bool _animating = false;       // a marquee is moving: keep redrawing

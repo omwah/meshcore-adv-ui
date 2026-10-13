@@ -17,7 +17,10 @@ shot settings-theme-daylight
 key left 4
 key down 6
 shot settings-mid
-key down
+key right
+shot settings-new-message
+key left
+key down 2
 key right
 shot settings-ping-bot
 key left

@@ -1,0 +1,43 @@
+# What a new message does with the screen asleep: LED only (the default),
+# the screen, nothing (but the chime), or the screen and the LED.
+# both-modes
+node Ivy 7
+as Ivy advert
+wait 3000
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+expect leds 0
+# LED only: the screen stays off, one burst of colours.
+wait 61000
+expect screen off
+as Ivy dm Cardputer one
+wait 3000
+expect screen off
+expect leds 1
+expect sounds 1
+# Screen: it wakes, no light.
+pref notify screen
+as Ivy dm Cardputer two
+wait 3000
+expect screen on
+expect leds 1
+expect sounds 2
+# Stay dark: neither, the chime still plays.
+pref notify dark
+wait 61000
+expect screen off
+as Ivy dm Cardputer three
+wait 3000
+expect screen off
+expect leds 1
+expect sounds 3
+# Screen and LED.
+pref notify both
+as Ivy dm Cardputer four
+wait 3000
+expect screen on
+expect leds 2
+expect sounds 4

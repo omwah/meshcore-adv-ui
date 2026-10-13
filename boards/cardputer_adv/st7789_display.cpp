@@ -70,7 +70,23 @@ void St7789Display::pushRows(int y, int h, const uint16_t* px) {
 }
 
 void St7789Display::setBacklight(uint8_t level) {
+  _level = level;
+  if (_railHeld) return;   // the LED has it fully on; restored after
   ledcWrite(BL_CHANNEL, level);
+}
+
+void St7789Display::ledPower(bool on) {
+  if (on && !_railHeld) {
+    ledcDetachPin(PIN_TFT_BL);
+    pinMode(PIN_TFT_BL, OUTPUT);
+    digitalWrite(PIN_TFT_BL, HIGH);
+    _railHeld = true;
+    delay(2);   // let the LED power up before it is sent a colour
+  } else if (!on && _railHeld) {
+    ledcAttachPin(PIN_TFT_BL, BL_CHANNEL);
+    ledcWrite(BL_CHANNEL, _level);
+    _railHeld = false;
+  }
 }
 
 void St7789Display::backlightRaw(int level) {
