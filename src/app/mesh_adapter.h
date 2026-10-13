@@ -80,6 +80,7 @@ public:
   void setPrefs(const model::Prefs& p) override;
   bool bleConnected() const override { return hasConnection(); }
   bool bleAvailable() const override { return _bleBuilt; }
+  bool pingBotAvailable() const override { return true; }
   uint32_t bleActivePin() const override { return _activePin; }
   bool blePairing() const override { return _bleBuilt && _plat.blePairing(); }
   // The PIN for this boot (fixed, or new random if so set); call once,
@@ -106,6 +107,9 @@ private:
   bool getContact(int i, ContactInfo& c) const { return i >= 0 && _mesh->getContactByIdx(MAX_ANON_CONTACTS + i, c); }
   ContactInfo* contactPtr(int i) const;
   void syncPrefsFromMesh();
+  bool sendDirect(const ContactRef& c, model::Message& m);
+  void pingReceived(const ContactInfo& from, uint8_t pathLen, float snr);
+  void pingTick(uint32_t ms);
 
   MyMesh* _mesh = nullptr;
   DataStore* _store = nullptr;
@@ -115,6 +119,21 @@ private:
   int _seenContacts = -1;
   uint32_t _activePin = 0;
   uint32_t _prefsCheckAt = 0;
+
+  // The ping bot.
+  static constexpr uint32_t PING_DELAY_MS = 1000, PING_QUIET_MS = 10000;
+  struct {                           // the path of the last DM packet heard
+    bool valid;
+    uint8_t src, pathLen;
+    uint8_t path[MAX_PATH_SIZE];
+  } _dmPath = {};
+  struct PingAnswered { uint8_t key[6]; uint32_t at; };
+  PingAnswered _answered[4] = {};
+  struct {                           // the reply waiting to go
+    uint8_t key[6];
+    uint32_t due;                    // 0: none
+    char text[model::TEXT_LEN];
+  } _pong = {};
 };
 
 }  // namespace app

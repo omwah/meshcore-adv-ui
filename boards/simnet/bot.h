@@ -1,5 +1,5 @@
 // A scripted MeshCore companion node for simulations: optionally echoes
-// direct messages back, after a delay.
+// direct messages back, after a delay. Remembers what it last got.
 #pragma once
 #include <stdint.h>
 #include <string>
@@ -23,6 +23,7 @@ public:
   void onDirectMessage(const ContactInfo& from, uint8_t txt_type, uint8_t, float, uint32_t, const uint8_t*, int,
                        const char* text) override {
     received++;
+    lastText = text;
     if (!echo || txt_type != TXT_TYPE_PLAIN) return;
     memcpy(_replyTo, from.id.pub_key, 6);
     _reply = std::string("Got it: ") + text;
@@ -30,6 +31,7 @@ public:
   }
   bool echo = false;
   int received = 0;
+  std::string lastText;   // the last direct message it got
 
 private:
   MyMesh* _mesh = nullptr;

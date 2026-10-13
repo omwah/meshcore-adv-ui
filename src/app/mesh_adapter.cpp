@@ -1,4 +1,5 @@
 #include "app/mesh_adapter.h"
+#include "app/ping_bot.h"
 #include "app/radio_presets.h"
 #include <helpers/AdvertDataHelpers.h>
 #include <helpers/TxtDataHelpers.h>
@@ -353,9 +354,16 @@ bool MeshAdapter::send(model::ThreadId t, const char* text) {
 
   ContactRef c;
   if (!contactAt(t.idx, c)) return false;
+  return sendDirect(c, m);
+}
+
+// A DM, tracked until its ACK (retried if none). `m` holds the text and ts.
+bool MeshAdapter::sendDirect(const ContactRef& c, model::Message& m) {
   Pending* p = newPending();
   if (!p) return false;
 
+  const char* text = m.text;
+  uint32_t ts = m.ts;
   m.status = model::Delivery::Pending;
   uint32_t seq = appendOutgoing(ThreadKey::direct(c.key), m);
   if (!seq) return false;
@@ -396,6 +404,7 @@ void MeshAdapter::loop() {
     configChanged();
   }
   storageTick(ms);
+  pingTick(ms);
 }
 
 // ------------------------------------------------------------------ receiving
@@ -419,6 +428,7 @@ void MeshAdapter::onDirectMessage(const ContactInfo& from, uint8_t txt_type, uin
   }
   snprintf(m.text, sizeof m.text, "%s", text);
   storeDirect(from.id.pub_key, m);
+  if (_ui.pingBot && txt_type == TXT_TYPE_PLAIN && isPing(text)) pingReceived(from, path_len, snr);
 }
 
 void MeshAdapter::onChannelMessage(uint8_t idx, uint8_t path_len, float snr, uint32_t ts, const char* text) {
@@ -437,8 +447,96 @@ void MeshAdapter::onChannelMessage(uint8_t idx, uint8_t path_len, float snr, uin
   storeChannel(idx, m);
 }
 
+// ------------------------------------------------------------------ ping bot
+
+namespace {
+
+// A relay's name, if exactly one repeater or room contact has that hash.
+bool relayName(void* ctx, const uint8_t* hash, int size, char* out, int n) {
+  MyMesh* mesh = (MyMesh*)ctx;
+  ContactInfo c;
+  const char* found = nullptr;
+  char name[sizeof c.name];
+  for (int i = 0; mesh->getContactByIdx(i, c); i++) {
+    if ((c.type != ADV_TYPE_REPEATER && c.type != ADV_TYPE_ROOM) || memcmp(c.id.pub_key, hash, size)) continue;
+    if (found) return false;   // two share it: can't tell which
+    snprintf(name, sizeof name, "%s", c.name);
+    found = name;
+  }
+  if (found) snprintf(out, n, "%s", found);
+  return found != nullptr;
+}
+
+}  // namespace
+
+void MeshAdapter::pingReceived(const ContactInfo& from, uint8_t pathLen, float snr) {
+  uint32_t ms = millis();
+  // One answer per contact every few seconds, whatever it sends.
+  PingAnswered* slot = &_answered[0];
+  for (auto& a : _answered) {
+    if (!memcmp(a.key, from.id.pub_key, 6)) {
+      if (a.at && ms - a.at < PING_QUIET_MS) return;
+      slot = &a;
+      break;
+    }
+    if (a.at < slot->at) slot = &a;   // else reuse the oldest
+  }
+  memcpy(slot->key, from.id.pub_key, 6);
+  slot->at = ms | 1;
+
+  memcpy(_pong.key, from.id.pub_key, 6);
+  if (pathLen == 0xFF) {
+    // Sent by a direct route: the relays used up its path on the way. Ours
+    // to the sender, reversed, is most likely the one it took.
+    uint8_t rev[MAX_PATH_SIZE];
+    uint8_t len = from.out_path_len;
+    if (len != OUT_PATH_UNKNOWN) {
+      int size = (len >> 6) + 1, hops = len & 63;
+      if (hops * size > (int)sizeof rev) hops = sizeof rev / size;
+      for (int h = 0; h < hops; h++) memcpy(rev + h * size, from.out_path + (hops - 1 - h) * size, size);
+      len = (uint8_t)((len & 0xC0) | hops);
+    }
+    formatPong(_pong.text, sizeof _pong.text, len, rev, true, snr, _lastRssi, relayName, _mesh);
+  } else {
+    // The path of this DM's packet, if the one just heard was it.
+    bool known = _dmPath.valid && _dmPath.src == from.id.pub_key[0] && _dmPath.pathLen == pathLen;
+    formatPong(_pong.text, sizeof _pong.text, pathLen, known ? _dmPath.path : nullptr, false, snr, _lastRssi,
+               relayName, _mesh);
+  }
+  _dmPath.valid = false;
+  _pong.due = (ms + PING_DELAY_MS) | 1;   // after MeshCore has finished with the packet
+}
+
+void MeshAdapter::pingTick(uint32_t ms) {
+  if (!_pong.due || (int32_t)(ms - _pong.due) < 0) return;
+  _pong.due = 0;
+  ContactInfo* c = _mesh->lookupContactByPubKey(_pong.key, 6);
+  if (!c || !_ui.pingBot) return;
+  ContactRef r;
+  toRef(*c, r);
+  model::Message m;
+  memset(&m, 0, sizeof m);
+  m.ts = _rtc->getCurrentTimeUnique();
+  m.outgoing = true;
+  m.snr_x4 = INT8_MIN;
+  snprintf(m.text, sizeof m.text, "%s", _pong.text);
+  sendDirect(r, m);
+}
+
 void MeshAdapter::onRawRx(float snr, float rssi, const uint8_t* raw, int len) {
   rawRx(snr, rssi, raw, len, _mesh->self_id.pub_key);
+  // MeshCore hands a packet to us here before decrypting it: if it is a DM,
+  // keep its path for the ping bot (the message hook has only its length).
+  mesh::Packet pkt;
+  if (len > 0 && len <= 255 && pkt.readFrom(raw, (uint8_t)len) && pkt.getPayloadType() == PAYLOAD_TYPE_TXT_MSG &&
+      pkt.payload_len > 1) {
+    int n = pkt.getPathByteLen();
+    if (n > (int)sizeof _dmPath.path) n = sizeof _dmPath.path;
+    _dmPath.src = pkt.payload[1];
+    _dmPath.pathLen = pkt.path_len;
+    memcpy(_dmPath.path, pkt.path, n);
+    _dmPath.valid = true;
+  }
 }
 
 bool MeshAdapter::addHeard(int i) {

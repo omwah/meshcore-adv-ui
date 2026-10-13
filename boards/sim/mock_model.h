@@ -92,6 +92,7 @@ public:
   void setPrefs(const model::Prefs& p) override { _prefs = p; _rev++; }
   bool bleConnected() const override { return _ble; }
   bool bleAvailable() const override { return true; }
+  bool pingBotAvailable() const override { return true; }
   uint32_t bleActivePin() const override { return _prefs.blePinRandom ? 482913 : _prefs.blePin; }
   bool blePairing() const override { return _pairing; }
   void setPairing(bool on) { _pairing = on; _rev++; }

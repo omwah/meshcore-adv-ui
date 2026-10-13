@@ -177,6 +177,7 @@ struct Prefs {
   uint8_t presetIdx;              // index into presets(), 0xFF custom
   TelemMode telemBattery, telemLocation, telemSensors;
   Mode deviceMode;                // takes effect after a restart
+  bool pingBot;                   // answer "ping" DMs with the path they took
 };
 
 struct BackupStatus {
@@ -299,6 +300,7 @@ public:
   virtual bool bleAvailable() const = 0;                  // compiled in
   virtual uint32_t bleActivePin() const = 0;              // the PIN in use since boot
   virtual bool blePairing() const = 0;                    // a phone is connected, not yet authenticated
+  virtual bool pingBotAvailable() const { return false; } // the local node only
 
   // Remote mode (the defaults are for a model without it).
   virtual Mode mode() const { return Mode::Local; }

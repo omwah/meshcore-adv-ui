@@ -233,6 +233,15 @@ public:
       _uiNode->begin();
       return true;
     }
+    if (!strcmp(cmd, "pref")) {   // pref pingbot on|off
+      char what[16] = {}, val[8] = {};
+      sscanf(arg, "%15s %7s", what, val);
+      model::Prefs p = _ui.prefs();
+      if (!strcmp(what, "pingbot")) p.pingBot = !strcmp(val, "on");
+      else { snprintf(err, n, "unknown pref '%s'", what); return true; }
+      _ui.setPrefs(p);
+      return true;
+    }
     if (!strcmp(cmd, "expect")) return expect(arg, err, n);
     if (!strcmp(cmd, "dump")) { dump(); return true; }
     return false;
@@ -312,6 +321,23 @@ private:
     sscanf(arg, "%15s %15s", what, val);
     long want = atol(val);
     long got = -1;
+    if (!strcmp(what, "got")) {   // expect got <node> <text>: the node's last DM contains the text
+      int used = 0;
+      sscanf(arg, "%*15s %*15s %n", &used);
+      auto it = _bots.find(val);
+      if (it == _bots.end()) { snprintf(err, n, "no node '%s'", val); return true; }
+      const std::string& g = it->second.task->lastText;
+      if (!used || !strstr(g.c_str(), arg + used)) snprintf(err, n, "%s last got '%s'", val, g.c_str());
+      return true;
+    }
+    if (!strcmp(what, "dms")) {   // expect dms <node> <n>: direct messages the node has got
+      long want = -1;
+      sscanf(arg, "%*15s %*15s %ld", &want);
+      auto it = _bots.find(val);
+      if (it == _bots.end()) { snprintf(err, n, "no node '%s'", val); return true; }
+      if (it->second.task->received != want) snprintf(err, n, "%s got %d DMs, not %ld", val, it->second.task->received, want);
+      return true;
+    }
     if (!strcmp(what, "contacts")) got = _ui.contactCount();
     else if (!strcmp(what, "unread")) got = _ui.unreadTotal();
     else if (!strcmp(what, "heard")) got = _ui.heardCount();

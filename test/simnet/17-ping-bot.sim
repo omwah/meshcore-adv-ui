@@ -1,0 +1,42 @@
+# The ping bot: a DM that is just "ping" gets a reply naming the path.
+# Carol is out of our range; Hilltop (a stock MeshCore repeater) relays.
+repeater Hilltop 9 hunter2
+node Carol 6
+unlink Cardputer Carol
+link Carol Hilltop 5
+as Hilltop advert
+as Carol advert flood
+wait 6000
+expect contacts 2
+# Flood our advert so Carol learns about us through the repeater.
+key menu
+key down 4
+key enter
+wait 6000
+hold esc 900
+pref pingbot on
+# Carol has no route to us yet: her ping floods, and the path comes with it.
+as Carol dm Card ping
+wait 8000
+expect dms Carol 1
+expect got Carol pong: 1 hop Hilltop, SNR
+# Asked again at once: no second answer for a while.
+as Carol dm Card Ping!
+wait 8000
+expect dms Carol 1
+# Later, by the route Carol has learnt: our stored route, reversed.
+wait 5000
+as Carol dm Card test
+wait 8000
+expect dms Carol 2
+expect got Carol pong: 1 hop Hilltop (stored route)
+# Not a ping, or the bot off: no answer.
+as Carol dm Card ping me
+wait 12000
+pref pingbot off
+as Carol dm Card ping
+wait 8000
+expect dms Carol 2
+key right
+key enter
+shot ping-bot-chat

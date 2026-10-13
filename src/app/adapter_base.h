@@ -32,6 +32,7 @@ struct UiPrefs {
   uint8_t blePinRandom;
   uint8_t deviceMode;            // model::Mode
   uint8_t remoteGps;             // remote mode: this device's GPS on (local mode keeps it in NodePrefs)
+  uint8_t pingBot;               // local mode: answer "ping" DMs
 };
 
 // The mode the device boots in, from the UI prefs on flash (before any

@@ -88,7 +88,12 @@ The Bluetooth build only: the USB-only build has no remote mode.
 - **GPS:**
   - The receiver is off by default.
   - Sharing your position in adverts and setting the clock at boot are separate options, also off by default.
-- **Settings:** node name, theme, brightness, screen timeout, text size, key filter, sound, auto-add, Bluetooth and PIN, factory reset.
+- **Settings:** node name, theme, brightness, screen timeout, text size, key filter, sound, auto-add, ping bot, Bluetooth and PIN, factory reset.
+- **Ping bot** (local node mode, off by default):
+  - A direct message that is just `ping` or `test` gets an automatic reply with the path it took, for example `pong: 2 hops a1>Hilltop, SNR 6.5`.
+  - Relays are named when their hash matches exactly one repeater or room contact.
+  - A DM that came by a direct route has no path left when it arrives, so the reply shows our stored route to the sender, reversed and marked `(stored route)`.
+  - Each contact gets at most one answer every 10 seconds.
 - **Backup & restore to SD:**
   - Automatic backup can be turned on or off.
   - Manual backup and restore, plus restore of the previous backup.

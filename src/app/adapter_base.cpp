@@ -121,6 +121,7 @@ void AdapterBase::uiToPrefs() {
   p.presetIdx = _ui.presetIdx;
   p.blePinRandom = _ui.blePinRandom;
   p.deviceMode = _ui.deviceMode == 1 ? model::Mode::Remote : model::Mode::Local;
+  p.pingBot = _ui.pingBot;
 }
 
 void AdapterBase::prefsToUi(const model::Prefs& p) {
@@ -139,6 +140,7 @@ void AdapterBase::prefsToUi(const model::Prefs& p) {
   _ui.presetIdx = p.presetIdx;
   _ui.blePinRandom = p.blePinRandom;
   _ui.deviceMode = (uint8_t)p.deviceMode;
+  _ui.pingBot = p.pingBot;
 }
 
 void AdapterBase::setUiMuted(int slot, bool muted) {

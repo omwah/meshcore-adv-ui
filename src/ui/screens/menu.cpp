@@ -117,7 +117,7 @@ MainMenu s_menu;
 
 enum SItem { S_HDR_ID, S_NAME, S_MODE, S_REMOTE, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT,
              S_HDR_IN, S_LOCKOUT, S_SOUND,
-             S_HDR_MESH, S_AUTOADD, S_BLE, S_PIN, S_PINMODE,
+             S_HDR_MESH, S_AUTOADD, S_PINGBOT, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
              S_HDR_TELEM, S_TBATT, S_TLOC, S_TENV,
              S_HDR_DANGER, S_FACTORY, S_N };
@@ -172,6 +172,11 @@ protected:
       case S_SOUND: it.label = "Sound"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.sound)); break;
       case S_HDR_MESH: it.label = "MESH & BLUETOOTH"; it.header = true; break;
       case S_AUTOADD: it.label = "Auto-add contacts"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.autoAddContacts)); break;
+      case S_PINGBOT:
+        it.label = "Answer \"ping\" DMs"; it.choice = true;
+        it.enabled = a.m().pingBotAvailable();
+        snprintf(it.value, sizeof it.value, "%s", !it.enabled ? "n/a" : yesNo(p.pingBot));
+        break;
       case S_BLE:
         it.label = "Bluetooth (phone app)"; it.choice = true;
         it.enabled = a.m().bleAvailable();
@@ -285,6 +290,7 @@ protected:
       case S_LOCKOUT: p.inputLockoutMs = (uint16_t)stepIn(kLockouts, p.inputLockoutMs, dir); break;
       case S_SOUND: p.sound = !p.sound; break;
       case S_AUTOADD: p.autoAddContacts = !p.autoAddContacts; break;
+      case S_PINGBOT: p.pingBot = !p.pingBot; break;
       case S_BLE: p.bleEnabled = !p.bleEnabled; break;
       case S_PINMODE:
         p.blePinRandom = !p.blePinRandom;
