@@ -378,6 +378,12 @@ private:
     else if (!strcmp(what, "linked")) got = _ui.bleConnected();   // remote mode: link up (1) or not (0)
     else if (!strcmp(what, "sounds")) got = g_sound.played;
     else if (!strcmp(what, "leds")) got = g_led.bursts;   // LED bursts since the start
+    else if (!strcmp(what, "chanunread")) {   // expect chanunread <slot> <n>: one channel's own count
+      long slot = atol(val), want2 = -1;
+      sscanf(arg, "%*15s %*15s %ld", &want2);
+      got = _ui.unreadIn({model::ThreadKind::Channel, (uint16_t)slot});
+      want = want2;
+    }
     else if (!strcmp(what, "divider")) got = _app ? ui::screens::chatNewCount(*_app) : -1;   // from the "New" line down
     else if (!strcmp(what, "request")) {
       static const char* const st[] = {"idle", "busy", "ok", "failed", "timeout"};

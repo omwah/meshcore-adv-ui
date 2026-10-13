@@ -247,6 +247,7 @@ int AdapterBase::threadCount() const {
   char name[32];
   for (int i = 0; i < _msgs.threadCount(); i++) {
     const ThreadInfo* t = _msgs.thread(i);
+    if (_msgs.hidden(t->key)) continue;   // kept off the chats list
     if (t->key.kind == 1 ? channelName(t->key.id[0], name, sizeof name) && name[0] : contactIndex(t->key.id) >= 0) n++;
   }
   return n;
@@ -257,6 +258,7 @@ bool AdapterBase::thread(int i, model::Thread& out) const {
     const ThreadInfo* t = _msgs.thread(k);
     int ci = -1;
     char chName[32] = "";
+    if (_msgs.hidden(t->key)) continue;
     if (t->key.kind == 0) {
       ci = contactIndex(t->key.id);
       if (ci < 0) continue;
@@ -339,6 +341,26 @@ bool AdapterBase::unreadSince(model::ThreadId t, uint32_t& readSeq) const {
   return true;
 }
 
+bool AdapterBase::threadHidden(model::ThreadId t) const {
+  ThreadKey k;
+  return threadKeyFor(t, k) && _msgs.hidden(k);
+}
+
+void AdapterBase::setThreadHidden(model::ThreadId t, bool on) {
+  ThreadKey k;
+  if (!threadKeyFor(t, k)) return;
+  _msgs.setHidden(k, on);
+  if (on && _msgs.find(k)) _msgs.markRead(k);
+  if (_ui.backupMessages) configChanged();
+  _rev++;
+}
+
+uint16_t AdapterBase::unreadIn(model::ThreadId t) const {
+  ThreadKey k;
+  const ThreadInfo* ti = threadKeyFor(t, k) ? _msgs.find(k) : nullptr;
+  return ti ? ti->unread : 0;
+}
+
 bool AdapterBase::lastMessage(model::ThreadId t, char* out, int n) const {
   ThreadKey k;
   return threadKeyFor(t, k) && _msgs.lastText(k, out, n);
@@ -358,22 +380,28 @@ uint16_t AdapterBase::unreadTotal() const {
   uint32_t n = 0;
   for (int i = 0; i < _msgs.threadCount(); i++) {
     const ThreadInfo* t = _msgs.thread(i);
-    if (t->key.kind == 1 && uiMuted(t->key.id[0])) continue;
+    // Muted channels keep a count of their own (Channels tab), but don't
+    // alert; neither do conversations kept off the chats list.
+    if ((t->key.kind == 1 && uiMuted(t->key.id[0])) || _msgs.hidden(t->key)) continue;
     n += t->unread;
   }
   return n > 0xFFFF ? 0xFFFF : (uint16_t)n;
 }
 
 void AdapterBase::storeDirect(const uint8_t* key, const model::Message& m) {
-  _msgs.append(ThreadKey::direct(key), m);
+  ThreadKey k = ThreadKey::direct(key);
+  _msgs.setHidden(k, false);   // a new message brings a hidden conversation back
+  _msgs.append(k, m);
   if (_ui.backupMessages) configChanged();
   _rev++;
 }
 
 void AdapterBase::storeChannel(uint8_t slot, const model::Message& m) {
   ThreadKey k = ThreadKey::channel(slot);
+  // An unmuted channel kept off the chats list comes back with a new post; a
+  // muted one stays off, counting its posts unread quietly.
+  if (!uiMuted(slot)) _msgs.setHidden(k, false);
   _msgs.append(k, m);
-  if (uiMuted(slot)) _msgs.markRead(k);
   if (_ui.backupMessages) configChanged();
   _rev++;
 }

@@ -47,6 +47,9 @@ public:
   void markRead(model::ThreadId t) override;
   bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
   bool lastMessage(model::ThreadId t, char* out, int n) const override;
+  bool threadHidden(model::ThreadId t) const override;
+  void setThreadHidden(model::ThreadId t, bool on) override;
+  uint16_t unreadIn(model::ThreadId t) const override;
   int loadOlder(model::ThreadId) override { return 0; }   // the mock shows everything at once
   int loadNewer(model::ThreadId) override { return 0; }
   bool atNewest(model::ThreadId) const override { return true; }
@@ -117,7 +120,9 @@ private:
     model::ThreadId id;
     uint16_t unread;
     bool used;
+    bool hidden;                   // kept off the chats list
   };
+  bool chanMuted(int slot) const;
   void addMsg(model::ThreadId t, uint32_t ts, bool out, const char* sender, const char* text,
               int8_t snr_x4, int8_t hops, model::Delivery st);
   ThreadState* threadFor(model::ThreadId t);

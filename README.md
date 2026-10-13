@@ -74,9 +74,10 @@ The Bluetooth build only: the USB-only build has no remote mode.
     the card's copy.
 - **Contact details:**
   - Path, hops, last heard, SNR/RSSI and position.
-  - Actions: favourite, reset path, trace route, ping, remove.
+  - Actions: favourite, reset path, trace route, ping, show in Chats, remove.
 - **Repeater / room admin:** login, status, neighbours, telemetry, clock sync, advert, CLI command.
-- **Channels:** join a `#hashtag` channel, join or create a private one, mute, show the key, leave.
+- **Channels:** join a `#hashtag` channel, join or create a private one, mute, show the key, leave. Muted channels don't alert; their unread count shows, dimmed, on the Channels tab.
+- **Show in Chats:** a DM or channel can be taken off the Chats list without leaving it or losing its history. A new message brings a DM or unmuted channel back; a muted channel stays off until shown again.
 - **Radio:**
   - Community presets, including USA and USA - Southern California.
   - Custom frequency, bandwidth, SF, CR and TX power.

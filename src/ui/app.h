@@ -160,7 +160,7 @@ void drawSignal(Canvas& c, int x, int y, int8_t snr_x4);       // 4 bars, 9x8
 void drawBattery(Canvas& c, int x, int y, uint8_t pct, bool charging, uint8_t fg);  // 14x7
 void drawScrollbar(Canvas& c, const Rect& r, int total, int first, int visible);
 // Unread-count pill ending at xRight; returns its left edge.
-int drawBadge(App& a, int xRight, int y, unsigned n);
+int drawBadge(App& a, int xRight, int y, unsigned n, uint8_t col = C_BADGE);
 uint8_t typeColor(model::NodeType t);
 const uint8_t* typeIcon(model::NodeType t);
 void fmtAgo(char* out, size_t n, uint32_t now, uint32_t ts);    // "3m", "2h", "5d"

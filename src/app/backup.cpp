@@ -23,6 +23,7 @@ const Entry kFiles[] = {
     {"/ui/prefs.bin", Entry::Always},
     {"/ui/msgs.bin", Entry::Messages},
     {"/ui/read.bin", Entry::Messages},
+    {"/ui/hidden.bin", Entry::Messages},
 };
 
 bool allowed(const char* path) {

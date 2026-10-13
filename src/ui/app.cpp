@@ -515,12 +515,12 @@ void drawScrollbar(Canvas& c, const Rect& r, int total, int first, int visible) 
   c.fillRect(x, ty, 2, th, C_ACCENT);
 }
 
-int drawBadge(App& a, int xRight, int y, unsigned n) {
+int drawBadge(App& a, int xRight, int y, unsigned n, uint8_t col) {
   char b[8];
   snprintf(b, sizeof b, n > 99 ? "99+" : "%u", n);
   int w = Canvas::textWidth(b, a.fSmall()) + 6;
   int x = xRight - w;
-  a.canvas().pill(x, y, w, a.fSmall()->height + 2, C_BADGE);
+  a.canvas().pill(x, y, w, a.fSmall()->height + 2, col);
   a.canvas().text(x + 3, y + 1, b, a.fSmall(), C_HTXT);
   return x;
 }

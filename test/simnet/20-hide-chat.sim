@@ -1,0 +1,81 @@
+# Taking a DM or a channel off the Chats list without leaving it: a new
+# message brings a DM or an unmuted channel back; a muted channel stays off,
+# counting its posts quietly (shown on the Channels tab).
+# both-modes
+node Bob 7.5
+node Kim 7
+as Bob advert
+as Kim advert
+wait 3000
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+as Bob dm Cardputer hello
+wait 3000
+as Kim chan 0 first post
+wait 3000
+expect threads 2
+expect sounds 2
+# Bob's screen (People, Tab): Show in Chats, just above Clear history.
+key right
+type bob
+key tab
+key down 20
+key up 2
+shot hide-contact-item
+key enter
+expect threads 1
+hold esc 900
+# A new DM brings it back, with the usual alert.
+as Bob dm Cardputer back again
+wait 3000
+expect threads 2
+expect sounds 3
+# The channel's screen (Channels, Tab): Show in Chats is its last item
+# (Public can't be left).
+key right 3
+key tab
+key down 20
+key enter
+expect threads 1
+hold esc 900
+as Kim chan 0 second post
+wait 3000
+expect threads 2
+expect sounds 4
+# Muted and hidden: it stays off; its count shows on the Channels tab only.
+key right 3
+key tab
+key down
+key enter
+key down 20
+key enter
+expect threads 1
+hold esc 900
+as Kim chan 0 quiet post
+wait 3000
+expect threads 1
+expect sounds 4
+expect chanunread 0 1
+key right 3
+shot hide-channels-tab
+# Still off after a restart.
+reboot
+wait 3000
+expect threads 1
+expect chanunread 0 1
+# Only Bob's unread DM counts in the header.
+expect unread 1
+hold esc 900
+# Opened from the Channels tab: the post is there; then back in Chats.
+key right 3
+key enter
+expect last quiet post
+expect chanunread 0 0
+key tab
+key down 20
+key enter
+hold esc 900
+expect threads 2

@@ -69,6 +69,9 @@ public:
   void markRead(model::ThreadId t) override;
   bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
   bool lastMessage(model::ThreadId t, char* out, int n) const override;
+  bool threadHidden(model::ThreadId t) const override;
+  void setThreadHidden(model::ThreadId t, bool on) override;
+  uint16_t unreadIn(model::ThreadId t) const override;
   int loadOlder(model::ThreadId t) override;
   int loadNewer(model::ThreadId t) override;
   bool atNewest(model::ThreadId t) const override;

@@ -173,7 +173,7 @@ MockModel::ThreadState* MockModel::threadFor(ThreadId t) {
   for (auto& s : _threads)
     if (s.used && s.id == t) return &s;
   for (auto& s : _threads)
-    if (!s.used) { s.used = true; s.id = t; s.unread = 0; return &s; }
+    if (!s.used) { s.used = true; s.id = t; s.unread = 0; s.hidden = false; return &s; }
   return &_threads[0];
 }
 
@@ -301,8 +301,34 @@ void MockModel::setMuted(int i, bool muted) {
 
 int MockModel::threadCount() const {
   int n = 0;
-  for (auto& s : _threads) n += s.used;
+  for (auto& s : _threads) n += s.used && !s.hidden;
   return n;
+}
+
+bool MockModel::chanMuted(int slot) const {
+  for (int c = 0; c < _nChannels; c++)
+    if (_channels[c].idx == slot) return _channels[c].muted;
+  return false;
+}
+
+bool MockModel::threadHidden(ThreadId t) const {
+  for (auto& s : _threads)
+    if (s.used && s.id == t) return s.hidden;
+  return false;
+}
+
+void MockModel::setThreadHidden(ThreadId t, bool on) {
+  ThreadState* s = threadFor(t);
+  if (!s) return;
+  s->hidden = on;
+  if (on) s->unread = 0;
+  _rev++;
+}
+
+uint16_t MockModel::unreadIn(ThreadId t) const {
+  for (auto& s : _threads)
+    if (s.used && s.id == t) return s.unread;
+  return 0;
 }
 
 bool MockModel::thread(int i, Thread& out) const {
@@ -310,7 +336,7 @@ bool MockModel::thread(int i, Thread& out) const {
   int order[MAX_T], n = 0;
   uint32_t last[MAX_T];
   for (int k = 0; k < MAX_T; k++) {
-    if (!_threads[k].used) continue;
+    if (!_threads[k].used || _threads[k].hidden) continue;
     uint32_t ts = 0;
     for (int j = 0; j < _nMsgs; j++)
       if (_msgs[j].t == _threads[k].id && _msgs[j].m.ts > ts) ts = _msgs[j].m.ts;
@@ -400,7 +426,7 @@ void MockModel::markRead(ThreadId t) {
 uint16_t MockModel::unreadTotal() const {
   uint16_t n = 0;
   for (auto& s : _threads)
-    if (s.used) n += s.unread;
+    if (s.used && !s.hidden && !(s.id.kind == ThreadKind::Channel && chanMuted(s.id.idx))) n += s.unread;
   return n;
 }
 
@@ -412,12 +438,14 @@ bool MockModel::send(ThreadId t, const char* text) {
 void MockModel::rxDirect(int c, const char* text) {
   ThreadId t{ThreadKind::Direct, (uint16_t)c};
   addMsg(t, now(), false, "", text, 20, _contacts[c].hops, Delivery::None);
+  threadFor(t)->hidden = false;
   threadFor(t)->unread++;
 }
 
 void MockModel::rxChannel(int slot, const char* sender, const char* text) {
   ThreadId t{ThreadKind::Channel, (uint16_t)slot};
   addMsg(t, now(), false, sender, text, -6, 2, Delivery::None);
+  if (!chanMuted(slot)) threadFor(t)->hidden = false;
   threadFor(t)->unread++;
 }
 

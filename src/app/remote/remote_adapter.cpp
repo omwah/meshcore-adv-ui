@@ -1245,15 +1245,17 @@ bool RemoteAdapter::backupNow() {
   ns.multiAcks = _self.multiAcks;
   ns.pathHashMode = _dev.pathHashMode;
   ns.repeat = _dev.repeat;
-  Backup::Section sec[7];
+  Backup::Section sec[8];
   int n = 0;
   // This node's message history, streamed from flash, if asked for.
-  char msgsPath[32], readPath[32];
+  char msgsPath[32], readPath[32], hiddenPath[32];
   snprintf(msgsPath, sizeof msgsPath, "/ui/%s-msgs.bin", _histTag);
   snprintf(readPath, sizeof readPath, "/ui/%s-read.bin", _histTag);
+  snprintf(hiddenPath, sizeof hiddenPath, "/ui/%s-hidden.bin", _histTag);
   if (_ui.backupMessages) {
     sec[n++] = {msgsPath, nullptr, 0, _fs};
     sec[n++] = {readPath, nullptr, 0, _fs};
+    if (_fs->exists(hiddenPath)) sec[n++] = {hiddenPath, nullptr, 0, _fs};
   }
   sec[n++] = {"node", (const uint8_t*)&ns, sizeof ns};
   sec[n++] = {"channels", (const uint8_t*)_chans, (uint32_t)(_maxChans * sizeof(Chan))};
@@ -1283,11 +1285,13 @@ bool RemoteAdapter::readBackupSection(void* ctx, const char* name, File& f, uint
     a._nContacts = count;
   } else if (!strcmp(name, "identity") && len == 64) {
     a._rs.haveKey = f.read(a._rs.key, 64) == 64;
-  } else if (!strncmp(name, "/ui/r", 5) && (strstr(name, "-msgs.bin") || strstr(name, "-read.bin"))) {
+  } else if (!strncmp(name, "/ui/r", 5) &&
+             (strstr(name, "-msgs.bin") || strstr(name, "-read.bin") || strstr(name, "-hidden.bin"))) {
     // Message history: to this node's files (the backup may be from a node
     // with another address).
     char path[32];
-    snprintf(path, sizeof path, "/ui/%s%s", a._histTag, strstr(name, "-msgs.bin") ? "-msgs.bin" : "-read.bin");
+    const char* suffix = strstr(name, "-msgs.bin") ? "-msgs.bin" : strstr(name, "-read.bin") ? "-read.bin" : "-hidden.bin";
+    snprintf(path, sizeof path, "/ui/%s%s", a._histTag, suffix);
     File out = a._fs->open(path, "w", true);
     if (!out) return false;
     uint8_t buf[256];

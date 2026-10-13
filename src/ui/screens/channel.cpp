@@ -55,7 +55,7 @@ TextScreen s_text;
 
 // ------------------------------------------------------------- channel
 
-enum ChItem { CH_OPEN, CH_MUTE, CH_KEY, CH_CLEAR, CH_REMOVE, CH_N };
+enum ChItem { CH_OPEN, CH_MUTE, CH_KEY, CH_CLEAR, CH_SHOW, CH_REMOVE, CH_N };
 
 int findChannel(App& a, int idx, model::Channel& out) {
   for (int i = 0, n = a.m().channelCount(); i < n; i++)
@@ -101,6 +101,13 @@ protected:
       case CH_MUTE: it.label = "Muted"; it.choice = true; snprintf(it.value, sizeof it.value, ch.muted ? "yes" : "no"); it.valueCol = ch.muted ? C_WARN : C_DIM; break;
       case CH_KEY: it.label = "Show key"; break;
       case CH_CLEAR: it.label = "Clear history"; break;
+      case CH_SHOW: {
+        bool shown = !a.m().threadHidden({model::ThreadKind::Channel, (uint16_t)chIdx});
+        it.label = "Show in Chats"; it.choice = true;
+        snprintf(it.value, sizeof it.value, "%s", shown ? "yes" : "no");
+        it.valueCol = shown ? C_DIM : C_WARN;
+        break;
+      }
       case CH_REMOVE: it.label = "Leave channel"; it.enabled = chIdx != 0; break;
     }
   }
@@ -111,7 +118,8 @@ protected:
     if (li < 0) return;
     switch (i) {
       case CH_OPEN: openThread(a, {model::ThreadKind::Channel, (uint16_t)chIdx}); break;
-      case CH_MUTE: adjust(a, i, 1); break;
+      case CH_MUTE:
+      case CH_SHOW: adjust(a, i, 1); break;
       case CH_KEY: {
         static char body[96];
         uint8_t k[16];
@@ -139,6 +147,15 @@ protected:
   }
 
   void adjust(App& a, int i, int) override {
+    if (i == CH_SHOW) {
+      model::ThreadId t{model::ThreadKind::Channel, (uint16_t)chIdx};
+      bool hide = !a.m().threadHidden(t);
+      a.m().setThreadHidden(t, hide);
+      model::Channel ch;
+      bool muted = findChannel(a, chIdx, ch) >= 0 && ch.muted;
+      a.toast(!hide ? "Back in Chats" : muted ? "Off Chats: open it from Channels" : "Off Chats until a new post");
+      return;
+    }
     if (i != CH_MUTE) return;
     model::Channel ch;
     int li = findChannel(a, chIdx, ch);

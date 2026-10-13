@@ -173,9 +173,12 @@ private:
     char ts[12];
     fmtAgo(ts, sizeof ts, a.m().now(), t.lastTs);
     int rx = Canvas::W - 6 - Canvas::textWidth(ts, sm);
-    c.text(rx, y + 1 + (f->height - sm->height) / 2, ts, sm, t.unread ? C_BADGE : C_DIM);
+    // A muted channel's count waits quietly: dimmed.
+    bool alerting = t.unread && !t.muted;
+    c.text(rx, y + 1 + (f->height - sm->height) / 2, ts, sm, alerting ? C_BADGE : C_DIM);
     int tx = Canvas::W - 4;
-    if (t.unread) tx = drawBadge(a, Canvas::W - 5, line2 + (f->height - sm->height - 2) / 2, t.unread) - 2;
+    if (t.unread)
+      tx = drawBadge(a, Canvas::W - 5, line2 + (f->height - sm->height - 2) / 2, t.unread, alerting ? C_BADGE : C_DIM) - 2;
     int ix = rx - 10;
     if (t.muted) { c.bitmap(ix, iy, icon::mute, 8, 8, C_DIM); ix -= 10; }
     if (t.favourite) { c.bitmap(ix, iy, icon::star, 8, 8, C_WARN); ix -= 10; }
@@ -226,15 +229,9 @@ private:
     const int iy = y + (rowH - 8) / 2;
     c.bitmap(4, iy, ch.hashtag ? icon::hash : icon::lock, 8, 8, C_CHAN);
     int x = Canvas::W - 6;
-    // Unread from the matching thread.
-    model::ThreadId tid{model::ThreadKind::Channel, ch.idx};
-    for (int t = 0, n = a.m().threadCount(); t < n; t++) {
-      model::Thread th;
-      if (a.m().thread(t, th) && th.id == tid && th.unread) {
-        x = drawBadge(a, x, y + (rowH - a.fSmall()->height - 2) / 2, th.unread) - 3;
-        break;
-      }
-    }
+    // Unread, also for muted channels (dimmed) and ones kept off Chats.
+    uint16_t unread = a.m().unreadIn({model::ThreadKind::Channel, ch.idx});
+    if (unread) x = drawBadge(a, x, y + (rowH - a.fSmall()->height - 2) / 2, unread, ch.muted ? C_DIM : C_BADGE) - 3;
     if (ch.muted) { x -= 10; c.bitmap(x, iy, icon::mute, 8, 8, C_DIM); }
     a.fitText(c, 16, y + (rowH - a.fList()->height) / 2, ch.name, a.fList(), C_TEXT, x - 20, sel);
   }

@@ -255,6 +255,12 @@ public:
   virtual bool unreadSince(ThreadId t, uint32_t& readSeq) const { (void)t; (void)readSeq; return false; }
   // The thread's last message in full (its preview may be cut short).
   virtual bool lastMessage(ThreadId t, char* out, int n) const = 0;
+  // Kept off the chats list (history and membership stay). A new message
+  // brings a DM or unmuted channel back; a muted channel stays off.
+  virtual bool threadHidden(ThreadId t) const = 0;
+  virtual void setThreadHidden(ThreadId t, bool on) = 0;
+  // Unread messages in one conversation (muted and hidden ones included).
+  virtual uint16_t unreadIn(ThreadId t) const = 0;
   // message() shows a window of a conversation: slide it to older or newer
   // messages; each returns how many came in (0 = no more that way).
   virtual int loadOlder(ThreadId t) = 0;

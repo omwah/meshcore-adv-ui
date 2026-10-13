@@ -75,16 +75,19 @@ bool MessageStore::begin(fs::FS* fs, const char* tag) {
   if (tag && tag[0]) {
     snprintf(_file, sizeof _file, "/ui/%s-msgs.bin", tag);
     snprintf(_readFile, sizeof _readFile, "/ui/%s-read.bin", tag);
+    snprintf(_hiddenFile, sizeof _hiddenFile, "/ui/%s-hidden.bin", tag);
     snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history/%s", tag);
   } else {
     snprintf(_file, sizeof _file, "/ui/msgs.bin");
     snprintf(_readFile, sizeof _readFile, "/ui/read.bin");
+    snprintf(_hiddenFile, sizeof _hiddenFile, "/ui/hidden.bin");
     snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history");
   }
   _nThreads = 0;
   _nextSeq = 1;
   _fs->mkdir("/ui");
   loadRead();
+  loadHidden();
   File f = _fs->open(_file, "r");
   if (f) {
     Rec r;
@@ -461,9 +464,45 @@ void MessageStore::loadRead() {
   f.close();
 }
 
+bool MessageStore::hidden(const ThreadKey& k) const {
+  for (int i = 0; i < _nHidden; i++)
+    if (_hidden[i] == k) return true;
+  return false;
+}
+
+void MessageStore::setHidden(const ThreadKey& k, bool on) {
+  if (hidden(k) == on) return;
+  if (on) {
+    if (_nHidden == MAX_HIDDEN) {   // full: the oldest entry goes
+      memmove(_hidden, _hidden + 1, sizeof(_hidden[0]) * (MAX_HIDDEN - 1));
+      _nHidden--;
+    }
+    _hidden[_nHidden++] = k;
+  } else {
+    int w = 0;
+    for (int i = 0; i < _nHidden; i++)
+      if (!(_hidden[i] == k)) _hidden[w++] = _hidden[i];
+    _nHidden = w;
+  }
+  File f = _fs->open(_hiddenFile, "w", true);
+  if (!f) return;
+  f.write((const uint8_t*)_hidden, sizeof(_hidden[0]) * _nHidden);
+  f.close();
+}
+
+void MessageStore::loadHidden() {
+  _nHidden = 0;
+  File f = _fs->open(_hiddenFile, "r");
+  if (!f) return;
+  while (_nHidden < MAX_HIDDEN && f.read((uint8_t*)&_hidden[_nHidden], sizeof(ThreadKey)) == sizeof(ThreadKey)) _nHidden++;
+  f.close();
+}
+
 void MessageStore::wipe() {
   _fs->remove(_file);
   _fs->remove(_readFile);
+  _fs->remove(_hiddenFile);
+  _nHidden = 0;
   _nThreads = 0;
   _nCache = 0;
   _nextSeq = 1;

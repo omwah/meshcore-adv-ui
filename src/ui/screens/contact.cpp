@@ -20,7 +20,7 @@ void fmtPos(char* out, size_t n, int32_t lat, int32_t lon) {
 
 // ------------------------------------------------------------- contact
 
-enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_FORGETPW, CI_CLEAR, CI_REMOVE, CI_N };
+enum CItem { CI_MESSAGE, CI_ADMIN, CI_DETAILS, CI_FAV, CI_TBATT, CI_TLOC, CI_TENV, CI_PATH, CI_TRACE, CI_PING, CI_FORGETPW, CI_SHOW, CI_CLEAR, CI_REMOVE, CI_N };
 
 class ContactScreen : public MenuScreen {
 public:
@@ -141,6 +141,14 @@ protected:
       case CI_TRACE: it.label = "Trace route"; break;
       case CI_PING: it.label = "Ping"; break;
       case CI_FORGETPW: it.label = "Forget saved password"; it.enabled = a.m().hasSavedPassword(idx); break;
+      case CI_SHOW: {
+        bool talks = ct.type != model::NodeType::Repeater && ct.type != model::NodeType::Sensor;
+        bool shown = !a.m().threadHidden({model::ThreadKind::Direct, (uint16_t)idx});
+        it.label = "Show in Chats"; it.choice = true; it.enabled = talks;
+        snprintf(it.value, sizeof it.value, "%s", shown ? "yes" : "no");
+        it.valueCol = shown ? C_DIM : C_WARN;
+        break;
+      }
       case CI_CLEAR: it.label = "Clear history"; break;
       case CI_REMOVE: it.label = "Remove contact"; it.valueCol = C_ERR; break;
     }
@@ -162,6 +170,7 @@ protected:
         break;
       }
       case CI_FAV:
+      case CI_SHOW:
       case CI_TBATT:
       case CI_TLOC:
       case CI_TENV: adjust(a, i, 1); break;
@@ -199,6 +208,12 @@ protected:
     model::Contact ct;
     if (!a.m().contact(idx, ct)) return;
     if (i == CI_FAV) a.m().setFavourite(idx, !ct.favourite);
+    else if (i == CI_SHOW) {
+      model::ThreadId t{model::ThreadKind::Direct, (uint16_t)idx};
+      bool hide = !a.m().threadHidden(t);
+      a.m().setThreadHidden(t, hide);
+      a.toast(hide ? "Off Chats until a new message" : "Back in Chats");
+    }
     else if (i >= CI_TBATT && i <= CI_TENV) a.m().setTelemetry(idx, (uint8_t)(ct.telemetry ^ (1 << (i - CI_TBATT))));
   }
 

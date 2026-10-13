@@ -41,6 +41,7 @@ public:
 #endif
   static constexpr int CAPACITY = MSG_RING_RECORDS;   // records kept on flash (512: ~108 KB)
   static constexpr int MAX_THREADS = 40;
+  static constexpr int MAX_HIDDEN = 32;
   static constexpr int CACHE = 24;         // messages of the open conversation in RAM
   static constexpr int PAGE = 12;          // messages loaded per step back or forward
 
@@ -65,6 +66,9 @@ public:
   void markRead(const ThreadKey& k);
   uint16_t unreadTotal() const;
   void forget(const ThreadKey& k);                // drop a thread (contact/channel removed)
+  // Conversations kept off the chats list (history and membership stay).
+  bool hidden(const ThreadKey& k) const;
+  void setHidden(const ThreadKey& k, bool on);
 
   // The open conversation: a window of up to CACHE messages, oldest first.
   void open(const ThreadKey& k);
@@ -94,14 +98,17 @@ private:
   void sortThreads();
   void saveRead();
   void loadRead();
+  void loadHidden();
 
   fs::FS* _fs = nullptr;
   fs::FS* _sd = nullptr;
-  char _file[32] = "/ui/msgs.bin", _readFile[32] = "/ui/read.bin";
+  char _file[32] = "/ui/msgs.bin", _readFile[32] = "/ui/read.bin", _hiddenFile[32] = "/ui/hidden.bin";
   char _archDir[48] = "/meshcore-adv-ui/history";
   uint32_t _nextSeq = 1;
   ThreadInfo _threads[MAX_THREADS];
   int _nThreads = 0;
+  ThreadKey _hidden[MAX_HIDDEN];
+  int _nHidden = 0;
   ThreadKey _open{};
   bool _hasOpen = false;
   model::Message _cache[CACHE];

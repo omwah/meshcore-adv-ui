@@ -8,10 +8,11 @@ key enter
 wait 1600
 shot contact-trace
 key esc
-key down 2
+# Ping, Show in Chats, Clear history
+key down 3
 key enter
 shot contact-remove-confirm
 key esc
-key up 7
+key up 8
 key down 3
 shot contact-telemetry
