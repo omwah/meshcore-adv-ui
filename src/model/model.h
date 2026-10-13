@@ -183,6 +183,7 @@ struct Prefs {
   Mode deviceMode;                // takes effect after a restart
   bool pingBot;                   // answer "ping" DMs with the path they took
   NotifyMode notify;              // what a new message does
+  bool shortPreview;              // chats list: scroll only the stored preview, not the whole message
 };
 
 struct BackupStatus {
@@ -252,6 +253,8 @@ public:
   // Unread messages in `t`: true, with `readSeq` the seq of the last one read
   // (messages after it are new).
   virtual bool unreadSince(ThreadId t, uint32_t& readSeq) const { (void)t; (void)readSeq; return false; }
+  // The thread's last message in full (its preview may be cut short).
+  virtual bool lastMessage(ThreadId t, char* out, int n) const = 0;
   // message() shows a window of a conversation: slide it to older or newer
   // messages; each returns how many came in (0 = no more that way).
   virtual int loadOlder(ThreadId t) = 0;

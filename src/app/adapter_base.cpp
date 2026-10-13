@@ -122,6 +122,7 @@ void AdapterBase::uiToPrefs() {
   p.blePinRandom = _ui.blePinRandom;
   p.deviceMode = _ui.deviceMode == 1 ? model::Mode::Remote : model::Mode::Local;
   p.pingBot = _ui.pingBot;
+  p.shortPreview = _ui.shortPreview;
   p.notify = _ui.notifyMode <= 3 ? (model::NotifyMode)_ui.notifyMode : model::NotifyMode::Led;
 }
 
@@ -143,6 +144,7 @@ void AdapterBase::prefsToUi(const model::Prefs& p) {
   _ui.deviceMode = (uint8_t)p.deviceMode;
   _ui.pingBot = p.pingBot;
   _ui.notifyMode = (uint8_t)p.notify;
+  _ui.shortPreview = p.shortPreview;
 }
 
 void AdapterBase::setUiMuted(int slot, bool muted) {
@@ -335,6 +337,11 @@ bool AdapterBase::unreadSince(model::ThreadId t, uint32_t& readSeq) const {
   if (!ti || !ti->unread) return false;
   readSeq = ti->readSeq;
   return true;
+}
+
+bool AdapterBase::lastMessage(model::ThreadId t, char* out, int n) const {
+  ThreadKey k;
+  return threadKeyFor(t, k) && _msgs.lastText(k, out, n);
 }
 
 void AdapterBase::markRead(model::ThreadId t) {

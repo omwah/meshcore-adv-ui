@@ -367,6 +367,18 @@ void MockModel::clearHistory(ThreadId t) {
   _rev++;
 }
 
+bool MockModel::lastMessage(ThreadId t, char* out, int n) const {
+  for (int j = _nMsgs - 1; j >= 0; j--) {
+    if (!(_msgs[j].t == t)) continue;
+    const Message& m = _msgs[j].m;
+    if (m.outgoing) snprintf(out, n, "You: %s", m.text);
+    else if (m.sender[0] && t.kind == ThreadKind::Channel) snprintf(out, n, "%s: %s", m.sender, m.text);
+    else snprintf(out, n, "%s", m.text);
+    return true;
+  }
+  return false;
+}
+
 bool MockModel::unreadSince(ThreadId t, uint32_t& readSeq) const {
   int unread = 0;
   for (auto& s : _threads)

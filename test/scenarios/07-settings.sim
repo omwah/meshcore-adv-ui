@@ -15,7 +15,9 @@ shot settings-theme-amber
 key right 3
 shot settings-theme-daylight
 key left 4
-key down 6
+key down 4
+shot settings-chat-preview
+key down 3
 shot settings-mid
 key right
 shot settings-new-message

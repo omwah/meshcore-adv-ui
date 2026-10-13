@@ -57,7 +57,7 @@ The Bluetooth build only: the USB-only build has no remote mode.
 ## Screens
 
 - **Home** has four tabs:
-  - Chats: conversations, unread first by recency.
+  - Chats: conversations, unread first by recency. The selected chat's last message scrolls by in full (Settings > Chat preview: "short" scrolls only its first 44 characters).
   - Contacts.
   - Nodes: repeaters, rooms and sensors.
   - Channels.
@@ -89,7 +89,7 @@ The Bluetooth build only: the USB-only build has no remote mode.
 - **GPS:**
   - The receiver is off by default.
   - Sharing your position in adverts and setting the clock at boot are separate options, also off by default.
-- **Settings:** node name, theme, brightness, screen timeout, text size, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and PIN, factory reset.
+- **Settings:** node name, theme, brightness, screen timeout, text size, chat preview, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and PIN, factory reset.
 - **New-message alert:** a 2-second burst of colours on the RGB LED with the screen left off (the default, easiest on the battery), the screen turning on, both, or neither. The chime follows the Sound setting either way. Enter on the setting previews the colours. The LED runs on the backlight's power, so the screen glows briefly while it flashes.
 - **Ping bot** (local node mode, off by default):
   - A direct message that is just `ping` or `test` gets an automatic reply with the path it took, for example `pong: 2 hops a1>Hilltop, SNR 6.5`.

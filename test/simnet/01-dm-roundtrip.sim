@@ -24,3 +24,9 @@ expect threads 1
 # Bob's reply arrived while the chat was open: still one chime for it.
 expect sounds 1
 dump
+# A long message: the chats list has all of it (its stored preview is cut short).
+hold esc 900
+as Bob dm Card Meet at the trailhead at 9, then up the ridge road to the Hilltop repeater; bring water.
+wait 3000
+expect lastmsg up the ridge road to the Hilltop repeater; bring water.
+shot net-chats-long

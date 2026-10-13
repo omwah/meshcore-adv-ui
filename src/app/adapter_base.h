@@ -34,6 +34,7 @@ struct UiPrefs {
   uint8_t remoteGps;             // remote mode: this device's GPS on (local mode keeps it in NodePrefs)
   uint8_t pingBot;               // local mode: answer "ping" DMs
   uint8_t notifyMode;            // model::NotifyMode (0: LED only)
+  uint8_t shortPreview;          // 0: chats list scrolls the whole last message
 };
 
 // The mode the device boots in, from the UI prefs on flash (before any
@@ -67,6 +68,7 @@ public:
   bool message(model::ThreadId t, int i, model::Message& out) const override;
   void markRead(model::ThreadId t) override;
   bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
+  bool lastMessage(model::ThreadId t, char* out, int n) const override;
   int loadOlder(model::ThreadId t) override;
   int loadNewer(model::ThreadId t) override;
   bool atNewest(model::ThreadId t) const override;

@@ -54,6 +54,9 @@ public:
   bool setStatus(uint32_t seq, model::Delivery st, uint8_t retries);
   bool setRepeats(uint32_t seq, uint8_t repeats);
   bool text(uint32_t seq, char* out, int n);
+  // A thread's last message in full, as its preview reads ("You: ",
+  // "sender: "), from flash.
+  bool lastText(const ThreadKey& k, char* out, int n);
   bool ackOf(uint32_t seq, uint32_t& ack);
 
   int threadCount() const { return _nThreads; }

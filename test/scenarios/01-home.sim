@@ -13,3 +13,9 @@ shot home-find
 key esc
 key esc
 shot home-esc-twice-stays
+# A long message: the selected chat's preview scrolls to its very end.
+rx dm 0 Meet at the trailhead at 9, then up the ridge road to the Hilltop repeater; bring water and a spare battery.
+wait 200
+shot home-chats-long
+wait 25000
+shot home-chats-long-end

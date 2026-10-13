@@ -352,6 +352,16 @@ private:
       if (!used || !strstr(g.c_str(), arg + used)) snprintf(err, n, "%s last got '%s'", val, g.c_str());
       return true;
     }
+    if (!strcmp(what, "lastmsg")) {   // expect lastmsg <text>: the first chat's last message, in full, ends so
+      const char* want = arg + strlen("lastmsg");
+      while (*want == ' ') want++;
+      model::Thread t;
+      char full[model::TEXT_LEN + 40] = "";
+      if (!_ui.thread(0, t) || !_ui.lastMessage(t.id, full, sizeof full)) { snprintf(err, n, "no chats"); return true; }
+      size_t fl = strlen(full), wl = strlen(want);
+      if (fl < wl || strcmp(full + fl - wl, want)) snprintf(err, n, "last message is '%s'", full);
+      return true;
+    }
     if (!strcmp(what, "dms")) {   // expect dms <node> <n>: direct messages the node has got
       long want = -1;
       sscanf(arg, "%*15s %*15s %ld", &want);

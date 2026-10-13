@@ -180,7 +180,19 @@ private:
     if (t.muted) { c.bitmap(ix, iy, icon::mute, 8, 8, C_DIM); ix -= 10; }
     if (t.favourite) { c.bitmap(ix, iy, icon::star, 8, 8, C_WARN); ix -= 10; }
     a.fitText(c, 17, y + 1, t.title, f, C_TEXT, ix - 19, sel);
-    a.fitText(c, 17, line2, t.preview, f, sel ? C_TEXT : C_DIM, tx - 21, sel);
+    const char* preview = t.preview;
+    if (sel && !a.m().prefs().shortPreview) {
+      // The selected chat scrolls through its whole last message (the
+      // stored preview is cut short): read it once per change.
+      uint32_t rev = a.m().revision();
+      if (!(_fullId == t.id) || rev != _fullRev) {
+        _fullId = t.id;
+        _fullRev = rev;
+        if (!a.m().lastMessage(t.id, _full, sizeof _full)) snprintf(_full, sizeof _full, "%s", t.preview);
+      }
+      preview = _full;
+    }
+    a.fitText(c, 17, line2, preview, f, sel ? C_TEXT : C_DIM, tx - 21, sel);
   }
 
   void drawContact(App& a, Canvas& c, int y, int rowH, int i, bool sel) {
@@ -303,6 +315,9 @@ private:
   uint16_t _order[MAX_ORDER];
   int _n = 0;
   uint32_t _builtRev = ~0u;
+  char _full[model::TEXT_LEN + 40];   // the selected chat's last message, in full
+  model::ThreadId _fullId{model::ThreadKind::Direct, 0xFFFF};
+  uint32_t _fullRev = 0;
 };
 
 HomeScreen s_home;

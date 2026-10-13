@@ -46,6 +46,7 @@ public:
   bool message(model::ThreadId t, int i, model::Message& out) const override;
   void markRead(model::ThreadId t) override;
   bool unreadSince(model::ThreadId t, uint32_t& readSeq) const override;
+  bool lastMessage(model::ThreadId t, char* out, int n) const override;
   int loadOlder(model::ThreadId) override { return 0; }   // the mock shows everything at once
   int loadNewer(model::ThreadId) override { return 0; }
   bool atNewest(model::ThreadId) const override { return true; }

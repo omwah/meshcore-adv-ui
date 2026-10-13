@@ -224,6 +224,14 @@ bool MessageStore::text(uint32_t seq, char* out, int n) {
   return true;
 }
 
+bool MessageStore::lastText(const ThreadKey& k, char* out, int n) {
+  const ThreadInfo* t = find(k);
+  Rec r;
+  if (!t || !readRec(t->lastSeq % CAPACITY, r) || r.seq != t->lastSeq) return false;
+  snprintf(out, n, "%s%s%s%s", t->lastOut ? "You: " : "", r.sender, r.sender[0] ? ": " : "", r.text);
+  return true;
+}
+
 bool MessageStore::ackOf(uint32_t seq, uint32_t& ack) {
   Rec r;
   if (!readRec(seq % CAPACITY, r) || r.seq != seq) return false;
