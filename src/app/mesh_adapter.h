@@ -8,6 +8,7 @@
 #pragma once
 #include <stdint.h>
 #include "MyMesh.h"
+#include "AbstractUITask.h"
 #include "app/adapter_base.h"
 
 namespace app {
@@ -22,8 +23,9 @@ public:
   void begin(MyMesh& mesh, DataStore& store, mesh::RTCClock& rtc, fs::FS& fs, bool bleBuilt, bool freshInstall);
 
   // ---- AbstractUITask (called by MyMesh) ----
-  void msgRead(int) override {}
-  void newMsg(uint8_t, const char*, const char*, int) override {}
+  void onMessageRecv(mesh::Packet*, const ContactInfo&, uint8_t, uint32_t, const char*) override {}
+  void onChannelMessageRecv(mesh::Packet*, ChannelDetails&, const char*) override {}
+  void onQueueSizeChanged(int) override {}
   void notify(UIEventType) override { _rev++; }
   void loop() override;   // retries, request timeouts
   void onDirectMessage(const ContactInfo& from, uint8_t txt_type, uint8_t path_len, float snr,

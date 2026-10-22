@@ -87,6 +87,7 @@ public:
 
 class SimBoard : public mesh::MainBoard {
 public:
+  template <typename T> void attachDynamicPrefs(T*) {} // host has no board-specific persistent prefs
   uint16_t battMv = 3950;
   uint16_t getBattMilliVolts() override { return battMv; }
   const char* getManufacturerName() const override { return "Simulator"; }

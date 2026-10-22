@@ -125,6 +125,7 @@ uint32_t MeshAdapter::choosePinForBoot() {
   } else {
     _activePin = _prefs.blePin ? _prefs.blePin : 123456;
   }
+  _mesh->setBLEPin(_activePin);  // keep MeshCore's reported PIN in sync with the BLE interface
   return _activePin;
 }
 
@@ -637,7 +638,7 @@ bool MeshAdapter::sendCommand(int ci, const char* cmd) {
   if (!requestIdle()) return false;
   ContactInfo* c = contactPtr(ci);
   uint32_t est = 0;
-  if (!c || _mesh->sendCommandData(*c, _rtc->getCurrentTimeUnique(), 0, cmd, est) == MSG_SEND_FAILED) return false;
+  if (!c || _mesh->sendCommandData(*c, _rtc->getCurrentTimeUnique(), 0, TXT_TYPE_CLI_DATA, cmd, est) == MSG_SEND_FAILED) return false;
   return startRequest(ReqKind::Cli, ci, est);
 }
 

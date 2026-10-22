@@ -33,7 +33,7 @@ void SimNode::select() {
 void SimNode::begin() {
   select();
   _store->begin();
-  _mesh->begin(false);
+  _mesh->begin();
   NodePrefs* p = _mesh->getNodePrefs();
   snprintf(p->node_name, sizeof p->node_name, "%s", _name.c_str());
   _mesh->savePrefs();

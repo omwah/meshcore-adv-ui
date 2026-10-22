@@ -10,8 +10,9 @@ class BotTask : public AbstractUITask {
 public:
   BotTask(mesh::MainBoard* b, MultiSerialInterface* i) : AbstractUITask(b, i) {}
   void attach(MyMesh* m, mesh::RTCClock* rtc) { _mesh = m; _rtc = rtc; }
-  void msgRead(int) override {}
-  void newMsg(uint8_t, const char*, const char*, int) override {}
+  void onMessageRecv(mesh::Packet*, const ContactInfo&, uint8_t, uint32_t, const char*) override {}
+  void onChannelMessageRecv(mesh::Packet*, ChannelDetails&, const char*) override {}
+  void onQueueSizeChanged(int) override {}
   void notify(UIEventType) override {}
   void loop() override {
     if (!_due || millis() < _due) return;

@@ -106,7 +106,8 @@ void setup() {
 
   bool fresh = !SPIFFS.exists("/identity/_main.id");
   store.begin();
-  the_mesh.begin(true);
+  the_mesh.begin();
+  the_mesh.setListener(&adapter);
 
   adapter.begin(the_mesh, store, rtc_clock, SPIFFS, kBleBuilt, fresh);
   ui_app = new (ui_storage) ui::App(adapter, display, keyboard, &sound);

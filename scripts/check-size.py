@@ -17,7 +17,7 @@ BUDGETS = {
     # Bluetooth over NimBLE (2026-10-11): 1296 -> 915 KB and 127 -> 113 KB
     # static RAM against stock's Bluedroid. Room left for BLE client mode.
     "cardputer_adv": (1_000_000, 120_000),       # stock BLE companion is ~1.25 MB
-    "cardputer_adv_usb": (720_000, 108_000),     # stock USB companion is ~0.64 MB
+    "cardputer_adv_usb": (740_000, 108_000),     # MeshCore 1.18 adds dynamic prefs/CLI (~7 KB over old cap)
 }
 
 

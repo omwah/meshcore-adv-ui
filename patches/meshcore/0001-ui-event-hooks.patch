@@ -1,6 +1,6 @@
-diff -ruN a/examples/companion_radio/AbstractUITask.h b/examples/companion_radio/AbstractUITask.h
---- a/examples/companion_radio/AbstractUITask.h	2026-08-14 05:19:19.000000000 -0700
-+++ b/examples/companion_radio/AbstractUITask.h	2026-10-11 16:26:06.479072296 -0700
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/AbstractUITask.h b/examples/companion_radio/AbstractUITask.h
+--- a/examples/companion_radio/AbstractUITask.h	2026-10-15 01:42:40.000000000 -0700
++++ b/examples/companion_radio/AbstractUITask.h	2026-10-21 20:56:04.309099400 -0700
 @@ -5,6 +5,7 @@
  #include <helpers/ui/UIScreen.h>
  #include <helpers/SensorManager.h>
@@ -9,8 +9,8 @@ diff -ruN a/examples/companion_radio/AbstractUITask.h b/examples/companion_radio
  #include <Arduino.h>
  
  #ifdef PIN_BUZZER
-@@ -43,4 +44,20 @@
-   virtual void newMsg(uint8_t path_len, const char* from_name, const char* text, int msgcount) = 0;
+@@ -40,4 +41,20 @@
+ 
    virtual void notify(UIEventType t = UIEventType::none) = 0;
    virtual void loop() = 0;
 +
@@ -30,10 +30,16 @@ diff -ruN a/examples/companion_radio/AbstractUITask.h b/examples/companion_radio
 +  virtual void onPathResponse(const ContactInfo& from, uint8_t in_path_len, uint8_t out_path_len, uint8_t extra_type,
 +                              const uint8_t* extra, uint8_t extra_len) { }   // a returned path (e.g. path discovery)
  };
-diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
---- a/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:06.524787638 -0700
-+++ b/examples/companion_radio/MyMesh.cpp	2026-10-11 16:26:06.479622876 -0700
-@@ -284,6 +284,7 @@
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
+--- a/examples/companion_radio/MyMesh.cpp	2026-10-21 20:57:39.673171677 -0700
++++ b/examples/companion_radio/MyMesh.cpp	2026-10-21 20:57:37.372795234 -0700
+@@ -1,4 +1,5 @@
+ #include "MyMesh.h"
++#include "AbstractUITask.h"
+ 
+ #include <Arduino.h> // needed for PlatformIO
+ #ifdef ENABLE_WIFI_INTERFACE
+@@ -289,6 +290,7 @@
  }
  
  void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
@@ -41,15 +47,15 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
    if (_serial->isConnected() && len + 3 <= MAX_FRAME_SIZE) {
      int i = 0;
      out_frame[i++] = PUSH_CODE_LOG_RX_DATA;
-@@ -412,6 +413,7 @@
+@@ -415,6 +417,7 @@
  }
  
  ContactInfo*  MyMesh::processAck(const uint8_t *data) {
 +  if (_ui) _ui->onAckReceived(data);
-   // see if matches any in a table
-   for (int i = 0; i < EXPECTED_ACK_TABLE_SIZE; i++) {
-     if (memcmp(data, &expected_ack_table[i].ack, 4) == 0) { // got an ACK from recipient
-@@ -457,6 +459,7 @@
+   if (_listener) {
+     uint32_t ack_crc;
+     memcpy(&ack_crc, data, 4);
+@@ -465,6 +468,7 @@
    memcpy(&out_frame[i], text, tlen);
    i += tlen;
    addToOfflineQueue(out_frame, i);
@@ -57,15 +63,15 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
  
    if (_serial->isConnected()) {
      uint8_t frame[1];
-@@ -568,6 +571,7 @@
-   memcpy(&out_frame[i], text, tlen);
-   i += tlen;
-   addToOfflineQueue(out_frame, i);
+@@ -587,6 +591,7 @@
+     frame[0] = PUSH_CODE_MSG_WAITING; // send push 'tickle'
+     _serial->writeFrame(frame, 1);
+   }
 +  if (_ui) _ui->onChannelMessage(channel_idx, path_len, pkt->getSNR(), timestamp, text);
- 
-   if (_serial->isConnected()) {
-     uint8_t frame[1];
-@@ -674,6 +678,7 @@
+   if (_listener) {
+     // Get the channel name from the channel index
+     ChannelDetails channel_details;
+@@ -688,6 +693,7 @@
  }
  
  void MyMesh::onContactResponse(const ContactInfo &contact, const uint8_t *data, uint8_t len) {
@@ -73,7 +79,7 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
    uint32_t tag;
    memcpy(&tag, data, 4);
  
-@@ -748,6 +753,7 @@
+@@ -777,6 +783,7 @@
  }
  
  bool MyMesh::onContactPathRecv(ContactInfo& contact, uint8_t* in_path, uint8_t in_path_len, uint8_t* out_path, uint8_t out_path_len, uint8_t extra_type, uint8_t* extra, uint8_t extra_len) {
@@ -81,7 +87,7 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
    if (extra_type == PAYLOAD_TYPE_RESPONSE && extra_len > 4) {
      uint32_t tag;
      memcpy(&tag, extra, 4);
-@@ -779,6 +785,7 @@
+@@ -808,6 +815,7 @@
  }
  
  void MyMesh::onControlDataRecv(mesh::Packet *packet) {
@@ -89,7 +95,7 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
    if (packet->payload_len + 4 > sizeof(out_frame)) {
      MESH_DEBUG_PRINTLN("onControlDataRecv(), payload_len too long: %d", packet->payload_len);
      return;
-@@ -821,6 +828,7 @@
+@@ -855,6 +863,7 @@
  void MyMesh::onTraceRecv(mesh::Packet *packet, uint32_t tag, uint32_t auth_code, uint8_t flags,
                           const uint8_t *path_snrs, const uint8_t *path_hashes, uint8_t path_len) {
    uint8_t path_sz = flags & 0x03;  // NEW v1.11+
@@ -97,3 +103,43 @@ diff -ruN a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMes
    if (12 + path_len + (path_len >> path_sz) + 1 > sizeof(out_frame)) {
      MESH_DEBUG_PRINTLN("onTraceRecv(), path_len is too long: %d", (uint32_t)path_len);
      return;
+@@ -897,9 +906,9 @@
+ 
+ void MyMesh::onSendTimeout() {}
+ 
+-MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store)
++MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store, AbstractUITask* ui)
+     : BaseChatMesh(radio, *new ArduinoMillis(), rng, rtc, *new StaticPoolPacketManager(16), tables),
+-      _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store), _listener(NULL), _iter(0) {
++      _serial(NULL), telemetry(MAX_PACKET_PAYLOAD - 4), _store(&store), _listener(NULL), _ui(ui), _iter(0) {
+   _iter_started = false;
+   _cli_rescue = false;
+   cli_command[0] = 0;
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.h b/examples/companion_radio/MyMesh.h
+--- a/examples/companion_radio/MyMesh.h	2026-10-21 20:57:39.673570532 -0700
++++ b/examples/companion_radio/MyMesh.h	2026-10-21 20:56:04.342777391 -0700
+@@ -2,6 +2,7 @@
+ 
+ #include <Arduino.h>
+ #include <Mesh.h>
++class AbstractUITask;
+ 
+ /*------------ Frame Protocol --------------*/
+ #define FIRMWARE_VER_CODE 14
+@@ -108,7 +109,7 @@
+       virtual ~Listener() { }
+   };
+ 
+-  MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store);
++  MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMeshTables &tables, DataStore& store, AbstractUITask* ui = NULL);
+ 
+   void begin();
+   void startInterface(BaseSerialInterface &serial);
+@@ -261,6 +262,7 @@
+   uint32_t pending_req;   // pending _BINARY_REQ
+   BaseSerialInterface *_serial;
+   Listener* _listener;
++  AbstractUITask* _ui;
+ 
+   ContactsIterator _iter;
+   uint32_t _iter_filter_since;

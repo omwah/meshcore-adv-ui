@@ -5,6 +5,7 @@
 #include <LittleFS.h>
 #include <helpers/SimpleMeshTables.h>
 #include "MyMesh.h"
+#include "AbstractUITask.h"
 #include "sim_net.h"
 
 class NullSerial : public BaseSerialInterface {
