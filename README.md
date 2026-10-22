@@ -21,6 +21,23 @@ can be added as new board directories.
   - Pending keys are discarded when the screen changes.
   - The key filter (debounce) is adjustable in Settings.
 
+## Screenshots
+
+Captured from the scripted mock-mesh simulator at 2× scale. Names and messages
+are example data, not real contacts. The device display is 240 × 135 pixels.
+
+| Chats | Direct messages |
+|---|---|
+| ![Chats tab with unread conversations](docs/screenshots/home-chats.png) | ![Direct-message conversation with delivery and signal details](docs/screenshots/chat-dm.png) |
+| **Inline reply** | **Channel conversation** |
+| ![Composing an inline reply](docs/screenshots/chat-compose.png) | ![Public channel with incoming messages](docs/screenshots/channel.png) |
+| **Contact details** | **Radio diagnostics** |
+| ![Contact details and actions](docs/screenshots/contact-detail.png) | ![Radio diagnostics](docs/screenshots/diagnostics.png) |
+| **Amber theme** | |
+| ![Settings in the Amber theme](docs/screenshots/amber-theme.png) | |
+
+Generate the full screenshot gallery locally with `pixi run shots` (`shots/index.html`).
+
 ## Remote node mode
 
 The Cardputer can also be the keyboard and screen of another MeshCore node
