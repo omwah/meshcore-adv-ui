@@ -78,4 +78,16 @@ int emojiMatch(const mc_emoji_t* e, const char* s, int* glyph) {
   return 0;
 }
 
+void emojiDecode(const mc_emoji_t* e, int glyph, int rows, uint8_t* out) {
+  const uint8_t* in = e->bitmaps + e->offs[glyph];
+  int left = rows * e->w;
+  while (left > 0) {
+    int run = (*in >> 4) + 1;
+    const uint8_t v = *in++ & 15;
+    if (run > left) run = left;
+    left -= run;
+    while (run--) *out++ = v;
+  }
+}
+
 }  // namespace ui

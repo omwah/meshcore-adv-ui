@@ -61,8 +61,9 @@ _STD = {
 # Colour emoji per profile. `sizes` maps each Spleen font to the bitmap size its
 # emoji are drawn from and the integer scale they are drawn at, or None for a
 # size too small to show them (a matched emoji then takes one replacement
-# glyph's place). `bytes` caps the bitmaps of all native sizes together (the
-# emoji of a tier are taken in order until it is spent); None for no cap.
+# glyph's place). `bytes` caps the bitmaps of all native sizes together, counted
+# before run-length coding (the emoji of a tier are taken in order until it is
+# spent); None for no cap. Coding roughly halves what is stored.
 # The 24-row font reuses the 12 px art at 2x on the Cardputer: its native art
 # would cost more than the other sizes together.
 _SIZES_SCALED = {"font_small": None, "font_medium": (12, 1), "font_large": (16, 1), "font_xlarge": (12, 2)}
@@ -70,7 +71,7 @@ _SIZES_NATIVE = {"font_small": None, "font_medium": (12, 1), "font_large": (16, 
 EMOJI = {
     "none": None,
     "min": {"tiers": ["core"], "sizes": _SIZES_SCALED, "bytes": None},
-    "std": {"tiers": ["core", "common"], "sizes": _SIZES_NATIVE, "bytes": 150000},
+    "std": {"tiers": ["core", "common"], "sizes": _SIZES_NATIVE, "bytes": 240000},
 }
 
 PROFILES = {

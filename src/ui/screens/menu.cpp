@@ -1,4 +1,5 @@
 // Main menu, Settings, Radio and Backup.
+#include "gen/unicode_cfg.h"
 #include "ui/screens/screens.h"
 #include "ui/widgets.h"
 #include "ui/tz.h"
@@ -99,7 +100,7 @@ protected:
         a.m().selfKey(k);
         snprintf(body, sizeof body,
                  "MeshMash\nKeyboard-native MeshCore\n\nNode: %s\nKey: %02X%02X%02X%02X...\n\n"
-                 "Firmware " MC_UI_VERSION "\nMIT licensed.",
+                 "Firmware " MC_UI_VERSION "\nUnicode: " MC_UNICODE_PROFILE "\nMIT licensed.",
                  a.m().prefs().nodeName, k[0], k[1], k[2], k[3]);
         openText(a, "About", body);
         break;

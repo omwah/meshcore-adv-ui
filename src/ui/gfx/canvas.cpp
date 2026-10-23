@@ -213,7 +213,7 @@ static Elem nextElem(const mc_font_t* f, const char* s) {
       return el;
     }
   }
-  if (layered) {
+  if (layered && cp >= 0x80) {          // nothing below U+0080 is invisible or a flag letter
     if (invisible(cp)) return el;
     if (cp >= 0x1F1E6 && cp <= 0x1F1FF) cp = 'A' + (cp - 0x1F1E6);   // a flag we lack shows its letters
   }
@@ -317,6 +317,29 @@ void Canvas::textScrolled(int x, int y, const char* s, const mc_font_t* f, uint8
   _cx0 = c0; _cx1 = c1; _cy0 = r0; _cy1 = r1;
 }
 
+// Lay the sprites over rows [y0, y0 + n) of the line buffer. A glyph is run
+// length coded, so it is decoded once for the whole band, down to the last row
+// the band needs, not once per row.
+void Canvas::composeEmoji(bool bigEndian, int y0, int n) {
+  uint8_t px[24 * 24];                               // the largest glyph, one byte a pixel
+  for (int i = 0; i < _nspr; i++) {
+    const Sprite& sp = _spr[i];
+    const int ya = sp.vy0 > y0 ? sp.vy0 : y0, yb = sp.vy1 < y0 + n ? sp.vy1 : y0 + n;
+    if (ya >= yb) continue;
+    const mc_emoji_t* e = sp.e;
+    const int rows = (yb - 1 - sp.y) / e->scale + 1;   // glyph rows the band reaches
+    emojiDecode(e, sp.glyph, rows, px);
+    for (int y = ya; y < yb; y++) {
+      const uint8_t* src = &px[((y - sp.y) / e->scale) * e->w];
+      uint16_t* out = &s_line[(y - y0) * W];
+      for (int x = sp.vx0; x < sp.vx1; x++) {
+        const uint8_t v = src[(x - sp.x) / e->scale];
+        if (v) out[x] = bigEndian ? (uint16_t)((e->pal[v] >> 8) | (e->pal[v] << 8)) : e->pal[v];
+      }
+    }
+  }
+}
+
 void Canvas::flush(hal::Display& d, const uint16_t palette[16], bool force) {
   uint16_t pal[16];
   for (int i = 0; i < 16; i++)
@@ -343,20 +366,10 @@ void Canvas::flush(hal::Display& d, const uint16_t palette[16], bool force) {
         out[2 * i] = pal[row[i] >> 4];
         out[2 * i + 1] = pal[row[i] & 15];
       }
-      for (int i = 0; i < _nspr; i++) {
-        const Sprite& sp = _spr[i];
-        if (y < sp.vy0 || y >= sp.vy1) continue;
-        const mc_emoji_t* e = sp.e;
-        const uint8_t* g = e->bitmaps + sp.glyph * emojiGlyphBytes(e);
-        const int sy = (y - sp.y) / e->scale;
-        for (int x = sp.vx0; x < sp.vx1; x++) {
-          uint8_t px = emojiPixel(g, e, (x - sp.x) / e->scale, sy);
-          if (px) out[x] = d.bigEndian() ? (uint16_t)((e->pal[px] >> 8) | (e->pal[px] << 8)) : e->pal[px];
-        }
-      }
       n++;
     }
     if (bandStart >= 0 && (!dirty || n == BAND || y == H - 1)) {
+      composeEmoji(d.bigEndian(), bandStart, n);
       d.pushRows(bandStart, n, s_line);
       bandStart = -1;
       n = 0;

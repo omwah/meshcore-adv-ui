@@ -410,6 +410,32 @@ void test_emoji_flush_composites_colour_over_the_framebuffer() {
   TEST_ASSERT_EQUAL_HEX16(kPal[0], shown(0, 0));                            // the corner is transparent
 }
 
+void test_emoji_decode_run_length_streams() {
+  // 4x2: [1 1 1 2 / 0 0 3 3] as runs (3,1) (1,2) (2,0) (2,3), then a second
+  // glyph 4x2 [5 5 5 5 / 5 5 5 5] as one run of eight crossing the row end
+  // (two runs of at most 16: here 8 = (8,5)).
+  static const uint8_t rle[] = {0x21, 0x02, 0x10, 0x13,   0x75};
+  static const uint16_t offs[] = {0, 4, 5};
+  static const uint16_t pal[16] = {};
+  static const mc_emoji_t e = {4, 2, 1, pal, rle, offs, nullptr};
+  uint8_t px[8];
+  emojiDecode(&e, 0, 2, px);
+  static const uint8_t want0[] = {1, 1, 1, 2, 0, 0, 3, 3};
+  TEST_ASSERT_EQUAL_MEMORY(want0, px, 8);
+  emojiDecode(&e, 1, 2, px);
+  static const uint8_t want1[] = {5, 5, 5, 5, 5, 5, 5, 5};
+  TEST_ASSERT_EQUAL_MEMORY(want1, px, 8);
+  memset(px, 9, sizeof px);
+  emojiDecode(&e, 0, 1, px);                               // only the first row is written
+  TEST_ASSERT_EQUAL_MEMORY(want0, px, 4);
+  TEST_ASSERT_EQUAL(9, px[4]);
+  // A run longer than the rows asked for is cut there, not past the buffer.
+  memset(px, 9, sizeof px);
+  emojiDecode(&e, 1, 1, px);
+  TEST_ASSERT_EQUAL(5, px[3]);
+  TEST_ASSERT_EQUAL(9, px[4]);
+}
+
 void test_emoji_are_centred_with_a_margin() {
   // Faces fill their cell, hands and symbols are small, flags are wide: each
   // must still sit in the middle of its 16 px cell with room on every side, or
@@ -562,6 +588,7 @@ int main(int, char**) {
   RUN_TEST(test_emoji_bare_text_characters_stay_text);
   RUN_TEST(test_emoji_elements_have_double_width_and_invisibles_none);
   RUN_TEST(test_emoji_flush_composites_colour_over_the_framebuffer);
+  RUN_TEST(test_emoji_decode_run_length_streams);
   RUN_TEST(test_emoji_are_centred_with_a_margin);
   RUN_TEST(test_emoji_is_covered_by_later_drawing);
   RUN_TEST(test_emoji_respects_the_clip);

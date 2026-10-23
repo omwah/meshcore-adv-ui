@@ -89,6 +89,7 @@ private:
     const mc_emoji_t* e;
   };
   void cover(int x0, int y0, int x1, int y1);   // something was drawn over this
+  void composeEmoji(bool bigEndian, int y0, int n);
 
   Sprite _spr[MC_MAX_EMOJI];
   int _nspr = 0;

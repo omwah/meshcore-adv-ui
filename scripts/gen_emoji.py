@@ -4,7 +4,7 @@ Reads Noto Color Emoji (a CBDT bitmap font, SIL OFL 1.1), finds each sequence
 of the chosen tiers (scripts/emoji_set.py) through its cmap and `ccmp`
 ligatures, scales the bitmap to the emoji size of each Spleen size, quantizes
 all of a size's glyphs to one shared 15-colour palette (index 0 is
-transparent) and writes 4bpp tables (ui/gfx/emoji.h). Needs Pillow and
+transparent) and writes run-length coded tables (ui/gfx/font.h). Needs Pillow and
 fontTools, which the pixi environment has.
 """
 import io
@@ -166,11 +166,17 @@ def indexed(im, pal):
 
 
 def bitmap_bytes(rows):
-    """Rows of indices (0..15) -> 4bpp bytes, row after row, high nibble first."""
+    """Rows of indices (0..15) -> run-length bytes: (run - 1) << 4 | pixel, runs of
+    1..16 that cross row ends. See ui/gfx/font.h."""
     flat = [v for r in rows for v in r]
-    if len(flat) % 2:
-        flat.append(0)
-    return [(flat[i] << 4) | flat[i + 1] for i in range(0, len(flat), 2)]
+    out, i = [], 0
+    while i < len(flat):
+        n = 1
+        while i + n < len(flat) and flat[i + n] == flat[i] and n < 16:
+            n += 1
+        out.append(((n - 1) << 4) | flat[i])
+        i += n
+    return out
 
 
 def rgb565(c):
@@ -185,7 +191,7 @@ def generate(emoji, font_path, out):
     ef = EmojiFont(font_path)
     sizes = emoji["sizes"]
     natives = sorted({px for v in sizes.values() if v for px in [v[0]]})
-    per = sum((px * px + 1) // 2 for px in natives)       # bytes a glyph costs at every native size
+    per = sum((px * px + 1) // 2 for px in natives)       # raw bytes a glyph would cost at every native size
     toks = [t for t in emoji_set.tokens(emoji["tiers"]) if ef.glyph(t)]
     dropped = len(emoji_set.tokens(emoji["tiers"])) - len(toks)
     if emoji["bytes"]:
@@ -219,25 +225,35 @@ def generate(emoji, font_path, out):
     for px in natives:
         ims = [scaled(p, px) for p in pngs]
         pal = shared_palette(ims)
-        bits = []
+        bits, offs = [], []
         for im in ims:
+            offs.append(len(bits))
             bits.extend(bitmap_bytes(indexed(im, pal)))
-        total += len(bits) + 32
+        offs.append(len(bits))
+        if len(bits) > 0xFFFF:
+            raise SystemExit(f"gen_emoji: {px}x{px} emoji need {len(bits)} bytes, past what 16-bit offsets "
+                             f"reach; drop a tier or lower the byte cap")
+        total += len(bits) + 2 * len(offs) + 32
         body.append(f"static const uint16_t emoji_pal_{px}[16] = {{0, "
                     + ", ".join("0x%04x" % rgb565(c) for c in pal) + "};")
         body.append(f"static const uint8_t emoji_bits_{px}[] = {{")
         for i in range(0, len(bits), 24):
             body.append("    " + ",".join("0x%02x" % b for b in bits[i:i + 24]) + ",")
         body.append("};")
-        lines.append(f"  {px}x{px}: {len(bits)} bytes of bitmaps, {len(pal)}-colour palette")
+        body.append(f"static const uint16_t emoji_offs_{px}[] = {{")
+        for i in range(0, len(offs), 16):
+            body.append("    " + ",".join(str(o) for o in offs[i:i + 16]) + ",")
+        body.append("};")
+        lines.append(f"  {px}x{px}: {len(bits)} bytes of run-length bitmaps (+{2 * len(offs)} of offsets), "
+                     f"{len(pal)}-colour palette")
     body.append("")
     for sym, v in sizes.items():
         if v:
             px, sc = v
             body.append(f"const mc_emoji_t {sym}_emoji = {{{px}, {px}, {sc}, emoji_pal_{px}, "
-                        f"emoji_bits_{px}, &emoji_seqs}};")
+                        f"emoji_bits_{px}, emoji_offs_{px}, &emoji_seqs}};")
         else:
-            body.append(f"const mc_emoji_t {sym}_emoji = {{0, 0, 1, 0, 0, &emoji_seqs}};")
+            body.append(f"const mc_emoji_t {sym}_emoji = {{0, 0, 1, 0, 0, 0, &emoji_seqs}};")
     with open(out, "w") as f:
         f.write("\n".join(body) + "\n")
     total += len(cps) * 4 + len(tab) * 6 + 16
