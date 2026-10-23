@@ -11,6 +11,9 @@
 # Generated sources (fonts etc.)
 /src/gen/
 
+# Verified upstream downloads (scripts/fetch_assets.py)
+/.cache/
+
 # Simulator state and captures (may contain keys/backups)
 /sim-data/
 /shots/

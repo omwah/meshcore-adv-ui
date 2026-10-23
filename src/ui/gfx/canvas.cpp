@@ -73,6 +73,13 @@ void Canvas::bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c, 
       }
 }
 
+void Canvas::bitmapWide(int x, int y, const uint8_t* rows, int w, int h, uint8_t c) {
+  const int stride = (w + 7) / 8;
+  for (int r = 0; r < h; r++)
+    for (int i = 0; i < w; i++)
+      if (rows[r * stride + i / 8] & (0x80 >> (i & 7))) pixel(x + i, y + r, c);
+}
+
 uint32_t utf8Next(const char** sp) {
   const uint8_t* s = (const uint8_t*)*sp;
   uint32_t c = *s++;

@@ -23,6 +23,7 @@ pkg-config = "*"
 [tasks]
 deps     = "scripts/prepare-deps.sh"
 fonts    = "python -I scripts/gen_fonts.py"
+icons    = "python -I scripts/gen_icons.py"
 sim      = { cmd = "pio run -e sim -e sim_tdeck", depends-on = ["deps"] }
 test     = { cmd = "pio test -e test -e test_tdeck -e simnet_test", depends-on = ["deps"] }
 simnet   = { cmd = "pio run -e simnet", depends-on = ["deps"] }

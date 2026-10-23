@@ -39,6 +39,8 @@ public:
   // 1bpp bitmap, `w` <= 8 per row byte, MSB left; transparent background.
   // `scale` draws each bit as a scale x scale block.
   void bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c, int scale = 1);
+  // Same for any width: ceil(w/8) bytes per row, MSB left.
+  void bitmapWide(int x, int y, const uint8_t* rows, int w, int h, uint8_t c);
 
   // UTF-8 text. Returns the x just past the last glyph drawn. bg < 0 is
   // transparent. maxw > 0 clips with an ellipsis when the text is wider.

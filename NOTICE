@@ -22,5 +22,11 @@ This project includes or derives from the following third-party work:
 * Spleen bitmap fonts by Frederic Cambus (BSD 2-Clause), fonts/spleen-*.bdf.
   See fonts/LICENSE.spleen.
 
+* Material Symbols Rounded by Google (Apache License 2.0), source of the
+  shortcut-bar icons in src/ui/icons_nav.h (chat_bubble, person, hub, tag,
+  tune; outlined, weight 400; google/material-design-icons @ 10ecc14). The
+  SVG outlines are rasterized to 1bpp bitmaps by scripts/gen_icons.py; that
+  conversion is the only change. See licenses/Apache-2.0.txt.
+
 * MeshCore (MIT), used unmodified as a git submodule in external/MeshCore with
   local patches in patches/meshcore/.

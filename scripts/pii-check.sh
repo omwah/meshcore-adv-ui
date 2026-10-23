@@ -27,7 +27,7 @@ bad() { printf 'pii-check: %s: %s\n' "$1" "$2" >&2; fail=1; }
 
 for f in "${files[@]}"; do
     case "$f" in
-        external/*|fonts/*.bdf|licenses/*|pixi.lock) continue ;;   # vendored / tool-generated
+        external/*|fonts/*.bdf|licenses/*|pixi.lock|scripts/assets.lock) continue ;;   # vendored / hash lockfiles
         scripts/pii-check.sh) continue ;;                           # its own patterns
         platformio.local.ini|*.backup.bin|sim-data/*|shots/*) bad "$f" "file type must never be committed"; continue ;;
     esac

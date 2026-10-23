@@ -1,0 +1,9 @@
+# Pinned upstream assets: name  sha256  url   (see scripts/fetch_assets.py)
+#
+# Material Symbols Rounded, outlined (FILL 0), weight 400, 24 px. Apache-2.0,
+# google/material-design-icons @ 10ecc14. Converted to 1bpp by gen_icons.py.
+ms_chat_bubble.svg  5323668b977357f7b5379fd1e8b073375b0a5d12c6351e10694308d4c2d5c9d7  https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/chat_bubble/materialsymbolsrounded/chat_bubble_24px.svg
+ms_person.svg  b60e9574bc2566ea0e72710cd40e4f61a00449130bdc258c0a1006af6857d727  https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/person/materialsymbolsrounded/person_24px.svg
+ms_hub.svg  2943c260885f3777145671f4d5f449bdb5fc791996943276a23392d460e91175  https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/hub/materialsymbolsrounded/hub_24px.svg
+ms_tag.svg  54e9cc5fbf0944764980c771519713ca9a8255e15c2b53f5bade2e91c210793c  https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/tag/materialsymbolsrounded/tag_24px.svg
+ms_tune.svg  2e153083c6847581bb13980e84f2ca1e05048407b68dc9b96c409b1678e8eacb  https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/tune/materialsymbolsrounded/tune_24px.svg

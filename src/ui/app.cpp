@@ -1,5 +1,6 @@
 #include "ui/app.h"
 #include "ui/icons.h"
+#include "ui/icons_nav.h"
 #include "ui/keynames.h"
 #include "ui/widgets.h"
 #include "ui/screens/screens.h"
@@ -240,7 +241,7 @@ bool App::showBar() { return hasTouch() && !top()->fullscreen() && !top()->textM
 #if MC_TOUCH
 void App::drawShortcutBar() {
   static const char* const kLabel[screens::SC_COUNT] = {"Chats", "Contacts", "Nodes", "Channels", "Menu"};
-  static const uint8_t* const kIcon[screens::SC_COUNT] = {icon::envelope, icon::person, icon::repeater, icon::hash, icon::menu};
+  const int IC = 20;
   const int y = Canvas::H - BAR_H;
   const mc_font_t* f = &font_small;
   _c.fillRect(0, y, Canvas::W, BAR_H, C_HEAD);
@@ -257,7 +258,7 @@ void App::drawShortcutBar() {
     bool on = i == showing;
     if (on) _c.fillRect(x + 1, y + 2, w - 2, BAR_H - 2, C_SEL);
     uint8_t col = on ? C_ACCENT : C_HTXT;
-    _c.bitmap(x + (w - 16) / 2, y + 4, kIcon[i], 8, 8, col, 2);
+    _c.bitmapWide(x + (w - IC) / 2, y + 3, icon::nav20[i], IC, IC, col);
     int lw = Canvas::textWidth(kLabel[i], f);
     _c.text(x + (w - lw) / 2, y + BAR_H - f->height - 2, kLabel[i], f, on ? C_TEXT : C_DIM);
     unsigned n = i == screens::SC_CHATS ? _m.unreadTotal() : i == screens::SC_CHANNELS ? chanUnread : 0;

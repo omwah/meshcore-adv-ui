@@ -1,0 +1,12 @@
+# T-Deck shortcut bar: each tab selected in turn (the others show the normal
+# state), for checking the Material Symbols icons. Buttons are 64 wide.
+vim on
+shot navbar-chats
+tap 96 223
+shot navbar-contacts
+tap 160 223
+shot navbar-nodes
+tap 224 223
+shot navbar-channels
+tap 288 223
+shot navbar-menu
