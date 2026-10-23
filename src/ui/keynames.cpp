@@ -4,10 +4,10 @@
 namespace ui {
 
 #ifdef MC_BOARD_TDECK
-// T-Deck: Alt is Esc, Sym+Space is Tab, Sym+Mic is Menu, Sym+Shift h/j/k/l
+// T-Deck: Alt is Esc, Sym+Space is Tab, Sym+Enter is Menu, Sym+Shift h/j/k/l
 // are the arrows.
 static const char* const kNames[][2] = {
-  {"opt", "sym+mic"},
+  {"opt", "sym+ent"},
   {"esc", "alt"},
   {"tab", "sym+spc"},
   {"fn", "sym+sh"},

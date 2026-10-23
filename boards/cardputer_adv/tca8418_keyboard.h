@@ -7,7 +7,7 @@
 extern "C" {
 #include "keymap/cardputer_keymap.h"
 }
-#include "keymap/report_diff.h"
+#include "report_diff.h"
 
 class Tca8418Keyboard : public hal::Keyboard {
 public:

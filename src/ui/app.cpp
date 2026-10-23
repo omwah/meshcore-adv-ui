@@ -475,7 +475,9 @@ void App::drawPairing() {
   _c.text(x + 6, y + 8 + f->height, "Enter this PIN on the phone:", fSmall(), C_DIM, -1, w - 12);
   int pw = Canvas::textWidth(pin, big);
   _c.text(x + (w - pw) / 2, y + 10 + f->height + fSmall()->height, pin, big, C_ACCENT);
-  _c.text(x + 6, y + h - fSmall()->height - 4, "esc: hide", fSmall(), C_DIM);
+  char hide[24];
+  snprintf(hide, sizeof hide, "%s: hide", keyName("esc", false));
+  _c.text(x + 6, y + h - fSmall()->height - 4, hide, fSmall(), C_DIM);
 }
 
 void App::drawFooter() {

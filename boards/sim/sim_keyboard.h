@@ -1,30 +1,44 @@
-// Simulated Cardputer keyboard: keys are pressed by their printed legend at
-// a (row, col) of the real 4x14 matrix and go through the same keymap code
-// as the device, so the simulator types and navigates exactly like it.
+// Simulated keyboard: keys are pressed by their printed legend at their place
+// in the real matrix and go through the same keymap code as the device, so
+// the simulator types and navigates exactly like it. The Cardputer's 4x14
+// keys, or with MC_BOARD_TDECK the T-Deck's 5x7 and its trackball.
 #pragma once
 #include <stdint.h>
 #include "hal/keyboard.h"
 extern "C" {
+#ifdef MC_BOARD_TDECK
+#include "tdeck_keymap.h"
+#else
 #include "cardputer_keymap.h"
+#endif
 }
 #include "report_diff.h"
 
 namespace sim {
 
+// Keys pressed together: the last one is the key, those before it are held
+// around it (modifiers). A row of BALL is a trackball roll, col its direction.
+struct Chord {
+  static constexpr int8_t BALL = -1;
+  int n = 0;
+  int8_t row[3], col[3];
+};
+
 class SimKeyboard : public hal::Keyboard {
 public:
-  explicit SimKeyboard(const uint32_t* nowMs) : _now(nowMs) { cardputer_keymap_reset(&_st); }
+  explicit SimKeyboard(const uint32_t* nowMs);
 
   bool begin() override { return true; }
-  void setTextMode(bool on) override { cardputer_keymap_text_mode(&_st, on); }
+  void setTextMode(bool on) override;
   bool poll(hal::KeyEvent& ev) override;
 
-  // Schedule a matrix change at an absolute time.
+  // Schedule a matrix change (or a trackball roll) at an absolute time.
   void at(uint32_t ms, int row, int col, bool down);
-  // Find a printed legend ("a", ";", "enter", "fn", "esc"...) on the matrix.
-  static bool find(const char* legend, int& row, int& col);
-  // Find the key and shift state that types character `c` on the US layout.
-  static bool findChar(char c, int& row, int& col, bool& shift);
+  // A key by its printed legend ("a", ";", "enter", "fn", "esc"...), an alias
+  // for what it does ("up", "menu"), or mod+key ("ctrl+o").
+  static bool find(const char* legend, Chord& out);
+  // The keys that type character `c`.
+  static bool findChar(char c, Chord& out);
   uint32_t lastScheduled() const { return _last; }
 
 private:
@@ -38,7 +52,11 @@ private:
   int _n = 0;
   uint32_t _last = 0;
   const uint32_t* _now;
+#ifdef MC_BOARD_TDECK
+  tdeck_keymap_t _st{};
+#else
   cardputer_keymap_t _st{};
+#endif
   ReportDiff _diff;
 };
 

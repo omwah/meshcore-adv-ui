@@ -11,7 +11,7 @@ step() { printf '\n== %s\n' "$*"; }
 step "PII check";                  scripts/pii-check.sh --all
 step "upstream main.cpp";          scripts/check-upstream-main.sh
 step "patches apply";              scripts/prepare-deps.sh --force
-step "unit tests";                 pio test -e test -e simnet_test
+step "unit tests";                 pio test -e test -e test_tdeck -e simnet_test
 step "mock simulator scenarios";   pio run -e sim -e sim_tdeck && python -I scripts/screenshots.py && python -I scripts/screenshots.py --board tdeck
 step "real MeshCore scenarios";    pio run -e simnet && .pio/build/simnet/program --remote-smoke && python -I scripts/simnet_tests.py
 step "firmware";                   pio run -e cardputer_adv -e cardputer_adv_usb

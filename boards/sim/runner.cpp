@@ -41,10 +41,11 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
     if (!started) {
       if (world.setup(cmd, arg)) continue;
       // Theme and text size before boot apply to the splash too.
-      if (!strcmp(cmd, "theme") || !strcmp(cmd, "textsize")) {
+      if (!strcmp(cmd, "theme") || !strcmp(cmd, "textsize") || !strcmp(cmd, "vim")) {
         if (!preStart) { world.attach(app, first); world.start(); preStart = true; }
         model::Prefs pr = app.m().prefs();
-        if (cmd[0] == 't' && cmd[1] == 'h') pr.theme = (uint8_t)atoi(arg);
+        if (cmd[0] == 'v') pr.vimKeys = !strcmp(arg, "on");
+        else if (cmd[0] == 't' && cmd[1] == 'h') pr.theme = (uint8_t)atoi(arg);
         else pr.textSize = (uint8_t)atoi(arg);
         app.m().setPrefs(pr);
         continue;
@@ -63,52 +64,43 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
     }
 
     if (!strcmp(cmd, "key") || !strcmp(cmd, "hold")) {
-      char legend[16] = {};
+      char legend[32] = {};
       int n = 1;
-      sscanf(arg, "%15s %d", legend, &n);
-      // "ctrl+d": the modifier held around each press.
-      int mr = -1, mc = -1;
-      char* plus = strchr(legend, '+');
-      if (plus && plus[1]) {
-        *plus = 0;
-        if (!SimKeyboard::find(legend, mr, mc)) {
-          fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, legend);
-          return 2;
-        }
-        memmove(legend, plus + 1, strlen(plus + 1) + 1);
-      }
-      int r, col;
-      if (!SimKeyboard::find(legend, r, col)) {
+      sscanf(arg, "%31s %d", legend, &n);
+      Chord ch;
+      if (!SimKeyboard::find(legend, ch)) {
         fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, legend);
         return 2;
       }
+      // Modifiers ("ctrl+o") go down just before the key and up just after.
+      const int k = ch.n - 1;
       uint32_t t = now + 10;
       if (!strcmp(cmd, "hold")) {
-        kb.at(t, r, col, true);
-        kb.at(t + n, r, col, false);
+        for (int i = 0; i < k; i++) kb.at(t - 5, ch.row[i], ch.col[i], true);
+        kb.at(t, ch.row[k], ch.col[k], true);
+        kb.at(t + n, ch.row[k], ch.col[k], false);
+        for (int i = 0; i < k; i++) kb.at(t + n + 5, ch.row[i], ch.col[i], false);
         c.advance(t + n + 100);
       } else {
         // One press at a time: the keyboard's event queue is small.
-        for (int i = 0; i < n; i++, t += 160) {
-          if (mr >= 0) kb.at(t - 5, mr, mc, true);
-          kb.at(t, r, col, true);
-          kb.at(t + 40, r, col, false);
-          if (mr >= 0) kb.at(t + 45, mr, mc, false);
+        for (int j = 0; j < n; j++, t += 160) {
+          for (int i = 0; i < k; i++) kb.at(t - 5, ch.row[i], ch.col[i], true);
+          kb.at(t, ch.row[k], ch.col[k], true);
+          kb.at(t + 40, ch.row[k], ch.col[k], false);
+          for (int i = 0; i < k; i++) kb.at(t + 45, ch.row[i], ch.col[i], false);
           c.advance(t + 60);
         }
       }
     } else if (!strcmp(cmd, "type")) {
       uint32_t t = now + 10;
-      int sr, sc;
-      SimKeyboard::find("shift", sr, sc);
       for (const char* s = arg; *s; s++) {
-        int r, col;
-        bool shift;
-        if (!SimKeyboard::findChar(*s, r, col, shift)) continue;
-        if (shift) kb.at(t, sr, sc, true);
-        kb.at(t + 5, r, col, true);
-        kb.at(t + 35, r, col, false);
-        if (shift) kb.at(t + 40, sr, sc, false);
+        Chord ch;
+        if (!SimKeyboard::findChar(*s, ch)) continue;
+        const int k = ch.n - 1;
+        for (int i = 0; i < k; i++) kb.at(t, ch.row[i], ch.col[i], true);
+        kb.at(t + 5, ch.row[k], ch.col[k], true);
+        kb.at(t + 35, ch.row[k], ch.col[k], false);
+        for (int i = 0; i < k; i++) kb.at(t + 40, ch.row[i], ch.col[i], false);
         t += 90;
         c.advance(t);   // so text mode applies from the second key on
       }

@@ -27,7 +27,7 @@ THEMES = ["Midnight", "Amber", "Phosphor", "Contrast", "Daylight", "Ocean"]
 SIZES = ["small", "medium", "large"]
 
 
-def run(scenario, theme, outdir, size=1):
+def run(scenario, theme, outdir, size=1, board="cardputer"):
     os.makedirs(outdir, exist_ok=True)
     with open(scenario) as f:
         body = f.read()
@@ -35,7 +35,11 @@ def run(scenario, theme, outdir, size=1):
     lines = body.splitlines()
     head = [l for l in lines if l.strip() in ("fresh", "empty")]
     rest = [l for l in lines if l.strip() not in ("fresh", "empty")]
-    script = "\n".join(head + [f"theme {theme}", f"textsize {size}"] + rest) + "\n"
+    pre = [f"theme {theme}", f"textsize {size}"]
+    # Scenarios written with arrow keys run on the T-Deck with vim keys off.
+    if board != "cardputer" and not any(l.strip().startswith("vim ") for l in rest):
+        pre.append("vim off")
+    script = "\n".join(head + pre + rest) + "\n"
     with tempfile.TemporaryDirectory() as tmp:
         env = dict(os.environ, ASAN_OPTIONS="detect_leaks=0")
         r = subprocess.run([SIM, "-o", tmp], input=script, text=True, capture_output=True, env=env)
@@ -79,7 +83,7 @@ def main():
             for z in sizes:
                 label = THEMES[t] if len(sizes) == 1 else f"{THEMES[t]}-{SIZES[z]}"
                 d = os.path.join(a.out, sc, label)
-                names = run(f, t, d, z)
+                names = run(f, t, d, z, a.board)
                 sections.append((sc, label, [os.path.relpath(os.path.join(d, n + ".png"), a.out) for n in names]))
                 print(f"{sc} / {label}: {len(names)} shots")
 
