@@ -46,8 +46,8 @@ On the T-Deck Plus (320 × 240, touch):
 | **Contact details (hold a row)** | **Vim keys: / and n** |
 | ![Contact details with touch value arrows](docs/screenshots/tdeck-details.png) | ![Search results stepped through with n](docs/screenshots/tdeck-vim-find.png) |
 
-Generate the full screenshot gallery locally with `pixi run shots` (`shots/index.html`),
-and the T-Deck's with `python -I scripts/screenshots.py --board tdeck` (`shots/tdeck/`).
+Generate the full screenshot gallery locally with `pixi run shots` (`shots/cardputer/index.html`),
+and the T-Deck's with `python -I scripts/screenshots.py --board tdeck` (`shots/tdeck/index.html`).
 
 ## Remote node mode
 
@@ -193,7 +193,7 @@ pixi install
 scripts/install-hooks.sh     # pre-commit check that keeps personal data out of git
 
 pixi run test                # host unit tests
-pixi run shots               # run the simulator scenarios -> shots/index.html
+pixi run shots               # run the simulator scenarios -> shots/cardputer/index.html
 pixi run build               # firmware: Cardputer ADV and T-Deck Plus, BLE and USB-only builds
 pixi run simnet-test         # UI on real MeshCore nodes in a simulated mesh
 pixi run ci                  # everything, including size budgets
