@@ -79,6 +79,14 @@ the SD card in the device (to `/` by default), to install from Launcher's SD
 browser later. The WebUI login is Launcher's default unless
 `LAUNCHER_USER` and `LAUNCHER_PASS` are set.
 
+The install also asks Launcher for a 1 MB `spiffs` data partition, where the
+firmware keeps its identity, contacts, settings and history; Launcher's own
+table has none. An existing `spiffs` is kept as it is. Without one nothing is
+saved: every boot is a first boot, and importing an identity from the app
+fails. The firmware then shows "No storage partition" at boot. If an app
+installed from the SD card has this problem, install it again over WiFi with
+`--replace`, or add a `spiffs` partition in Launcher's Partition Manager.
+
 Launcher has its own partition layout, so settings stored on the internal
 flash may not survive switching apps. Turn on Settings > Backup & restore >
 Auto-backup to SD before switching. When the firmware starts with nothing on flash and finds a

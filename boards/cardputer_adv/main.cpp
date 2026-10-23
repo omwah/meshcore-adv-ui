@@ -58,6 +58,9 @@ static Ws2812Led led(display);
 // The UI, built in setup() on the local or the remote model.
 alignas(ui::App) static uint8_t ui_storage[sizeof(ui::App)];
 static ui::App* ui_app = nullptr;
+// SPIFFS mounted. Launcher can install an app without a partition for it,
+// and then nothing (identity, contacts, settings) is saved.
+static bool fs_ok = false;
 static bool remoteMode = false;
 
 static void halt(const char* why) {
@@ -92,7 +95,7 @@ void setup() {
   Serial.begin(115200);
   board.begin();
   display.begin();
-  SPIFFS.begin(true);
+  fs_ok = SPIFFS.begin(true);
 #if defined(BLE_PIN_CODE) && MC_UI_REMOTE
   remoteMode = app::readDeviceMode(SPIFFS) == model::Mode::Remote;
   if (remoteMode) {
@@ -117,6 +120,7 @@ void setup() {
   led.begin();
   ui_app->setLed(&led);
   ui_app->begin(ui::screens::boot());
+  if (!fs_ok) ui_app->toast("No storage partition: nothing is saved", ui::C_ERR);
   ui_app->loop(millis());
 #if defined(BLE_PIN_CODE)
   platform.blePairingFn = [] { return ble_interface.pairing(); };
@@ -142,8 +146,8 @@ void setup() {
   };
 #endif
   // One status line for bring-up (no keys, names or addresses).
-  Serial.printf("meshcore-adv-ui %s: lora-cap %s, keyboard %s, speaker %s, sd %s, contacts %d, heap %u (min %u)\n",
-                MC_UI_VERSION, board.loraCapPresent() ? "ok" : "MISSING", keyboard.present() ? "ok" : "MISSING",
+  Serial.printf("meshcore-adv-ui %s: flash fs %s, lora-cap %s, keyboard %s, speaker %s, sd %s, contacts %d, heap %u (min %u)\n",
+                MC_UI_VERSION, fs_ok ? "ok" : "MISSING", board.loraCapPresent() ? "ok" : "MISSING", keyboard.present() ? "ok" : "MISSING",
                 sound.present() ? "ok" : "MISSING",
                 platform.sd() ? "yes" : "no", the_mesh.getNumContacts(), (unsigned)platform.heapFree(),
                 (unsigned)platform.heapMin());

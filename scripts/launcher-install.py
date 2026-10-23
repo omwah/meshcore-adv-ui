@@ -213,8 +213,13 @@ class Launcher:
         size = image_size(data)
         manifest = {
             "sourceName": f"{name}.bin",
+            # An empty SPIFFS partition for MeshCore's files (identity,
+            # contacts, settings): Launcher's own table has none, and without
+            # it nothing is saved. An existing "spiffs" is kept as it is.
             "parts": [{"kind": "app", "label": "app", "subtype": 0, "sourceOffset": 0,
-                       "copySize": size, "declaredSize": size}],
+                       "copySize": size, "declaredSize": size},
+                      {"kind": "data", "label": "spiffs", "subtype": 0x82, "sourceOffset": 0,
+                       "copySize": 0, "declaredSize": SPIFFS_SIZE}],
         }
         body, ctype = multipart({"command": 0, "size": len(data), "manifest": json.dumps(manifest)})
         # Launcher reads and plans the partition table before it answers: give
@@ -237,6 +242,10 @@ class Launcher:
             time.sleep(1 + attempt)
         die(f"{path.name}: {status} {text}")
 
+
+# The SPIFFS partition asked for: what a full contact list and history need,
+# with room to spare (Launcher gives a small request its default size).
+SPIFFS_SIZE = 0x100000
 
 VARIANT_ENVS = {"cardputer": "cardputer_adv", "tdeck": "tdeck"}
 

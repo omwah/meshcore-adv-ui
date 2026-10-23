@@ -61,6 +61,9 @@ static I2sSound sound;
 // The UI, built in setup() on the local or the remote model.
 static void* ui_storage = nullptr;
 static ui::App* ui_app = nullptr;
+// SPIFFS mounted. Launcher can install an app without a partition for it,
+// and then nothing (identity, contacts, settings) is saved.
+static bool fs_ok = false;
 static bool remoteMode = false;
 
 // Settings the drivers follow.
@@ -109,7 +112,7 @@ void setup() {
   board.begin();
   ui_storage = psram(sizeof(ui::App));
   display.begin();
-  SPIFFS.begin(true);
+  fs_ok = SPIFFS.begin(true);
 #if defined(BLE_PIN_CODE) && MC_UI_REMOTE
   remoteMode = app::readDeviceMode(SPIFFS) == model::Mode::Remote;
   if (remoteMode) {
@@ -135,6 +138,7 @@ void setup() {
   sound.begin();
   ui_app->setTouch(&touch);
   ui_app->begin(ui::screens::boot());
+  if (!fs_ok) ui_app->toast("No storage partition: nothing is saved", ui::C_ERR);
   ui_app->loop(millis());
 #if defined(BLE_PIN_CODE)
   platform.blePairingFn = [] { return ble_interface.pairing(); };
@@ -154,8 +158,9 @@ void setup() {
   if (!adapter.prefs().bleEnabled) adapter.disableBluetooth();
   board.onBootComplete();
   // One status line for bring-up (no keys, names or addresses).
-  Serial.printf("meshcore-adv-ui %s: keyboard %s, touch %s, sd %s, contacts %d, heap %u (min %u), psram %u\n",
-                MC_UI_VERSION, keyboard.present() ? (keyboard.rawMode() ? "ok" : "chars only") : "MISSING",
+  Serial.printf("meshcore-adv-ui %s: flash fs %s, keyboard %s, touch %s, sd %s, contacts %d, heap %u (min %u), psram %u\n",
+                MC_UI_VERSION, fs_ok ? "ok" : "MISSING",
+                keyboard.present() ? (keyboard.rawMode() ? "ok" : "chars only") : "MISSING",
                 touch.present() ? "ok" : "MISSING", platform.sd() ? "yes" : "no", the_mesh.getNumContacts(),
                 (unsigned)platform.heapFree(), (unsigned)platform.heapMin(), (unsigned)ESP.getFreePsram());
 }
