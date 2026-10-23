@@ -104,7 +104,7 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 
 ## 8. LilyGo T-Deck Plus
 
-Install with `pixi run launcher-install IP --tdeck` (or `pio run -e tdeck -t
+Install with `pixi run launcher-install IP --variant tdeck --replace` (or `pio run -e tdeck -t
 upload`; if a flash won't take, hold the trackball down while pressing reset).
 The serial status line at boot reports the keyboard, touch, SD and PSRAM.
 

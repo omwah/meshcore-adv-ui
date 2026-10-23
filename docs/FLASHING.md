@@ -69,11 +69,14 @@ From the SD card:
 
 Over WiFi, from a source checkout: start Launcher's WebUI on the device, then
 ```sh
-pixi run launcher-install <IP> --boot
+pixi run launcher-install <IP> --replace --boot
 ```
-This builds, packages and installs the newest BLE image, replacing an earlier
-`meshcore-adv-ui` in Launcher's menu. `--usb` installs the USB-only build as
-`meshcore-adv-ui-usb`. The WebUI login is Launcher's default unless
+This builds, packages and installs the newest BLE image. `--replace` deletes an
+earlier `meshcore-adv-ui` in Launcher's menu first; without it a second copy is
+added. `--variant tdeck` installs the T-Deck build, and `--usb` the USB-only
+build as `meshcore-adv-ui-usb`. `--upload [FOLDER]` only copies the image to
+the SD card in the device (to `/` by default), to install from Launcher's SD
+browser later. The WebUI login is Launcher's default unless
 `LAUNCHER_USER` and `LAUNCHER_PASS` are set.
 
 Launcher has its own partition layout, so settings stored on the internal

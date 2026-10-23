@@ -4,26 +4,31 @@
 # (licenses/Apache-2.0.txt).
 #
 # Changes for meshcore-adv-ui: installs this project's packaged app image
-# (the newest in dist/, BLE or --usb build, Cardputer or --tdeck) under the
-# name meshcore-adv-ui;
-# no SD runtime upload; a reboot that drops the connection counts as done.
+# (the newest in dist/ for the variant, BLE or --usb build) under the name
+# meshcore-adv-ui; no SD runtime upload; a reboot that drops the connection
+# counts as done.
 """
 Install a meshcore-adv-ui build on a Cardputer or T-Deck running bmorcelli's
 Launcher, over Launcher's web interface (WebUI), the way its own page does.
 
-    pixi run launcher-install IP [--tdeck] [--usb] [--boot] [--no-replace]
+    pixi run launcher-install IP [--variant V] [--usb] [--replace] [--boot]
+    pixi run launcher-install IP [--variant V] [--usb] --upload [FOLDER]
     python -I scripts/launcher-install.py IP [BIN] [--name NAME] ...
 
 IP     the device's address, as Launcher's WebUI screen shows it
 BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin,
        or ...-tdeck.bin, that `pixi run package` made; never a -full.bin)
---tdeck the T-Deck's build (...-tdeck.bin) instead of the Cardputer's
+--variant  the board: cardputer (default) or tdeck
 --usb  the USB-only build instead (installed as meshcore-adv-ui-usb)
 --name the app's name in Launcher's menu (default: meshcore-adv-ui)
---no-replace  keep an installed app of that name and add a copy; by default
-       it is deleted first. Launcher applies a partition change by restarting:
-       start its WebUI again when asked.
---boot restart into the app once it is installed.
+--replace  first delete any installed app of that name, so a new build takes
+       its place rather than adding a copy. Launcher applies a partition change
+       by restarting: start its WebUI again when asked.
+--boot restart into the app once it is installed (installing already makes it
+       the one Launcher boots).
+--upload  instead of installing, copy the image to the SD card in the device
+       (to FOLDER, default /), under its own name: install it from there with
+       Launcher's SD file browser.
 
 The WebUI login is Launcher's default (admin / launcher) unless
 $LAUNCHER_USER and $LAUNCHER_PASS say otherwise.
@@ -35,6 +40,7 @@ The protocol (Launcher's src/webInterface.cpp and webUi/scripts.js):
   POST /OTA              command=0, size, manifest (JSON: the parts to install)
   POST /OTAFILE          the file, multipart field "file1" -> "OK"
   GET  /reboot
+  POST /                 folder, file: one file to the SD card (--upload)
 Only standard-library Python.
 """
 
@@ -221,6 +227,19 @@ class Launcher:
         status, text = self.request("POST", "/OTAFILE", body, ctype, timeout=300)
         return status, text if status == 200 else f"POST /OTAFILE: {text}"
 
+    def upload(self, path, folder, timeout=60):
+        """One file to folder on the SD card, tried three times."""
+        body, ctype = multipart({"folder": folder}, [("file", path.name, path.read_bytes())])
+        for attempt in range(3):
+            status, text = self.request("POST", "/", body, ctype, timeout=timeout)
+            if status == 200 and text == "OK":
+                return
+            time.sleep(1 + attempt)
+        die(f"{path.name}: {status} {text}")
+
+
+VARIANT_ENVS = {"cardputer": "cardputer_adv", "tdeck": "tdeck"}
+
 
 def newest_image(env):
     """The app image of the newest package in dist/ for env."""
@@ -234,14 +253,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.strip().split("\n\n")[0])
     ap.add_argument("ip")
     ap.add_argument("bin", nargs="?", type=Path)
+    ap.add_argument("--variant", choices=VARIANT_ENVS, default="cardputer")
     ap.add_argument("--usb", action="store_true")
-    ap.add_argument("--tdeck", action="store_true")
     ap.add_argument("--name")
-    ap.add_argument("--no-replace", action="store_true")
+    ap.add_argument("--replace", action="store_true")
     ap.add_argument("--boot", action="store_true")
+    ap.add_argument("--upload", nargs="?", const="/", metavar="FOLDER")
     a = ap.parse_args()
+    if a.upload is not None and (a.replace or a.boot or a.name):
+        die("--upload installs nothing: no --replace, --boot or --name with it")
 
-    env = ("tdeck" if a.tdeck else "cardputer_adv") + ("_usb" if a.usb else "")
+    env = VARIANT_ENVS[a.variant] + ("_usb" if a.usb else "")
     name = a.name or ("meshcore-adv-ui-usb" if a.usb else "meshcore-adv-ui")
     path = a.bin or newest_image(env)
     if not path.is_file():
@@ -253,7 +275,13 @@ def main():
     if not dev.alive():
         die(f"no Launcher WebUI at {a.ip} (start it from Launcher's menu)")
     dev.login()
-    if not a.no_replace:
+    if a.upload is not None:
+        folder = "/" + a.upload.strip("/")
+        say(f"sending {path.name}, {path.stat().st_size} bytes ...")
+        dev.upload(path, folder, timeout=300)
+        say(f"{folder.rstrip('/')}/{path.name} on the SD card: install it from Launcher's SD browser")
+        return
+    if a.replace:
         dev.replace(name)
     say(f"installing {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
     dev.install(path, name)
