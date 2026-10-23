@@ -1,6 +1,10 @@
 # Main menu and the pages under it (each reached from a fresh menu).
 key menu
 shot menu
+# Backspace goes back as Esc does, outside text.
+key bksp
+shot menu-bksp-home
+key menu
 key down 5
 shot menu-radio-sel
 key enter

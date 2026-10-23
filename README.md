@@ -76,6 +76,7 @@ The Bluetooth build only: the USB-only build has no remote mode.
 | Enter | open / select | send |
 | `` ` `` (Esc) | back (on Home: clear search) | stop typing |
 | hold Esc | go Home | go Home |
+| Backspace | back (on Home: delete from the search) | delete |
 | Opt | main menu | main menu |
 | Tab | details / actions for the selection | |
 | letters | find (on Home), start writing (in a chat) | type |
@@ -90,6 +91,7 @@ depends on it: vim keys are on by default, and everything can be done by touch.
 | letters | vim keys (below): `j` `k` move, `h` `l` change tab or value, `/` finds |
 | Enter, trackball click | open / select / send |
 | Alt | Esc: back, stop typing; hold for Home |
+| Backspace | back, outside text (on Home: edits the search) |
 | Sym + Enter | main menu |
 | Sym + Space | Tab: details / actions for the selection |
 | Mic | Ctrl (for Ctrl-d, Ctrl-u, Ctrl-o) |

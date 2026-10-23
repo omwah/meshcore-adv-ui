@@ -323,6 +323,12 @@ void App::handleKey(Key k, uint32_t now) {
   } else {
     _vim.reset();
   }
+  // Backspace is back too, where nothing is being typed; not held (one screen
+  // a press), and not on Home, where it edits the search.
+  if (k.code == K_BKSP && _depth > 1 && !top()->textMode(*this)) {
+    if (k.repeat) return;
+    k.code = K_ESC;
+  }
   if (k.code == K_LONG_ESC) {
     popToRoot();
   } else if (k.code == K_MENU && !top()->fullscreen()) {
