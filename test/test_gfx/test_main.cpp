@@ -410,6 +410,33 @@ void test_emoji_flush_composites_colour_over_the_framebuffer() {
   TEST_ASSERT_EQUAL_HEX16(kPal[0], shown(0, 0));                            // the corner is transparent
 }
 
+void test_emoji_are_centred_with_a_margin() {
+  // Faces fill their cell, hands and symbols are small, flags are wide: each
+  // must still sit in the middle of its 16 px cell with room on every side, or
+  // a row of emoji looks unevenly spaced.
+  const char* const set[] = {"\xf0\x9f\x98\x80", "\xf0\x9f\x91\x8d", "\xe2\x9a\xa1", "\xf0\x9f\x87\xba\xf0\x9f\x87\xb8",
+                             "\xf0\x9f\x94\x8b", "\xf0\x9f\xa5\xb0", "\xf0\x9f\xa4\xaf", "\xe2\x9c\x8c\xef\xb8\x8f"};
+  for (const char* e : set) {
+    s_c.noClip();
+    s_c.clear(0);
+    s_cap = CapturingDisplay();
+    s_c.text(0, 0, e, kEmojiFont, 1);
+    s_c.flush(s_cap, kPal, true);
+    int x0 = 99, y0 = 99, x1 = -1, y1 = -1;
+    for (int y = 0; y < 16; y++)
+      for (int x = 0; x < 16; x++)
+        if (shown(x, y) != kPal[0]) {
+          x0 = x < x0 ? x : x0; y0 = y < y0 ? y : y0;
+          x1 = x > x1 ? x : x1; y1 = y > y1 ? y : y1;
+        }
+    TEST_ASSERT_TRUE_MESSAGE(x1 >= 0, e);
+    const int l = x0, r = 15 - x1, t = y0, b = 15 - y1;
+    TEST_ASSERT_TRUE_MESSAGE(l >= 1 && r >= 1 && t >= 1 && b >= 1, e);       // never touching the cell edge
+    TEST_ASSERT_TRUE_MESSAGE(l - r <= 1 && r - l <= 1, e);                   // centred, to a pixel
+    TEST_ASSERT_TRUE_MESSAGE(t - b <= 1 && b - t <= 1, e);
+  }
+}
+
 void test_emoji_is_covered_by_later_drawing() {
   s_c.noClip();
   s_c.clear(0);
@@ -535,6 +562,7 @@ int main(int, char**) {
   RUN_TEST(test_emoji_bare_text_characters_stay_text);
   RUN_TEST(test_emoji_elements_have_double_width_and_invisibles_none);
   RUN_TEST(test_emoji_flush_composites_colour_over_the_framebuffer);
+  RUN_TEST(test_emoji_are_centred_with_a_margin);
   RUN_TEST(test_emoji_is_covered_by_later_drawing);
   RUN_TEST(test_emoji_respects_the_clip);
   RUN_TEST(test_emoji_change_repushes_rows_even_if_the_framebuffer_did_not);

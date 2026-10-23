@@ -52,17 +52,49 @@ class EmojiFont:
 SRC_CROP = (4, 0, 132, 128)   # the square that holds every glyph's content
 
 
+MARGIN = 1   # empty pixels kept on every side of a glyph, so neighbours never touch
+
+
 def scaled(png, n):
-    """The glyph as an n x n RGBA image, alpha already thresholded."""
+    """The glyph as an n x n RGBA image, alpha already thresholded.
+
+    Noto places each glyph by its own design, so left to the font a face fills
+    its cell while a hand or a symbol floats in it, and a row of emoji looks
+    unevenly spaced. Each glyph is instead centred on its visible content in a
+    box MARGIN pixels in from the cell edge: scaled down if it is larger than
+    that box, never scaled up (a small glyph stays small).
+    """
     from PIL import Image
-    im = Image.open(io.BytesIO(png)).convert("RGBA").crop(SRC_CROP)
-    im = im.convert("RGBa").resize((n, n), Image.LANCZOS).convert("RGBA")
-    px = im.load()
+    src = Image.open(io.BytesIO(png)).convert("RGBA").crop(SRC_CROP)
+    bb = src.getchannel("A").point(lambda v: 255 if v >= 128 else 0).getbbox()
+    src = src.crop(bb)
+    bw, bh = src.size
+    inner = n - 2 * MARGIN
+    nat = n / (SRC_CROP[2] - SRC_CROP[0])              # the whole crop at n pixels
+    k = min(1.0, inner / (max(bw, bh) * nat)) * nat    # pixels per source pixel
+    w, h = max(1, round(bw * k)), max(1, round(bh * k))
+    w, h = min(w + ((n - w) & 1), inner), min(h + ((n - h) & 1), inner)   # even margins: truly centred
+    if (n - w) & 1:
+        w -= 1
+    if (n - h) & 1:
+        h -= 1
+    im = src.convert("RGBa").resize((w, h), Image.LANCZOS).convert("RGBA")
+    out = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    out.paste(im, ((n - w) // 2, (n - h) // 2))
+    px = out.load()
     for y in range(n):
         for x in range(n):
             r, g, b, a = px[x, y]
             px[x, y] = (r, g, b, 255) if a >= 128 else (0, 0, 0, 0)
-    return im
+    # Thresholding trims faint edge pixels, so centre once more on what is left
+    # (a margin sum that is odd leaves one pixel of difference, no more).
+    bb = out.getchannel("A").getbbox()
+    dx, dy = ((n - bb[2]) - bb[0]) // 2, ((n - bb[3]) - bb[1]) // 2
+    if dx or dy:
+        moved = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+        moved.paste(out, (dx, dy))
+        out = moved
+    return out
 
 
 def shared_palette(images, colors=15):
