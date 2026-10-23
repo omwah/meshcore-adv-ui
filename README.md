@@ -118,8 +118,10 @@ Touch:
   from anywhere, with unread counts. It hides while typing.
 - **Rows:** tap to open, hold for details. A heard advert is added on a
   second tap.
-- **Drag** to move through lists and scroll conversations, in the direction
-  of the finger, as j/k do: drag up for older messages, which load at the top.
+- **Drag** to move through lists and scroll conversations, the same way for both.
+  Settings → Touch scroll: *same* (default) moves the selection or view the way the
+  finger goes, as j/k do (drag up for older messages, which load at the top);
+  *opposite* has the content follow the finger instead (drag down for older).
   The header names the tab; there's no tab strip, the bar is the tabs. **Swipe sideways** on Home to change tabs.
 - **‹** in the header goes back; hold it for Home.
 - A setting's value shows `‹ value ›`: tap either side to change it.
@@ -182,7 +184,7 @@ A command being typed (`2g`) shows at the right of the footer.
 - **GPS:**
   - The receiver is off by default.
   - Sharing your position in adverts and setting the clock at boot are separate options, also off by default.
-- **Settings:** node name, theme, brightness, screen timeout, lock when the screen is off (T-Deck), text size, chat preview, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and its PIN (a new random one at every boot by default; Settings → New PIN picks a fixed one), factory reset.
+- **Settings:** node name, theme, brightness, screen timeout, lock when the screen is off and touch scroll direction (T-Deck), text size, chat preview, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and its PIN (a new random one at every boot by default; Settings → New PIN picks a fixed one), factory reset.
 - **New-message alert:** a 2-second burst of colours on the RGB LED with the screen left off (the default, easiest on the battery), the screen turning on, both, or neither. The chime follows the Sound setting either way. Enter on the setting previews the colours. The LED runs on the backlight's power, so the screen glows briefly while it flashes.
 - **Ping bot** (local node mode, off by default):
   - A direct message that is just `ping` or `test` gets an automatic reply with the path it took, for example `pong: 2 hops a1>Hilltop, SNR 6.5`.

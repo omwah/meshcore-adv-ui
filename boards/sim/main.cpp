@@ -49,9 +49,9 @@ public:
       else { _m.setPairing(false); _m.setBle(!strcmp(arg, "on")); }
       return true;
     }
-    if (!strcmp(cmd, "pref")) {   // pref notify led|screen|dark|both, pref timeout <s>, pref lock on|off
-      char what[16] = {}, val[8] = {};
-      sscanf(arg, "%15s %7s", what, val);
+    if (!strcmp(cmd, "pref")) {   // pref notify led|screen|dark|both, pref timeout <s>, pref lock on|off, pref scroll same|opposite
+      char what[16] = {}, val[16] = {};
+      sscanf(arg, "%15s %15s", what, val);
       model::Prefs pr = _m.prefs();
       if (!strcmp(what, "notify")) {
         static const char* const modes[] = {"led", "screen", "dark", "both"};
@@ -61,6 +61,8 @@ public:
         pr.notify = (model::NotifyMode)m;
       } else if (!strcmp(what, "timeout")) {
         pr.screenTimeoutS = (uint16_t)atoi(val);
+      } else if (!strcmp(what, "scroll")) {   // pref scroll same|opposite
+        pr.touchScrollNatural = !strcmp(val, "opposite");
       } else if (!strcmp(what, "lock")) {
         pr.lockOnTimeout = !strcmp(val, "on");
       } else {

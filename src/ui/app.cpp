@@ -422,8 +422,9 @@ void Screen::onTouch(App& a, const Gesture& g, const HitTarget* t) {
       }
       return;
     case Gesture::DRAG: {
-      // The selection follows the finger: dragging down moves it down.
-      int n = a.dragSteps(g.dy, a.mx().row);
+      // Dragging down moves the selection down, or with natural scrolling up (the content
+      // follows the finger); see scrollDy.
+      int n = a.dragSteps(a.scrollDy(g.dy), a.mx().row);
       for (; n > 0; n--) a.key(K_DOWN);
       for (; n < 0; n++) a.key(K_UP);
       return;
