@@ -800,18 +800,21 @@ void fmtSnr(char* out, size_t n, int8_t snr_x4) {
 }
 
 int wrapText(const char* s, const mc_font_t* f, int w, LineFn fn, void* ctx) {
-  int cols = w / f->width;
-  if (cols < 1) cols = 1;
   int line = 0;
   while (*s) {
-    // Find the longest prefix of <= cols code points, preferring a space break.
+    // Find the longest prefix that fits in w pixels (at least one element, so
+    // a narrow column still advances), preferring a space break. Elements are
+    // glyphs and whole emoji sequences, never a piece of either.
     const char* p = s;
     const char* lastSpace = nullptr;
-    int n = 0;
-    while (*p && *p != '\n' && n < cols) {
+    int x = 0;
+    while (*p && *p != '\n') {
+      int adv;
+      int b = Canvas::elem(p, f, &adv);
+      if (x + adv > w && p > s) break;
       if (*p == ' ') lastSpace = p;
-      utf8Next(&p);
-      n++;
+      x += adv;
+      p += b;
     }
     const char* end = p;
     const char* next = p;

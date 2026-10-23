@@ -14,6 +14,10 @@ hardware, so other devices can be added as new board directories.
 - **Small.** The UI draws into a 16 KB 4-bit framebuffer with Spleen bitmap
   fonts (about 15 KB of flash). Only rows that changed are sent to the panel.
   Nothing on the UI side uses the heap.
+- **Unicode and emoji.** Received text beyond Latin, Cyrillic and Greek names
+  falls back to Noto Sans Mono, and common emoji are drawn in colour from Noto
+  Color Emoji. What a build carries is chosen at build time: see
+  [docs/unicode.md](docs/unicode.md).
 - **Colour themes.** Every colour is a *role* (header, selection, unread,
   channel, repeater...). A theme is a 16-entry palette, so switching is
   instant. Themes: Midnight, Amber, Phosphor, Contrast, Daylight, Ocean.
@@ -262,7 +266,8 @@ external/      MeshCore submodule (never edited; see patches/)
   [anton-vinogradov/meshtastic-adv](https://github.com/anton-vinogradov/meshtastic-adv).
 - The keyboard mappings, the T-Deck keyboard, trackball and touch handling,
   and the font tooling are adapted from esp-vim (Apache-2.0).
-- The fonts are [Spleen](https://github.com/fcambus/spleen) by Frederic Cambus (BSD-2-Clause).
+- The fonts are [Spleen](https://github.com/fcambus/spleen) by Frederic Cambus (BSD-2-Clause),
+  with Noto Sans Mono and Noto Color Emoji (SIL OFL 1.1) as fallbacks; see `NOTICE`.
 
 See `NOTICE` for details.
 

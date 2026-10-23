@@ -31,6 +31,16 @@ This project includes or derives from the following third-party work:
   OFL; no Reserved Font Name is declared by the upstream copyright notice.
   The only transformation is rasterization and thresholding to one bit.
 
+* Noto Color Emoji 2.057 by Google (SIL Open Font License 1.1,
+  licenses/OFL-1.1-NotoEmoji.txt; "Copyright 2022 Google Inc." per the font's
+  own name table), from googlefonts/noto-emoji @ e20cbc2, 2D/fonts. The font
+  file is not distributed. scripts/gen_emoji.py reads its bitmap glyphs,
+  scales them to 12, 16 and 24 pixels and reduces them to a 15-colour palette
+  per size; those bitmaps are compiled into the firmware (src/gen/, never
+  committed) and remain derived from the font, under the OFL. Rescaling and
+  colour reduction are the only changes. The upstream notice declares no
+  Reserved Font Name.
+
 * Material Symbols Rounded by Google (Apache License 2.0), source of the
   shortcut-bar icons in src/ui/icons_nav.h (chat_bubble, person, lan, tag,
   tune; outlined, weight 400; google/material-design-icons @ 10ecc14). The

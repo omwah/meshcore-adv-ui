@@ -2,6 +2,7 @@
 #include <unity.h>
 #include <string.h>
 #include "ui/app.h"
+#include "ui/gfx/emoji.h"
 #include "gen/fonts.h"
 #include "gen/unicode_cfg.h"
 
@@ -18,6 +19,23 @@ public:
   void pushRows(int, int h, const uint16_t* px) override { rows += h; calls++; first = px[0]; }
   void setBacklight(uint8_t) override {}
 };
+
+// Keeps every pixel pushed, to look at what a flush composes.
+class CapturingDisplay : public hal::Display {
+public:
+  uint16_t px[Canvas::W * Canvas::H] = {};
+  int rows = 0;
+  bool begin() override { return true; }
+  int width() const override { return Canvas::W; }
+  int height() const override { return Canvas::H; }
+  bool bigEndian() const override { return false; }
+  void pushRows(int y, int h, const uint16_t* p) override {
+    memcpy(&px[y * Canvas::W], p, (size_t)h * Canvas::W * 2);
+    rows += h;
+  }
+  void setBacklight(uint8_t) override {}
+};
+static CapturingDisplay s_cap;
 
 static Canvas s_c;
 static const uint16_t kPal[16] = {0x0000, 0x1234};
@@ -305,6 +323,180 @@ static void collect(void*, const char* s, int len, int line) {
   s_lines = line + 1;
 }
 
+
+// --- Colour emoji --------------------------------------------------------
+#if MC_UNICODE_EMOJI
+
+static const mc_font_t* const kEmojiFont = &font_large;   // 8x16: 16 px emoji
+
+static int match(const char* s, int* glyph = nullptr) {
+  int g = -1;
+  int n = emojiMatch(kEmojiFont->emoji, s, &g);
+  if (glyph) *glyph = g;
+  return n;
+}
+
+void test_emoji_match_sequences() {
+  TEST_ASSERT_EQUAL(4, match("\xf0\x9f\x98\x80"));                          // 😀
+  TEST_ASSERT_EQUAL(6, match("\xe2\x9d\xa4\xef\xb8\x8f"));                  // ❤️ with its selector
+  TEST_ASSERT_EQUAL(3, match("\xe2\x9d\xa4"));                              // ❤ without
+  TEST_ASSERT_EQUAL(8, match("\xf0\x9f\x91\x8d\xf0\x9f\x8f\xbd"));          // 👍🏽, a tone
+  TEST_ASSERT_EQUAL(8, match("\xf0\x9f\x87\xba\xf0\x9f\x87\xb8"));          // 🇺🇸
+  TEST_ASSERT_EQUAL(4 + 3 + 4 + 3 + 4, match("\xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x91\xa7"));   // 👨‍👩‍👧
+  TEST_ASSERT_EQUAL(0, match("a"));
+  TEST_ASSERT_EQUAL(0, match("\xef\xb8\x8f"));                              // a selector alone
+  TEST_ASSERT_EQUAL(0, match(""));
+}
+
+void test_emoji_match_is_longest_and_glyph_is_distinct() {
+  int plain, tone;
+  match("\xf0\x9f\x91\x8d", &plain);                                        // 👍
+  int n = match("\xf0\x9f\x91\x8d\xf0\x9f\x8f\xbd", &tone);                 // 👍🏽 is its own glyph
+  TEST_ASSERT_EQUAL(8, n);
+  TEST_ASSERT_TRUE(plain != tone);
+  // A sequence we lack matches its longest known prefix: 👍 then an unknown tone modifier-less rest.
+  TEST_ASSERT_EQUAL(4, match("\xf0\x9f\x91\x8d" "x"));
+  // Keycaps need their U+20E3.
+  TEST_ASSERT_EQUAL(0, match("1"));
+}
+
+void test_emoji_bare_text_characters_stay_text() {
+  // (c) is in Spleen, so without a selector it is text; with FE0F it is the emoji.
+  int adv;
+  TEST_ASSERT_EQUAL(2, Canvas::elem("\xc2\xa9", kEmojiFont, &adv));
+  TEST_ASSERT_EQUAL(8, adv);
+}
+
+void test_emoji_elements_have_double_width_and_invisibles_none() {
+  int adv;
+  TEST_ASSERT_EQUAL(4, Canvas::elem("\xf0\x9f\x98\x80", kEmojiFont, &adv));
+  TEST_ASSERT_EQUAL(16, adv);
+  TEST_ASSERT_EQUAL(3, Canvas::elem("\xe2\x80\x8d", kEmojiFont, &adv));      // ZWJ
+  TEST_ASSERT_EQUAL(0, adv);
+  TEST_ASSERT_EQUAL(3, Canvas::elem("\xef\xb8\x8f", kEmojiFont, &adv));      // FE0F
+  TEST_ASSERT_EQUAL(0, adv);
+  TEST_ASSERT_EQUAL(4, Canvas::elem("\xf0\x9f\x8f\xbd", kEmojiFont, &adv));  // a lone tone modifier
+  TEST_ASSERT_EQUAL(0, adv);
+  // A flag we lack shows its two letters.
+  const char* de = "\xf0\x9f\x87\xa9\xf0\x9f\x87\xaa";
+  TEST_ASSERT_EQUAL(2 * 8, Canvas::textWidth(de, kEmojiFont));
+  // A keycap is an emoji where the profile has it and otherwise just its digit.
+  const char* seven = "7\xef\xb8\x8f\xe2\x83\xa3";
+  TEST_ASSERT_EQUAL(match(seven) ? 16 : 8, Canvas::textWidth(seven, kEmojiFont));
+  TEST_ASSERT_EQUAL(4 * 16 + 4 * 8, Canvas::textWidth("\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80 abc", kEmojiFont));
+}
+
+// The colour of the pixel the last flush put at (x, y).
+static uint16_t shown(int x, int y) { return s_cap.px[y * Canvas::W + x]; }
+
+void test_emoji_flush_composites_colour_over_the_framebuffer() {
+  s_c.noClip();
+  s_c.clear(0);
+  s_cap = CapturingDisplay();
+  s_c.text(0, 0, "\xf0\x9f\x98\x80", kEmojiFont, 1);                       // 😀, 16x16
+  s_c.flush(s_cap, kPal, true);
+  // Somewhere on the face is yellow (R high, G high, B low), a colour no palette slot holds.
+  bool yellow = false, theme = false;
+  for (int y = 0; y < 16; y++)
+    for (int x = 0; x < 16; x++) {
+      uint16_t c = shown(x, y);
+      int r = c >> 11, g = (c >> 5) & 63, b = c & 31;
+      if (r > 24 && g > 40 && b < 12) yellow = true;
+      if (c != kPal[0]) theme = theme || (c == kPal[1]);
+    }
+  TEST_ASSERT_TRUE(yellow);
+  TEST_ASSERT_FALSE(theme);
+  TEST_ASSERT_EQUAL_HEX16(kPal[0], shown(20, 0));                           // beside it: background
+  TEST_ASSERT_EQUAL_HEX16(kPal[0], shown(0, 0));                            // the corner is transparent
+}
+
+void test_emoji_is_covered_by_later_drawing() {
+  s_c.noClip();
+  s_c.clear(0);
+  s_cap = CapturingDisplay();
+  s_c.text(0, 0, "\xf0\x9f\x98\x80", kEmojiFont, 1);
+  s_c.fillRect(0, 0, 16, 16, 1);                                            // a panel over all of it
+  s_c.flush(s_cap, kPal, true);
+  for (int y = 0; y < 16; y++)
+    for (int x = 0; x < 16; x++) TEST_ASSERT_EQUAL_HEX16(kPal[1], shown(x, y));
+  // Over half of it: the other half stays.
+  s_c.clear(0);
+  s_c.text(0, 0, "\xf0\x9f\x98\x80", kEmojiFont, 1);
+  s_c.fillRect(8, 0, 8, 16, 1);
+  s_c.flush(s_cap, kPal, true);
+  bool left = false;
+  for (int y = 0; y < 16; y++) {
+    for (int x = 0; x < 8; x++) left = left || shown(x, y) != kPal[0];
+    for (int x = 8; x < 16; x++) TEST_ASSERT_EQUAL_HEX16(kPal[1], shown(x, y));
+  }
+  TEST_ASSERT_TRUE(left);
+}
+
+void test_emoji_respects_the_clip() {
+  s_c.noClip();
+  s_c.clear(0);
+  s_cap = CapturingDisplay();
+  s_c.clip(0, 0, 8, 8);
+  s_c.text(0, 0, "\xf0\x9f\x98\x80", kEmojiFont, 1);
+  s_c.noClip();
+  s_c.flush(s_cap, kPal, true);
+  for (int y = 0; y < 16; y++)
+    for (int x = 0; x < 16; x++)
+      if (x >= 8 || y >= 8) TEST_ASSERT_EQUAL_HEX16(kPal[0], shown(x, y));
+}
+
+void test_emoji_change_repushes_rows_even_if_the_framebuffer_did_not() {
+  CountingDisplay d;
+  s_c.noClip();
+  s_c.clear(0);
+  s_c.flush(d, kPal, true);                                                 // everything pushed once
+  s_c.clear(0);
+  s_c.text(0, 0, "\xf0\x9f\x98\x80", kEmojiFont, 1);
+  d.rows = 0;
+  s_c.flush(d, kPal, false);
+  TEST_ASSERT_TRUE(d.rows >= 16);                                           // the emoji appeared
+  s_c.clear(0);
+  d.rows = 0;
+  s_c.flush(d, kPal, false);
+  TEST_ASSERT_TRUE(d.rows >= 16);                                           // and went again
+  d.rows = 0;
+  s_c.flush(d, kPal, false);
+  TEST_ASSERT_EQUAL(0, d.rows);                                             // nothing changed
+}
+
+void test_emoji_wrap_never_splits_a_sequence() {
+  memset(s_line, 0, sizeof s_line);
+  // Six 16 px emoji in 80 px: five, then one.
+  const char* six = "\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80\xf0\x9f\x98\x80";
+  int n = wrapText(six, kEmojiFont, 80, collect, nullptr);
+  TEST_ASSERT_EQUAL(2, n);
+  TEST_ASSERT_EQUAL(20, (int)strlen(s_line[0]));
+  TEST_ASSERT_EQUAL(4, (int)strlen(s_line[1]));
+  // A family is one element: it stays whole on the next line.
+  memset(s_line, 0, sizeof s_line);
+  const char* fam = "ab \xf0\x9f\x91\xa8\xe2\x80\x8d\xf0\x9f\x91\xa9\xe2\x80\x8d\xf0\x9f\x91\xa7";
+  n = wrapText(fam, kEmojiFont, 3 * 8 + 8, collect, nullptr);   // room for "ab " plus half the family
+  TEST_ASSERT_EQUAL(2, n);
+  TEST_ASSERT_EQUAL_STRING("ab", s_line[0]);
+  TEST_ASSERT_EQUAL(18, (int)strlen(s_line[1]));
+}
+
+void test_smallest_size_shows_one_replacement_per_emoji() {
+  // 5x8 has no emoji art: a matched sequence takes one cell, not one per code point.
+  TEST_ASSERT_EQUAL(5, Canvas::textWidth("\xe2\x9d\xa4\xef\xb8\x8f", &font_small));
+  TEST_ASSERT_EQUAL(5, Canvas::textWidth("\xf0\x9f\x98\x80", &font_small));
+}
+
+void test_emoji_scale_doubles_the_art() {
+  // The 24 row font draws 12 px art at 2x on the Cardputer profile and 24 px art on std;
+  // either way an emoji is two 12 px cells.
+  int adv;
+  Canvas::elem("\xf0\x9f\x98\x80", &font_xlarge, &adv);
+  TEST_ASSERT_EQUAL(24, adv);
+}
+
+#endif  // MC_UNICODE_EMOJI
+
 void test_wrap_breaks_at_spaces() {
   memset(s_line, 0, sizeof s_line);
   int n = wrapText("hello world again", &font_large, 8 * 11, collect, nullptr);  // 11 cols
@@ -337,6 +529,19 @@ int main(int, char**) {
   RUN_TEST(test_spleen_ascii_is_unchanged_by_layers);
   RUN_TEST(test_generated_fallback_draws_greek_and_marks_unknown);
   RUN_TEST(test_layers_cover_every_size);
+#if MC_UNICODE_EMOJI
+  RUN_TEST(test_emoji_match_sequences);
+  RUN_TEST(test_emoji_match_is_longest_and_glyph_is_distinct);
+  RUN_TEST(test_emoji_bare_text_characters_stay_text);
+  RUN_TEST(test_emoji_elements_have_double_width_and_invisibles_none);
+  RUN_TEST(test_emoji_flush_composites_colour_over_the_framebuffer);
+  RUN_TEST(test_emoji_is_covered_by_later_drawing);
+  RUN_TEST(test_emoji_respects_the_clip);
+  RUN_TEST(test_emoji_change_repushes_rows_even_if_the_framebuffer_did_not);
+  RUN_TEST(test_emoji_wrap_never_splits_a_sequence);
+  RUN_TEST(test_smallest_size_shows_one_replacement_per_emoji);
+  RUN_TEST(test_emoji_scale_doubles_the_art);
+#endif
   RUN_TEST(test_wrap_breaks_at_spaces);
   RUN_TEST(test_wrap_hard_breaks_long_words);
   return UNITY_END();

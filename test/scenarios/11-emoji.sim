@@ -1,0 +1,16 @@
+# Colour emoji in received messages: singles, selectors, tones, flags, joined
+# sequences, keycaps, a sequence we lack, and emoji in a long wrapped line.
+rx dm 0 MeshCore connected 📡 Signal strength 📶 Battery low 🔋⚠️
+rx dm 0 😀😂🤣😊😎 👍👎👋 ❤️💙💚 ✅❌ 🏠🚗☕
+rx dm 0 👍🏽👋🏿 🇺🇸🇨🇦🇯🇵 👨‍👩‍👧 MeshCore 🛰️ connected! 🇩🇪 🥹
+rx dm 0 Location received 📍🗺️ then 1️⃣2️⃣ and a long line so it wraps: 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥 done
+wait 200
+key enter
+shot emoji-chat
+key down 6
+shot emoji-chat-2
+key down 6
+shot emoji-chat-3
+key down 6
+shot emoji-chat-4
+key esc

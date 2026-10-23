@@ -17,6 +17,11 @@
 #ifndef MC_SCREEN_H
 #define MC_SCREEN_H 135
 #endif
+// Colour emoji on screen at once (each costs 20 bytes). A screenful of text
+// seldom holds more than a dozen; the T-Deck's larger screen gets more.
+#ifndef MC_MAX_EMOJI
+#define MC_MAX_EMOJI (MC_SCREEN_W * MC_SCREEN_H > 50000 ? 96 : 48)
+#endif
 
 namespace ui {
 
@@ -54,6 +59,18 @@ public:
   // a marquee.
   void textScrolled(int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, int offset);
 
+  // Colour emoji. The framebuffer holds theme palette indices, so a colour
+  // glyph is a sprite recorded here and composited over its pixels by flush().
+  // Anything drawn over it afterwards covers it, and clear() drops them all, so
+  // draw it where the rest of the text goes. False when MC_MAX_EMOJI are
+  // already placed. A glyph clipped away entirely counts as drawn.
+  bool emoji(int x, int y, const mc_emoji_t* e, int glyph);
+
+  // The text element at the start of s: a glyph, an emoji sequence, or
+  // something that takes no room (a variation selector). Returns its bytes
+  // (0 at the terminator) and its advance in pixels.
+  static int elem(const char* s, const mc_font_t* f, int* adv);
+
   // Limit drawing to a rectangle (for scrolling regions).
   void clip(int x, int y, int w, int h);
   void noClip() { clip(0, 0, W, H); }
@@ -64,6 +81,17 @@ public:
   const uint8_t* raw() const { return _fb; }
 
 private:
+  struct Sprite {
+    int16_t x, y;                       // top left, unclipped
+    int16_t vx0, vy0, vx1, vy1;         // the part still showing
+    uint16_t glyph;
+    uint32_t sig;                       // changes whenever the sprite does
+    const mc_emoji_t* e;
+  };
+  void cover(int x0, int y0, int x1, int y1);   // something was drawn over this
+
+  Sprite _spr[MC_MAX_EMOJI];
+  int _nspr = 0;
   uint8_t _fb[W / 2 * H];
   uint32_t _rowHash[H];
   int _cx0, _cy0, _cx1, _cy1;                 // clip, exclusive max

@@ -20,6 +20,34 @@ typedef struct {
     uint16_t index;
 } mc_run_t;
 
+// Colour emoji, drawn as sprites (ui/gfx/emoji.h). One sequence table is shared
+// by every size; each size has its own bitmaps and palette.
+//
+// A glyph is w x h pixels, 4 bits each, row after row with no padding between
+// rows, the high nibble first; index 0 is transparent and 1..15 select `pal`
+// (RGB565, entry 0 unused). It is drawn `scale` times larger, so the advance
+// is w * scale. `bitmaps` may be null (a size too small to show emoji): a
+// matched sequence then takes one replacement glyph's place.
+typedef struct {
+    uint16_t off;      // first code point in `cps`
+    uint8_t len;
+    uint16_t glyph;    // index into the bitmaps
+} mc_seq_t;
+
+typedef struct {
+    uint16_t nseqs;
+    uint8_t maxlen;    // longest sequence, in code points
+    const mc_seq_t *seqs;   // sorted by code points, lexicographically
+    const uint32_t *cps;
+} mc_emoji_seqs_t;
+
+typedef struct {
+    uint8_t w, h, scale;
+    const uint16_t *pal;
+    const uint8_t *bitmaps;
+    const mc_emoji_seqs_t *seqs;
+} mc_emoji_t;
+
 typedef struct mc_font {
     const char *name;
     uint8_t width, height, bytes_per_row, max_cols;
@@ -27,4 +55,5 @@ typedef struct mc_font {
     const mc_run_t *runs;
     const uint8_t *bitmaps;
     const struct mc_font *next;
+    const mc_emoji_t *emoji;   // null: this font draws no emoji
 } mc_font_t;

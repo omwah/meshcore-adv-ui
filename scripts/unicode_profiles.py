@@ -12,6 +12,8 @@ Spec syntax (the value of MC_UNICODE / custom_unicode):
     std,+math               a profile, plus a group at every size
     min,-greek              ... or minus one
     min,+0x2600-0x26ff      ... plus a raw code point range (also U+2600-U+26FF)
+    min,+emoji-common       ... plus an emoji tier (scripts/emoji_set.py)
+    std,-emoji              ... or without any emoji
     none                    Spleen only, exactly as before the layers existed
 
 Policy: emoji coverage comes first and rarely used writing systems and symbols
@@ -56,6 +58,21 @@ _STD = {
     "font_xlarge": ["latin-ext-a", "greek", "cyrillic", "punct", "currency", "arrows"],
 }
 
+# Colour emoji per profile. `sizes` maps each Spleen font to the bitmap size its
+# emoji are drawn from and the integer scale they are drawn at, or None for a
+# size too small to show them (a matched emoji then takes one replacement
+# glyph's place). `bytes` caps the bitmaps of all native sizes together (the
+# emoji of a tier are taken in order until it is spent); None for no cap.
+# The 24-row font reuses the 12 px art at 2x on the Cardputer: its native art
+# would cost more than the other sizes together.
+_SIZES_SCALED = {"font_small": None, "font_medium": (12, 1), "font_large": (16, 1), "font_xlarge": (12, 2)}
+_SIZES_NATIVE = {"font_small": None, "font_medium": (12, 1), "font_large": (16, 1), "font_xlarge": (24, 1)}
+EMOJI = {
+    "none": None,
+    "min": {"tiers": ["core"], "sizes": _SIZES_SCALED, "bytes": None},
+    "std": {"tiers": ["core", "common"], "sizes": _SIZES_NATIVE, "bytes": 150000},
+}
+
 PROFILES = {
     "none": {s: [] for s in _MIN},
     "min": _MIN,
@@ -80,7 +97,8 @@ def _group_ranges(name):
 
 
 def resolve(spec=""):
-    """Spec -> (normalized spec, {font symbol: [group or range names]})."""
+    """Spec -> (normalized spec, {font symbol: [group or range names]}, emoji
+    settings or None)."""
     terms = [t.strip() for t in (spec or DEFAULT).split(",") if t.strip()]
     # A raw range contains no comma, so splitting on commas is safe, but a
     # profile name comes first and is optional.
@@ -90,10 +108,33 @@ def resolve(spec=""):
     if base not in PROFILES:
         raise ValueError(f"unknown Unicode profile {base!r}; have {', '.join(sorted(PROFILES))}")
     groups = {s: list(g) for s, g in PROFILES[base].items()}
+    emoji = None
+    if EMOJI[base]:
+        emoji = {"tiers": list(EMOJI[base]["tiers"]), "sizes": dict(EMOJI[base]["sizes"]),
+                 "bytes": EMOJI[base]["bytes"]}
     for t in terms:
         if t[0] not in "+-":
             raise ValueError(f"expected +group or -group, got {t!r}")
         name = t[1:]
+        if name == "emoji" or name.startswith("emoji-"):
+            import emoji_set
+            tier = name[6:]
+            if tier and tier not in emoji_set.TIERS:
+                raise ValueError(f"unknown emoji tier {tier!r}; have {', '.join(sorted(emoji_set.TIERS))}")
+            if t[0] == "-":
+                if tier and emoji:
+                    emoji["tiers"] = [x for x in emoji["tiers"] if x != tier]
+                    if not emoji["tiers"]:
+                        emoji = None
+                else:
+                    emoji = None
+            else:
+                if emoji is None:
+                    emoji = {"tiers": [], "sizes": dict(EMOJI["std"]["sizes"]), "bytes": EMOJI["std"]["bytes"]}
+                for x in ([tier] if tier else EMOJI["std"]["tiers"]):
+                    if x not in emoji["tiers"]:
+                        emoji["tiers"].append(x)
+            continue
         if _group_ranges(name) is None:
             raise ValueError(f"unknown group {name!r}; have {', '.join(sorted(GROUPS))}")
         for g in groups.values():
@@ -101,7 +142,7 @@ def resolve(spec=""):
                 g.append(name)
             elif t[0] == "-" and name in g:
                 g.remove(name)
-    return ",".join([base] + terms), groups
+    return ",".join([base] + terms), groups, emoji
 
 
 def ranges_for(names):

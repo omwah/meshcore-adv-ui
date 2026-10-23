@@ -19,6 +19,7 @@ platformio = ">=6.1"
 pillow = ">=11"
 sdl2 = ">=2.30"
 pkg-config = "*"
+fonttools = ">=4.67.0,<5"
 
 [tasks]
 deps     = "scripts/prepare-deps.sh"
