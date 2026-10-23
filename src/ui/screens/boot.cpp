@@ -1,5 +1,6 @@
 // Splash shown while the mesh starts, then Home. On a fresh install with a
 // backup on the SD card, offers to restore it first.
+#include "ui/icons_nav.h"
 #include "ui/screens/screens.h"
 #include <stdio.h>
 
@@ -39,11 +40,19 @@ public:
     const mc_font_t* big = &font_xlarge;
     const mc_font_t* med = &font_large;
     const mc_font_t* sm = &font_medium;
-    // "MeshCore" on top, the node's name large in a band, then its key and
-    // the firmware version, laid out for 135 rows and centred on taller screens.
+    // "MeshMash" on top, followed by a link and a keyboard (this is a
+    // keyboard-driven client), the node's name large in a band, then its key
+    // and the firmware version, laid out for 135 rows and centred on taller
+    // screens.
     const int oy = r.h > 135 ? (r.h - 135) / 2 : 0;
-    const char* t = "MeshCore";
-    c.text((r.w - Canvas::textWidth(t, med)) / 2, oy + 10, t, med, C_ACCENT);
+    const char* t = "MeshMash";
+    const int IC = 16, GAP = 6;
+    const int tw = Canvas::textWidth(t, med);
+    int tx = (r.w - (tw + 2 * (GAP + IC))) / 2;
+    c.text(tx, oy + 10, t, med, C_ACCENT);
+    tx += tw + GAP;
+    c.bitmapWide(tx, oy + 10, icon::splash16_link, IC, IC, C_ACCENT);
+    c.bitmapWide(tx + IC + GAP, oy + 10, icon::splash16_keyboard, IC, IC, C_ACCENT);
     int bandY = oy + 34, bandH = big->height + 12;
     c.fillRect(0, bandY, r.w, bandH, C_HEAD);
     c.hline(0, bandY + bandH, r.w, C_ACCENT);
