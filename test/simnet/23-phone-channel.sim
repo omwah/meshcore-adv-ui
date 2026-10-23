@@ -1,0 +1,10 @@
+# A channel message a phone app sends through the node shows up on the device as
+# ours: in the channel's history, not counted as unread.
+phone on
+wait 1000
+phone chan 0 Posted from the phone
+wait 1500
+expect lastmsg Posted from the phone
+expect unread 0
+key menu
+key enter

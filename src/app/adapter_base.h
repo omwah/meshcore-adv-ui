@@ -118,6 +118,11 @@ protected:
     uint8_t key[6];
     uint8_t attempt;
     bool used;
+    bool phoneOwned;                 // sent by a phone app: it retries, we only show the outcome
+  };
+  struct PhoneSent {               // recent DMs a phone sent, to tell its retries from new messages
+    uint8_t key[6];
+    uint32_t ts, seq;
   };
   struct Signal {                  // last direct reception per contact
     uint8_t key[4];
@@ -232,6 +237,8 @@ protected:
   static constexpr int MAX_PENDING = 6, MAX_SIGNALS = 48, MAX_HEARD = 24, MAX_LOG = 40, MAX_NEIGH = 16;
   static constexpr int MAX_DM_ATTEMPTS = 3;   // then one last flood if a path was in use
   Pending _pending[MAX_PENDING] = {};
+  PhoneSent _phoneSent[4] = {};
+  uint8_t _phoneSentNext = 0;
   Signal _signals[MAX_SIGNALS] = {};
   Heard _heard[MAX_HEARD];
   int _nHeard = 0;

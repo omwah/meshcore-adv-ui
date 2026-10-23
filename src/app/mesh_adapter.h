@@ -32,6 +32,8 @@ public:
                        uint32_t sender_ts, const uint8_t* extra, int extra_len, const char* text) override;
   void onChannelMessage(uint8_t channel_idx, uint8_t path_len, float snr, uint32_t ts, const char* text) override;
   void onAckReceived(const uint8_t* ack) override;
+  void onSentMessage(const uint8_t* pub_key_prefix, uint8_t channel_idx, uint8_t attempt, uint32_t timestamp,
+                     uint32_t expected_ack, uint32_t est_timeout, const char* text) override;
   void onContactResponse(const ContactInfo& from, const uint8_t* data, uint8_t len) override;
   void onTraceData(uint32_t tag, uint8_t flags, const uint8_t* hashes, const uint8_t* snrs, uint8_t path_len,
                    float final_snr) override;

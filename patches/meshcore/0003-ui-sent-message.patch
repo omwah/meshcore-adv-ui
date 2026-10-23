@@ -1,0 +1,41 @@
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/AbstractUITask.h b/examples/companion_radio/AbstractUITask.h
+--- a/examples/companion_radio/AbstractUITask.h	2026-10-23 14:16:01.032563151 -0700
++++ b/examples/companion_radio/AbstractUITask.h	2026-10-23 14:16:00.983220238 -0700
+@@ -55,6 +55,12 @@
+                            uint8_t path_len, float final_snr) { }
+   virtual void onRawRx(float snr, float rssi, const uint8_t* raw, int len) { }
+   virtual void onControlData(float snr, float rssi, uint8_t path_len, const uint8_t* payload, int len) { }
++  // A message a connected app asked the node to send (the UI's own sends do not come
++  // through here). pub_key_prefix is the 6-byte recipient of a direct message, null
++  // for a channel (then channel_idx is set, and text is the message without our name).
++  // expected_ack is the ACK a direct message waits for. The app owns any retry.
++  virtual void onSentMessage(const uint8_t* pub_key_prefix, uint8_t channel_idx, uint8_t attempt, uint32_t timestamp,
++                             uint32_t expected_ack, uint32_t est_timeout, const char* text) { }
+   virtual void onPathResponse(const ContactInfo& from, uint8_t in_path_len, uint8_t out_path_len, uint8_t extra_type,
+                               const uint8_t* extra, uint8_t extra_len) { }   // a returned path (e.g. path discovery)
+ };
+diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.cpp b/examples/companion_radio/MyMesh.cpp
+--- a/examples/companion_radio/MyMesh.cpp	2026-10-23 14:16:01.033334207 -0700
++++ b/examples/companion_radio/MyMesh.cpp	2026-10-23 14:16:00.983676506 -0700
+@@ -1173,6 +1173,7 @@
+           next_ack_idx = (next_ack_idx + 1) % EXPECTED_ACK_TABLE_SIZE;
+         }
+ 
++        if (_ui && txt_type == TXT_TYPE_PLAIN) _ui->onSentMessage(pub_key_prefix, 0, attempt, msg_timestamp, expected_ack, est_timeout, text);
+         out_frame[0] = RESP_CODE_SENT;
+         out_frame[1] = (result == MSG_SEND_SENT_FLOOD) ? 1 : 0;
+         memcpy(&out_frame[2], &expected_ack, 4);
+@@ -1199,6 +1200,13 @@
+       ChannelDetails channel;
+       bool success = getChannel(channel_idx, channel);
+       if (success && sendGroupMessage(msg_timestamp, channel.channel, _prefs.node_name, text, len - i)) {
++        if (_ui) {
++          char plain[MAX_TEXT_LEN + 1];
++          int n = len - i < MAX_TEXT_LEN ? len - i : MAX_TEXT_LEN;
++          memcpy(plain, text, n);
++          plain[n] = 0;
++          _ui->onSentMessage(NULL, channel_idx, 0, msg_timestamp, 0, 0, plain);
++        }
+         writeOKFrame();
+       } else {
+         writeErrFrame(ERR_CODE_NOT_FOUND); // bad channel_idx

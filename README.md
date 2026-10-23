@@ -233,6 +233,13 @@ about 0.3 MB smaller than stock even with the UI and remote mode. The phone apps
 service; a phone that was paired with a Bluedroid build has to forget the
 device and pair again once.
 
+**Messages and the phone app (local mode).** What the node receives reaches both the phone
+and this device. A message sent from the phone also appears here, as yours, with its
+delivery status (a DM shows pending, then delivered when the ACK comes; the phone does
+its own retries). The other direction is a limit of MeshCore's phone protocol, not of this
+firmware: it has no frame for "a message I sent", only received ones, so a message sent
+on this device cannot appear in the phone app's history.
+
 ### Simulators
 
 There are two simulators. Both run the real UI on a virtual clock, and key

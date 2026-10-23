@@ -1,0 +1,35 @@
+# Messages a phone app sends through the node show up on the device, as ours:
+# pending, then delivered on the ACK; the phone's retry is not a second message; an
+# unanswered one fails; a channel send appears.
+node Erin 6
+as Erin advert
+wait 3000
+phone on
+key menu
+key down 3
+key enter
+wait 2000
+hold esc 900
+key right
+key enter
+wait 500
+phone dm Erin Sent from the phone
+wait 500
+expect window 1
+expect last Sent from the phone
+wait 4000
+expect status delivered
+shot phone-dm-delivered
+# The phone sends it again (a retry of the same message): still one.
+phone retry
+wait 3000
+expect window 1
+# A new message the contact cannot ACK: pending, then failed once the wait is over.
+unlink Cardputer Erin
+phone dm Erin Anyone there?
+wait 500
+expect window 2
+expect status pending
+wait 30000
+expect status failed
+shot phone-dm-failed

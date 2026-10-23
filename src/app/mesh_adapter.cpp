@@ -383,6 +383,56 @@ bool MeshAdapter::sendDirect(const ContactRef& c, model::Message& m) {
 
 void MeshAdapter::onAckReceived(const uint8_t* ack) { ackReceived(rd32(ack)); }
 
+// A message a phone app sent through the node: show it as ours. The phone retries a DM
+// itself (same timestamp, a higher attempt), so a retry only renews the wait for its ACK.
+void MeshAdapter::onSentMessage(const uint8_t* key, uint8_t channel_idx, uint8_t attempt, uint32_t ts,
+                                uint32_t expected_ack, uint32_t est_timeout, const char* text) {
+  if (!text[0]) return;
+  model::Message m;
+  memset(&m, 0, sizeof m);
+  m.ts = ts;
+  m.outgoing = true;
+  m.snr_x4 = INT8_MIN;
+  snprintf(m.text, sizeof m.text, "%s", text);
+
+  if (!key) {   // a channel: no ACK to wait for
+    messageCount(model::ThreadId{model::ThreadKind::Channel, channel_idx});
+    m.status = model::Delivery::Sent;
+    appendOutgoing(ThreadKey::channel(channel_idx), m);
+    _rev++;
+    return;
+  }
+
+  PhoneSent* known = nullptr;
+  for (auto& ps : _phoneSent)
+    if (ps.seq && ps.ts == ts && !memcmp(ps.key, key, 6)) known = &ps;
+  uint32_t seq;
+  if (known) {
+    seq = known->seq;
+  } else {
+    m.status = model::Delivery::Pending;
+    seq = appendOutgoing(ThreadKey::direct(key), m);
+    if (!seq) return;
+    PhoneSent& slot = _phoneSent[_phoneSentNext++ % 4];
+    memcpy(slot.key, key, 6);
+    slot.ts = ts;
+    slot.seq = seq;
+  }
+  Pending* p = nullptr;
+  for (auto& q : _pending)
+    if (q.used && q.seq == seq) p = &q;
+  if (!p) p = newPending();
+  if (!p) return;
+  if (p->used) p->prevAck = p->ack;
+  else { memset(p, 0, sizeof *p); p->seq = seq; p->ts = ts; memcpy(p->key, key, 6); p->used = true; p->phoneOwned = true; }
+  p->attempt = attempt;
+  p->ack = expected_ack;
+  p->sentAt = millis();
+  p->timeout = est_timeout + 1000;
+  if (known) _msgs.setStatus(seq, model::Delivery::Pending, attempt);
+  _rev++;
+}
+
 void MeshAdapter::loop() {
   uint32_t ms = millis();
   retryPending(ms);

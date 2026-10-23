@@ -440,6 +440,12 @@ void AdapterBase::ackReceived(uint32_t a) {
 void AdapterBase::retryPending(uint32_t ms) {
   for (auto& p : _pending) {
     if (!p.used || ms - p.sentAt < p.timeout) continue;
+    if (p.phoneOwned) {   // the phone retries (and a retry or late ACK revives it); we only say it failed
+      _msgs.setStatus(p.seq, model::Delivery::Failed, p.attempt);
+      p.used = false;
+      _rev++;
+      continue;
+    }
     int ci = contactIndex(p.key);
     ContactRef c;
     bool have = ci >= 0 && contactAt(ci, c);

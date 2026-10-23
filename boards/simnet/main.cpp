@@ -21,6 +21,10 @@
 //   wipe                          erase the UI node's flash and reboot (fresh install)
 //   sd on|off                     insert or remove the SD card (sim-data/.../sd)
 //   ble on|off                    remote mode: drop or restore the Bluetooth link
+//   phone on|off                  local mode: a phone app connects to (or leaves) the node
+//   phone dm <node> <text>        the phone sends a DM through the node's own command handler
+//   phone retry                   it sends the last DM again, same timestamp, next attempt
+//   phone chan <slot> <text>      it sends to a channel
 //   nodewipe                      remote mode: erase the node (do it with the link off)
 //   nopair (before anything else) remote mode: don't connect by itself; the UI chooses the node
 //   blepin <pin>                  remote mode: the node's Bluetooth PIN (default 123456)
@@ -143,7 +147,8 @@ public:
       return;
     }
     _uiNode.reset();
-    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_local, format));
+    _phone.linkUp(false);   // a restart drops the phone
+    _uiNode.reset(new SimNode(_medium, 0, "Cardputer", _dir + "/ui", kEpoch, &_local, format, &_phone));
     bool fresh = !_uiNode->fs().exists("/identity/_main.id");
     _uiNode->begin();
     _local.begin(_uiNode->mesh(), _uiNode->store(), *rtcOf(*_uiNode), _uiNode->fs(), false, fresh);
@@ -237,6 +242,7 @@ public:
       return true;
     }
     if (!strcmp(cmd, "sd")) { _plat.card = !strcmp(arg, "on"); return true; }
+    if (!strcmp(cmd, "phone")) return phone(arg, err, n);
     if (!strcmp(cmd, "ble")) {   // remote mode: the Bluetooth link
       _bleOff = strcmp(arg, "on") != 0;
       _pipe.linkUp(!_bleOff);
@@ -273,6 +279,57 @@ public:
 
 private:
   static mesh::RTCClock* rtcOf(SimNode& n) { return n.mesh().getRTCClock(); }
+
+  // A phone app on the node's Bluetooth: it speaks MeshCore's companion protocol, so
+  // its sends reach MyMesh's own command handler (CMD_SEND_TXT_MSG, CMD_SEND_CHANNEL_TXT_MSG).
+  bool phone(const char* arg, char* err, size_t n) {
+    char what[8] = {};
+    int used = 0;
+    sscanf(arg, "%7s %n", what, &used);
+    const char* rest = arg + used;
+    if (_remote) { snprintf(err, n, "phone: local mode only"); return true; }
+    if (!strcmp(what, "on") || !strcmp(what, "off")) { _phone.linkUp(what[1] == 'n'); return true; }
+    uint8_t f[MAX_FRAME_SIZE];
+    int len = 0;
+    uint32_t ts = _phoneTs;
+    if (!strcmp(what, "dm")) {
+      char name[32] = {};
+      int u2 = 0;
+      sscanf(rest, "%31s %n", name, &u2);
+      auto it = _bots.find(name);
+      if (it == _bots.end()) { snprintf(err, n, "no node '%s'", name); return true; }
+      memcpy(_phoneKey, it->second.node->mesh().self_id.pub_key, 6);
+      snprintf(_phoneText, sizeof _phoneText, "%s", rest + u2);
+      ts = _phoneTs = _uiNode->mesh().getRTCClock()->getCurrentTimeUnique();
+      _phoneAttempt = 0;
+    } else if (!strcmp(what, "retry")) {
+      _phoneAttempt++;
+    } else if (!strcmp(what, "chan")) {
+      int slot = 0, u2 = 0;
+      sscanf(rest, "%d %n", &slot, &u2);
+      f[len++] = 3;   // CMD_SEND_CHANNEL_TXT_MSG
+      f[len++] = 0;   // TXT_TYPE_PLAIN
+      f[len++] = (uint8_t)slot;
+      uint32_t t = _uiNode->mesh().getRTCClock()->getCurrentTimeUnique();
+      memcpy(&f[len], &t, 4); len += 4;
+      int tl = (int)strlen(rest + u2);
+      memcpy(&f[len], rest + u2, tl); len += tl;
+      if (!_phone.send(f, len)) snprintf(err, n, "phone is not connected");
+      return true;
+    } else {
+      snprintf(err, n, "phone what? '%s'", what);
+      return true;
+    }
+    f[len++] = 2;   // CMD_SEND_TXT_MSG
+    f[len++] = 0;   // TXT_TYPE_PLAIN
+    f[len++] = _phoneAttempt;
+    memcpy(&f[len], &ts, 4); len += 4;
+    memcpy(&f[len], _phoneKey, 6); len += 6;
+    int tl = (int)strlen(_phoneText);
+    memcpy(&f[len], _phoneText, tl); len += tl;
+    if (!_phone.send(f, len)) snprintf(err, n, "phone is not connected");
+    return true;
+  }
 
   bool asNode(const char* arg, char* err, size_t n) {
     char name[32] = {}, what[16] = {};
@@ -456,6 +513,10 @@ private:
   app::MeshAdapter& _local;
   app::RemoteAdapter* _remote;
   PipeLink& _pipe;
+  PipeLink _phone;   // local mode: the phone app's end of the node's serial interface
+  uint32_t _phoneTs = 0;
+  uint8_t _phoneKey[6] = {}, _phoneAttempt = 0;
+  char _phoneText[160] = "";
   fs::FS _remoteFs;
   MultiSerialInterface& _ifaces;
   SimMedium _medium;
