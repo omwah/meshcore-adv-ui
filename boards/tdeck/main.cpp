@@ -100,7 +100,7 @@ static void setupRemote() {
   ui_app->setTouch(&touch);
   ui_app->begin(ui::screens::boot());
   board.onBootComplete();
-  Serial.printf("meshcore-adv-ui %s (remote node mode): keyboard %s, touch %s, sd %s, heap %u (min %u)\n",
+  Serial.printf("meshmash %s (remote node mode): keyboard %s, touch %s, sd %s, heap %u (min %u)\n",
                 MC_UI_VERSION, keyboard.present() ? (keyboard.rawMode() ? "ok" : "chars only") : "MISSING",
                 touch.present() ? "ok" : "MISSING", platform.sd() ? "yes" : "no", (unsigned)platform.heapFree(),
                 (unsigned)platform.heapMin());
@@ -158,7 +158,7 @@ void setup() {
   if (!adapter.prefs().bleEnabled) adapter.disableBluetooth();
   board.onBootComplete();
   // One status line for bring-up (no keys, names or addresses).
-  Serial.printf("meshcore-adv-ui %s: flash fs %s, keyboard %s, touch %s, sd %s, contacts %d, heap %u (min %u), psram %u\n",
+  Serial.printf("meshmash %s: flash fs %s, keyboard %s, touch %s, sd %s, contacts %d, heap %u (min %u), psram %u\n",
                 MC_UI_VERSION, fs_ok ? "ok" : "MISSING",
                 keyboard.present() ? (keyboard.rawMode() ? "ok" : "chars only") : "MISSING",
                 touch.present() ? "ok" : "MISSING", platform.sd() ? "yes" : "no", the_mesh.getNumContacts(),

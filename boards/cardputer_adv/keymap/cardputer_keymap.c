@@ -2,7 +2,7 @@
  * Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
  * (licenses/Apache-2.0.txt).
  *
- * Derived from esp-vim's esp_kbd_cardputer.c for meshcore-adv-ui. Changes: renamed
+ * Derived from esp-vim's esp_kbd_cardputer.c for MeshMash. Changes: renamed
  * (esp_kbd_cardputer -> cardputer_keymap), uses kbd_report.h, and adds
  * text_mode: with it set, the keys printed with arrows (; , . /) type their
  * characters plainly and give the arrows with Fn, for typing messages; and

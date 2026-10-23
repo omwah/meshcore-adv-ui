@@ -85,7 +85,7 @@ static void setupRemote() {
   ui_app->setLed(&led);
   ui_app->begin(ui::screens::boot());
   board.onBootComplete();
-  Serial.printf("meshcore-adv-ui %s (remote node mode): keyboard %s, speaker %s, sd %s, heap %u (min %u)\n",
+  Serial.printf("meshmash %s (remote node mode): keyboard %s, speaker %s, sd %s, heap %u (min %u)\n",
                 MC_UI_VERSION, keyboard.present() ? "ok" : "MISSING", sound.present() ? "ok" : "MISSING",
                 platform.sd() ? "yes" : "no", (unsigned)platform.heapFree(), (unsigned)platform.heapMin());
 }
@@ -146,7 +146,7 @@ void setup() {
   };
 #endif
   // One status line for bring-up (no keys, names or addresses).
-  Serial.printf("meshcore-adv-ui %s: flash fs %s, lora-cap %s, keyboard %s, speaker %s, sd %s, contacts %d, heap %u (min %u)\n",
+  Serial.printf("meshmash %s: flash fs %s, lora-cap %s, keyboard %s, speaker %s, sd %s, contacts %d, heap %u (min %u)\n",
                 MC_UI_VERSION, fs_ok ? "ok" : "MISSING", board.loraCapPresent() ? "ok" : "MISSING", keyboard.present() ? "ok" : "MISSING",
                 sound.present() ? "ok" : "MISSING",
                 platform.sd() ? "yes" : "no", the_mesh.getNumContacts(), (unsigned)platform.heapFree(),

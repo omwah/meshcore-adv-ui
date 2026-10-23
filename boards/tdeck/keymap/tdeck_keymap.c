@@ -2,7 +2,7 @@
  * Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
  * (licenses/Apache-2.0.txt).
  *
- * Derived from esp-vim's esp_kbd_tdeck.c for meshcore-adv-ui. Changes: renamed
+ * Derived from esp-vim's esp_kbd_tdeck.c for MeshMash. Changes: renamed
  * (esp_kbd_tdeck -> tdeck_keymap), uses kbd_report.h, and Sym-Enter sends
  * the HID Application (Menu) key.
  */

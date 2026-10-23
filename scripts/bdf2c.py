@@ -3,7 +3,7 @@
 # Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
 # (licenses/Apache-2.0.txt).
 #
-# Modified for meshcore-adv-ui: added the optional HEADER, TYPE and RANGES
+# Modified for MeshMash: added the optional HEADER, TYPE and RANGES
 # arguments (generated include, struct type name, and a code point filter so
 # only the glyphs the UI needs are linked). Behaviour without them is unchanged.
 """

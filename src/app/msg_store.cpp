@@ -76,12 +76,12 @@ bool MessageStore::begin(fs::FS* fs, const char* tag) {
     snprintf(_file, sizeof _file, "/ui/%s-msgs.bin", tag);
     snprintf(_readFile, sizeof _readFile, "/ui/%s-read.bin", tag);
     snprintf(_hiddenFile, sizeof _hiddenFile, "/ui/%s-hidden.bin", tag);
-    snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history/%s", tag);
+    snprintf(_archDir, sizeof _archDir, "/meshmash/history/%s", tag);
   } else {
     snprintf(_file, sizeof _file, "/ui/msgs.bin");
     snprintf(_readFile, sizeof _readFile, "/ui/read.bin");
     snprintf(_hiddenFile, sizeof _hiddenFile, "/ui/hidden.bin");
-    snprintf(_archDir, sizeof _archDir, "/meshcore-adv-ui/history");
+    snprintf(_archDir, sizeof _archDir, "/meshmash/history");
   }
   _nThreads = 0;
   _nextSeq = 1;
@@ -295,8 +295,8 @@ void MessageStore::archivePath(const ThreadKey& k, char* out, int n) const {
 void MessageStore::archive(const Rec& r) {
   char path[64];
   archivePath(r.key, path, sizeof path);
-  _sd->mkdir("/meshcore-adv-ui");
-  _sd->mkdir("/meshcore-adv-ui/history");
+  _sd->mkdir("/meshmash");
+  _sd->mkdir("/meshmash/history");
   _sd->mkdir(_archDir);
   File f = _sd->open(path, "a", true);
   if (!f) return;

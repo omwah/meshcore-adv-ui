@@ -1,12 +1,12 @@
-# Installing meshcore-adv-ui
+# Installing MeshMash
 
 Images for the M5Stack Cardputer ADV with the Cap LoRa-1262. Build them with
 `pixi run package`. They are written to `dist/<version>/`:
 
 | File | Use it with |
 |---|---|
-| `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` | esptool, web flashers, M5Burner: one image, written at offset `0x0`; and Launcher from the SD card |
-| `meshcore-adv-ui-<ver>-cardputer_adv.bin` | Launcher's WebUI install (`pixi run launcher-install`), or anything that installs an app at `0x10000` |
+| `meshmash-<ver>-cardputer_adv-full.bin` | esptool, web flashers, M5Burner: one image, written at offset `0x0`; and Launcher from the SD card |
+| `meshmash-<ver>-cardputer_adv.bin` | Launcher's WebUI install (`pixi run launcher-install`), or anything that installs an app at `0x10000` |
 | `...-cardputer_adv_usb...` | The same pair for the USB-only build (no Bluetooth, about 0.23 MB smaller) |
 | `SHA256SUMS` | Checksums of the above |
 
@@ -41,7 +41,7 @@ After flashing, press the reset button or power-cycle the device.
 ## esptool (command line)
 
 ```sh
-pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32s3 write_flash 0x0 meshcore-adv-ui-<ver>-cardputer_adv-full.bin
+pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32s3 write_flash 0x0 meshmash-<ver>-cardputer_adv-full.bin
 ```
 
 From a source checkout, `pio run -e cardputer_adv -t upload` builds and flashes
@@ -63,7 +63,7 @@ If it asks for an address, use `0x0`.
 ## M5Launcher (bmorcelli's Launcher)
 
 From the SD card:
-1. Copy `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` (or `-tdeck-full.bin`)
+1. Copy `meshmash-<ver>-cardputer_adv-full.bin` (or `-tdeck-full.bin`)
    to the SD card. Use the `-full` image: Launcher reads its partition table
    and makes the `spiffs` partition the firmware saves to. From the app-only
    image it makes none, and then nothing is saved.
@@ -74,9 +74,9 @@ Over WiFi, from a source checkout: start Launcher's WebUI on the device, then
 pixi run launcher-install <IP> --replace --boot
 ```
 This builds, packages and installs the newest BLE image. `--replace` deletes an
-earlier `meshcore-adv-ui` in Launcher's menu first; without it a second copy is
+earlier `meshmash` in Launcher's menu first; without it a second copy is
 added. `--variant tdeck` installs the T-Deck build, and `--usb` the USB-only
-build as `meshcore-adv-ui-usb`. `--upload [FOLDER]` only copies the `-full`
+build as `meshmash-usb`. `--upload [FOLDER]` only copies the `-full`
 image to the SD card in the device (to `/` by default), to install from
 Launcher's SD browser later. The WebUI login is Launcher's default unless
 `LAUNCHER_USER` and `LAUNCHER_PASS` are set.
@@ -97,7 +97,7 @@ backup on the card, it offers to restore it.
 
 ## Coming from stock MeshCore
 
-meshcore-adv-ui runs stock MeshCore underneath and keeps its files on the
+MeshMash runs stock MeshCore underneath and keeps its files on the
 SPIFFS partition in the stock format. If you flash only the app (Launcher, or
 an app-only write to `0x10000`), an existing companion's identity, contacts
 and channels carry over. A `-full.bin` write at `0x0` keeps them too, because

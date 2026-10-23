@@ -333,7 +333,7 @@ void RemoteAdapter::onReply(uint8_t cmd, uint32_t cookie, const uint8_t* f, int 
       if (code == cp::RC_DEVICE_INFO) {
         cp::parseDeviceInfo(f, len, _dev);
         allocTables(_dev.maxContacts ? _dev.maxContacts : 100, _dev.maxChannels ? _dev.maxChannels : 8);
-        q(out, cp::encAppStart(out, "meshcore-adv-ui"), CK_SYNC_CHAIN);
+        q(out, cp::encAppStart(out, "meshmash"), CK_SYNC_CHAIN);
       }
       break;
     case cp::APP_START:
@@ -1212,7 +1212,7 @@ model::Diag RemoteAdapter::diag() const {
 // ------------------------------------------------------------------ backup (the node's own)
 
 const char* RemoteAdapter::backupPath(bool previous) const {
-  return _bkPath[previous][0] ? _bkPath[previous] : (previous ? "/meshcore-adv-ui/remote.bak" : "/meshcore-adv-ui/remote.bin");
+  return _bkPath[previous][0] ? _bkPath[previous] : (previous ? "/meshmash/remote.bak" : "/meshmash/remote.bin");
 }
 
 // What the node holds (settings, channels with their keys, contacts as the

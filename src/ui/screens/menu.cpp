@@ -98,7 +98,7 @@ protected:
         uint8_t k[6];
         a.m().selfKey(k);
         snprintf(body, sizeof body,
-                 "meshcore-adv-ui\nKeyboard UI for MeshCore\n\nNode: %s\nKey: %02X%02X%02X%02X...\n\n"
+                 "MeshMash\nKeyboard-native MeshCore\n\nNode: %s\nKey: %02X%02X%02X%02X...\n\n"
                  "Firmware " MC_UI_VERSION "\nMIT licensed.",
                  a.m().prefs().nodeName, k[0], k[1], k[2], k[3]);
         openText(a, "About", body);
@@ -479,7 +479,7 @@ protected:
     }
     c.text(r.x + 4, r.y + 2, l, s, b.cardPresent ? C_TEXT : C_WARN, -1, r.w - 8);
     if (b.lastError[0]) c.text(r.x + 4, r.y + 2 + lh, b.lastError, s, C_ERR, -1, r.w - 8);
-    else c.text(r.x + 4, r.y + 2 + lh, remoteMode(a) ? "of the remote node, on this SD card" : "/meshcore-adv-ui/backup.bin", s,
+    else c.text(r.x + 4, r.y + 2 + lh, remoteMode(a) ? "of the remote node, on this SD card" : "/meshmash/backup.bin", s,
                 C_DIM, -1, r.w - 8);
     return 2 * lh + 6;
   }

@@ -3,12 +3,12 @@
 # Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
 # (licenses/Apache-2.0.txt).
 #
-# Changes for meshcore-adv-ui: installs this project's packaged app image
+# Changes for MeshMash: installs this project's packaged app image
 # (the newest in dist/ for the variant, BLE or --usb build) under the name
-# meshcore-adv-ui; no SD runtime upload; a reboot that drops the connection
+# meshmash; no SD runtime upload; a reboot that drops the connection
 # counts as done.
 """
-Install a meshcore-adv-ui build on a Cardputer or T-Deck running bmorcelli's
+Install a MeshMash build on a Cardputer or T-Deck running bmorcelli's
 Launcher, over Launcher's web interface (WebUI), the way its own page does.
 
     pixi run launcher-install IP [--variant V] [--usb] [--replace] [--boot]
@@ -20,9 +20,10 @@ BIN    the image (default: the newest dist/<ver>/...-cardputer_adv.bin, or
        ...-tdeck.bin, that `pixi run package` made; with --upload the merged
        ...-full.bin)
 --variant  the board: cardputer (default) or tdeck
---usb  the USB-only build instead (installed as meshcore-adv-ui-usb)
---name the app's name in Launcher's menu (default: meshcore-adv-ui)
---replace  first delete any installed app of that name, so a new build takes
+--usb  the USB-only build instead (installed as meshmash-usb)
+--name the app's name in Launcher's menu (default: meshmash)
+--replace  first delete any installed app of that name (or the old name,
+       meshcore-adv-ui), so a new build takes
        its place rather than adding a copy. Launcher applies a partition change
        by restarting: start its WebUI again when asked.
 --boot restart into the app once it is installed (installing already makes it
@@ -148,21 +149,22 @@ class Launcher:
         if not any(c.name == "ESP32SESSION" for c in self.jar):
             die("login refused: set $LAUNCHER_USER and $LAUNCHER_PASS to the WebUI's login")
 
-    def apps_named(self, name):
+    def apps_named(self, names):
         status, text = self.request("GET", "/partitions")
         if status != 200:
             die(f"GET /partitions: {status} {text}")
         table = json.loads(text)
         return [e for e in table["entries"]
-                if e["type"] == 0 and e.get("appName") == name and not e.get("running")]
+                if e["type"] == 0 and e.get("appName") in names and not e.get("running")]
 
     def replace(self, name):
-        old = self.apps_named(name)
+        # Also the same build under the project's old name.
+        old = self.apps_named({name, name.replace("meshmash", "meshcore-adv-ui")})
         if not old:
             say(f"no installed '{name}' to replace")
             return
         for e in old:
-            say(f"deleting '{name}' ({e['label']} at {e['offset']:#x}, {e['size'] // 1024} KB)")
+            say(f"deleting '{e['appName']}' ({e['label']} at {e['offset']:#x}, {e['size'] // 1024} KB)")
             status, text = self.multipart_form("/partitions", {"action": "delete", "offset": e["offset"]})
             if status != 200:
                 die(f"delete {e['label']}: {status} {text}")
@@ -264,7 +266,7 @@ VARIANT_ENVS = {"cardputer": "cardputer_adv", "tdeck": "tdeck"}
 def newest_image(env, full=False):
     """The app image (or the merged one) of the newest package in dist/ for env."""
     suffix = "-full" if full else ""
-    imgs = sorted((ROOT / "dist").glob(f"*/meshcore-adv-ui-*-{env}{suffix}.bin"), key=lambda p: p.stat().st_mtime)
+    imgs = sorted((ROOT / "dist").glob(f"*/meshmash-*-{env}{suffix}.bin"), key=lambda p: p.stat().st_mtime)
     if not imgs:
         die(f"no {env} image in dist/: run pixi run package")
     return imgs[-1]
@@ -285,7 +287,7 @@ def main():
         die("--upload installs nothing: no --replace, --boot or --name with it")
 
     env = VARIANT_ENVS[a.variant] + ("_usb" if a.usb else "")
-    name = a.name or ("meshcore-adv-ui-usb" if a.usb else "meshcore-adv-ui")
+    name = a.name or ("meshmash-usb" if a.usb else "meshmash")
     path = a.bin or newest_image(env, full=a.upload is not None)
     if not path.is_file():
         die(f"{path}: no such file")

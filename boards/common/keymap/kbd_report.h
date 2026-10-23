@@ -2,7 +2,7 @@
  * Copyright esp-vim authors. Licensed under the Apache License, Version 2.0
  * (licenses/Apache-2.0.txt).
  *
- * Derived from esp-vim's esp_kbd_hid.h for meshcore-adv-ui: only the
+ * Derived from esp-vim's esp_kbd_hid.h for MeshMash: only the
  * keys-held report and modifier bits are kept; the HID report-map parsing and
  * terminal byte encoding were removed.
  */

@@ -103,7 +103,7 @@ private:
   fs::FS* _fs = nullptr;
   fs::FS* _sd = nullptr;
   char _file[32] = "/ui/msgs.bin", _readFile[32] = "/ui/read.bin", _hiddenFile[32] = "/ui/hidden.bin";
-  char _archDir[48] = "/meshcore-adv-ui/history";
+  char _archDir[48] = "/meshmash/history";
   uint32_t _nextSeq = 1;
   ThreadInfo _threads[MAX_THREADS];
   int _nThreads = 0;

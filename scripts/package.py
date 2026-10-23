@@ -2,9 +2,9 @@
 """Package firmware images for release (run after `pixi run build`).
 
 For each device env this writes to dist/<version>/:
-  meshcore-adv-ui-<version>-<env>.bin         application only: OTA, and
+  meshmash-<version>-<env>.bin         application only: OTA, and
                                               Launcher's WebUI install
-  meshcore-adv-ui-<version>-<env>-full.bin    bootloader + partitions + app,
+  meshmash-<version>-<env>-full.bin    bootloader + partitions + app,
                                               flashed at 0x0: M5Burner, web
                                               flashers, esptool; and
                                               Launcher from the SD card
@@ -66,7 +66,7 @@ def main():
         app = os.path.join(os.path.dirname(md["prog_path"]), "firmware.bin")
         if not os.path.exists(app):
             sys.exit(f"{env}: {os.path.relpath(app, ROOT)} missing; run `pixi run build` first")
-        base = f"meshcore-adv-ui-{ver}-{env}"
+        base = f"meshmash-{ver}-{env}"
         app_out = os.path.join(out, base + ".bin")
         shutil.copyfile(app, app_out)
         full_out = os.path.join(out, base + "-full.bin")

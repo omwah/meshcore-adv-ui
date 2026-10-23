@@ -1,15 +1,15 @@
-# Host-side toolchain for meshcore-adv-ui. Firmware dependencies come from
+# Host-side toolchain for MeshMash. Firmware dependencies come from
 # PlatformIO (pinned in platformio.ini) and the MeshCore submodule.
 #
 #   pixi install         # materialise .pixi/envs/default
 #   pixi run <task>      # see `pixi task list`
 
 [workspace]
-authors = ["meshcore-adv-ui contributors"]
+authors = ["MeshMash contributors"]
 license = "MIT"
 license-file = "LICENSE"
 channels = ["conda-forge"]
-name = "meshcore-adv-ui"
+name = "meshmash"
 platforms = ["linux-64"]
 version = "1.1.0"
 

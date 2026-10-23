@@ -42,7 +42,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 - [x] **Backup works.** "Back up now" succeeded on hardware.
 - [x] **Card detection.** Insert a FAT32 card. Backup & restore shows "SD card ready". Works on hardware (backups are written).
 - [x] **No radio disruption.** "Back up now" while messages arrive must not disturb the radio. RadioLib and SD each drive their own CS (5 and 12). Works on hardware: messages arriving during backups all showed delivered.
-- [ ] **History archive.** With a card in, after more than 512 messages in all, scrolling up past the oldest flash message loads older ones from `/meshcore-adv-ui/history/`. "Clear history" removes that thread's file. (Covered in simnet with a 40-record ring.)
+- [ ] **History archive.** With a card in, after more than 512 messages in all, scrolling up past the oldest flash message loads older ones from `/meshmash/history/`. "Clear history" removes that thread's file. (Covered in simnet with a 40-record ring.)
 - [x] **Fresh-install restore.** Erase flash (`pio run -t erase`), reflash, and accept the restore offer. Check that the same node key, contacts and channels come back. Works on hardware (a fresh Launcher install).
 
 ## 4. GPS (ATGM336H)

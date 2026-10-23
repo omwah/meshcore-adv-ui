@@ -44,6 +44,9 @@ fs::FS* Esp32Platform::sd() {
   _sdTried = true;
   _sdCheckAt = now;
   _sdOk = SD.begin(PIN_SD_CS, loraSpi, 16000000);   // shared with LoRa; RadioLib drives its own CS
+  // The project's folder before it was called MeshMash: backups and history
+  // move over once.
+  if (_sdOk && !SD.exists("/meshmash") && SD.exists("/meshcore-adv-ui")) SD.rename("/meshcore-adv-ui", "/meshmash");
   return _sdOk ? &SD : nullptr;
 }
 

@@ -148,7 +148,7 @@ static void test_encoders() {
   TEST_ASSERT_EQUAL(4, f[12]);
   TEST_ASSERT_EQUAL('y', f[13]);
 
-  n = cp::encAppStart(f, "meshcore-adv-ui");
+  n = cp::encAppStart(f, "meshmash");
   TEST_ASSERT_TRUE(n >= 8);
   TEST_ASSERT_EQUAL('m', f[8]);
 

@@ -71,7 +71,7 @@ diff -ruN -x '*.orig' -x '*.rej' a/examples/companion_radio/MyMesh.h b/examples/
    void handleCmdFrame(size_t len);
    bool advert();
 +
-+  // meshcore-adv-ui: for a built-in UI that changes state directly instead of
++  // MeshMash: for a built-in UI that changes state directly instead of
 +  // through app command frames. Each does what the matching app command does.
 +  void uiMarkContactsDirty();                       // lazy save, as CMD_REMOVE_CONTACT etc.
 +  void uiSaveChannels();                            // as CMD_SET_CHANNEL

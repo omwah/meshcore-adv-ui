@@ -1,8 +1,11 @@
-# meshcore-adv-ui
+# MeshMash
 
-A keyboard-native user interface for [MeshCore](https://github.com/meshcore-dev/MeshCore)
-LoRa mesh radios. It runs on the M5Stack Cardputer ADV with the Cap LoRa-1262
-module, and on the LilyGo T-Deck Plus. The UI is kept separate from the
+**Stop tapping, start mashing.**
+
+MeshMash is a keyboard-native user interface for
+[MeshCore](https://github.com/meshcore-dev/MeshCore) LoRa mesh radios: you
+mash keys, not a phone screen. It runs on the M5Stack Cardputer ADV with the
+Cap LoRa-1262 module, and on the LilyGo T-Deck Plus. The UI is kept separate from the
 hardware, so other devices can be added as new board directories.
 
 - **Stock MeshCore inside.** MeshCore is a git submodule pinned to a release.
@@ -20,6 +23,10 @@ hardware, so other devices can be added as new board directories.
   - Lists stop at their ends instead of wrapping.
   - Pending keys are discarded when the screen changes.
   - The key filter (debounce) is adjustable in Settings.
+
+Formerly meshcore-adv-ui. An SD card from that version keeps working: its
+`/meshcore-adv-ui/` folder (backups and history) is renamed to `/meshmash/`
+the first time the card is mounted.
 
 ## Screenshots
 
@@ -146,7 +153,7 @@ A command being typed (`2g`) shows at the right of the footer.
   - A "New" line marks where the messages that arrived since you last opened the chat begin, and the chat opens scrolled to it.
   - You can compose replies inline, in a word-wrapped box.
   - History: the newest 512 messages stay on flash. With an SD card, older
-    ones move to `/meshcore-adv-ui/history/` on the card instead of being
+    ones move to `/meshmash/history/` on the card instead of being
     lost. Up at the top of a conversation loads older messages, and Down at
     the bottom comes back.
   - "Clear history" on a contact or channel deletes its messages, including

@@ -19,10 +19,10 @@ namespace app {
 
 class Backup {
 public:
-  static constexpr const char* DIR = "/meshcore-adv-ui";
-  static constexpr const char* PATH = "/meshcore-adv-ui/backup.bin";
-  static constexpr const char* PREV_PATH = "/meshcore-adv-ui/backup.bak";
-  static constexpr const char* TMP_PATH = "/meshcore-adv-ui/backup.tmp";
+  static constexpr const char* DIR = "/meshmash";
+  static constexpr const char* PATH = "/meshmash/backup.bin";
+  static constexpr const char* PREV_PATH = "/meshmash/backup.bak";
+  static constexpr const char* TMP_PATH = "/meshmash/backup.tmp";
 
   struct Options {
     bool identity;   // include the private key
