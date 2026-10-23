@@ -17,16 +17,11 @@ hardware, so other devices can be added as new board directories.
 - **Colour themes.** Every colour is a *role* (header, selection, unread,
   channel, repeater...). A theme is a 16-entry palette, so switching is
   instant. Themes: Midnight, Amber, Phosphor, Contrast, Daylight, Ocean.
-- **Predictable keys:**
-  - One press moves one step.
-  - Enter never auto-repeats.
-  - Lists stop at their ends instead of wrapping.
-  - Pending keys are discarded when the screen changes.
-  - The key filter (debounce) is adjustable in Settings.
-
-Formerly meshcore-adv-ui. An SD card from that version keeps working: its
-`/meshcore-adv-ui/` folder (backups and history) is renamed to `/meshmash/`
-the first time the card is mounted.
+- **Vim keys.** Move with `j` `k` `h` `l`, jump with `gg` `G` and counts,
+  page with Ctrl-d / Ctrl-u, find with `/` and `n`, switch tabs with `gt`,
+  write with `i` and send with `ZZ`. No arrow keys, trackball or touch needed:
+  on by default on the T-Deck, a setting on the Cardputer. See
+  [Vim keys](#vim-keys).
 
 ## Screenshots
 
