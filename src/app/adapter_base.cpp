@@ -84,6 +84,7 @@ void AdapterBase::loadUiPrefs(fs::FS& fs) {
     _ui.autoBackup = 1;
     _ui.backupIdentity = 1;
     _ui.bleEnabled = 1;
+    _ui.blePinRandom = 1;   // a new PIN every boot: 123456 is the first one anyone tries
     _ui.presetIdx = 0;
   }
 }

@@ -46,6 +46,7 @@ MockModel::MockModel() {
   _prefs.backupIdentity = true;
   _prefs.bleEnabled = true;
   _prefs.blePin = 123456;
+  _prefs.blePinRandom = true;   // as a fresh device
   _prefs.presetIdx = 0;
   _prefs.telemBattery = model::TelemMode::PerContact;
 

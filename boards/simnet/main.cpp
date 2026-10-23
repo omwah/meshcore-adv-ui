@@ -26,6 +26,7 @@
 //   blepin <pin>                  remote mode: the node's Bluetooth PIN (default 123456)
 //   expect identity same|new      UI node key vs. before the last wipe
 //   expect screen on|off
+//   expect pinmode random|fixed   the Bluetooth PIN mode (a fresh device: random)
 //   expect sounds <n>          notification chimes played so far
 //   expect request idle|busy|ok|failed|timeout
 //   expect repeats <n>         repeats heard of the last message we sent in the open chat
@@ -248,11 +249,12 @@ public:
       _uiNode->begin();
       return true;
     }
-    if (!strcmp(cmd, "pref")) {   // pref pingbot on|off, pref notify <mode>
+    if (!strcmp(cmd, "pref")) {   // pref pingbot on|off, pref notify <mode>, pref pin random|fixed
       char what[16] = {}, val[8] = {};
       sscanf(arg, "%15s %7s", what, val);
       model::Prefs p = _ui.prefs();
       if (!strcmp(what, "pingbot")) p.pingBot = !strcmp(val, "on");
+      else if (!strcmp(what, "pin")) p.blePinRandom = !strcmp(val, "random");   // pref pin random|fixed
       else if (!strcmp(what, "notify")) {   // pref notify led|screen|dark|both
         static const char* const modes[] = {"led", "screen", "dark", "both"};
         int m = 0;
@@ -368,6 +370,11 @@ private:
       auto it = _bots.find(val);
       if (it == _bots.end()) { snprintf(err, n, "no node '%s'", val); return true; }
       if (it->second.task->received != want) snprintf(err, n, "%s got %d DMs, not %ld", val, it->second.task->received, want);
+      return true;
+    }
+    if (!strcmp(what, "pinmode")) {   // expect pinmode random|fixed
+      const bool random = _ui.prefs().blePinRandom;
+      if (random != !strcmp(val, "random")) snprintf(err, n, "the PIN mode is %s", random ? "random" : "fixed");
       return true;
     }
     if (!strcmp(what, "contacts")) got = _ui.contactCount();
