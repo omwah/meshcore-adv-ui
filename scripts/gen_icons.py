@@ -24,11 +24,12 @@ OUT = os.path.join(ROOT, "src", "ui", "icons_nav.h")
 # Shortcut order (screens::SC_*): Chats, Contacts, Nodes, Channels, Menu.
 # Fields: name, SVG, threshold nudge for icons that clog at small sizes, and a
 # window override for icons whose outline leaves Material's 20-unit live area.
-HUB_VIEW = (0.0, -980.0, 960.0)  # the rings span the whole 24-unit grid
+# (Nodes is `lan`, not `hub`: hub's three small rings fill in to lopsided
+# blobs at 16-20 px, however they are positioned.)
 ICONS = [
     ("chats", "ms_chat_bubble.svg", 0.0, None),
     ("contacts", "ms_person.svg", 0.0, None),
-    ("nodes", "ms_hub.svg", 0.05, HUB_VIEW),  # three rings: keep the holes open
+    ("nodes", "ms_lan.svg", 0.0, None),
     ("channels", "ms_tag.svg", 0.0, None),
     ("menu", "ms_tune.svg", 0.0, None),
 ]
