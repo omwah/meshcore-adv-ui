@@ -71,6 +71,28 @@ The Bluetooth build only: the USB-only build has no remote mode.
 | Tab | details / actions for the selection | |
 | letters | find (on Home), start writing (in a chat) | type |
 
+## Vim keys
+
+Settings → Vim keys (on by default where the keyboard has no arrows). Letters
+become commands in lists, menus and the message view; writing is unchanged.
+On the Cardputer, `;` `,` `.` `/` then always type, and Fn + them still moves.
+
+| Keys | Does |
+|---|---|
+| `j` `k` / `h` `l` | down / up; previous / next tab, change value |
+| `gg` `G`, `{n}G` | first / last, row n |
+| Ctrl-d Ctrl-u, Ctrl-f Ctrl-b | half page, page down / up |
+| `5j` | a count repeats a motion |
+| `/` then `n` `N` | find on Home (Enter keeps the matches), next / previous match |
+| `gt` `gT`, `{n}gt` | next / previous Home tab, tab n |
+| `i` `a` `o` | write a message (`o` on Home: open the selection and write) |
+| `ZZ` `ZQ` | send / discard the draft left after Esc |
+| `q` | back |
+| Ctrl-o | the conversation before this one |
+| `]u` `[u` | next / previous conversation with unread messages |
+
+A command being typed (`2g`) shows at the right of the footer.
+
 ## Screens
 
 - **Home** has four tabs:
@@ -159,6 +181,8 @@ presses go through the same Cardputer keymap code as the device.
 
 - **`sim`** uses a scripted mock mesh. It gives deterministic screenshots of
   every screen and theme. Scenarios are in `test/scenarios/*.sim`.
+  **`sim_tdeck`** is the same at the T-Deck's 320x240
+  (`scripts/screenshots.py --board tdeck`).
 - **`simnet`** runs stock MeshCore: our node, scripted companion nodes, and
   unmodified MeshCore repeaters, on a simulated LoRa medium with real airtime
   and per-link SNR. It covers routing, ACKs, retries, admin, trace, channels,

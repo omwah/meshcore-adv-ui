@@ -184,7 +184,7 @@ void App::previewTheme(uint8_t idx) {
 void App::entered() {
   _marqueeStart = _now;
   _in.flush();
-  _k.setTextMode(top()->textMode(*this));
+  _k.setTextMode(keyboardText());
   top()->onEnter(*this);
   _dirty = true;
 }
@@ -247,6 +247,21 @@ void App::wake() {
   _dirty = true;
 }
 
+bool App::vimActive() { return _m.prefs().vimKeys && !top()->textMode(*this); }
+
+// Keys that double as arrows (the Cardputer's ; , . /) type their characters
+// while writing, and always with vim keys, which need / and have h/j/k/l.
+bool App::keyboardText() { return _m.prefs().vimKeys || top()->textMode(*this); }
+
+// A count (5j) repeats a motion; the screen sees each step as a fresh press.
+void App::dispatch(const Key& k) {
+  bool motion = k.code == K_UP || k.code == K_DOWN || k.code == K_LEFT || k.code == K_RIGHT ||
+                k.code == K_NEXT_MATCH || k.code == K_PREV_MATCH;
+  int n = motion && k.count > 1 ? k.count : 1;
+  Screen* s = top();
+  for (int i = 0; i < n && top() == s; i++) s->onKey(*this, k);
+}
+
 uint32_t App::loop(uint32_t now) {
   _now = now;
   hal::KeyEvent ev;
@@ -296,6 +311,7 @@ uint32_t App::loop(uint32_t now) {
 
   // Text-mode can change within a screen (e.g. starting to compose).
   Key k;
+  if (_vim.expire(now)) _dirty = true;
   while (_in.next(k)) {
     Screen* before = top();
     if (_pairing && !_pairingHidden) {
@@ -304,17 +320,29 @@ uint32_t App::loop(uint32_t now) {
       _dirty = true;
       continue;
     }
+    _dirty = true;
+    if (vimActive()) {
+      Key v;
+      if (!_vim.feed(k, now, v)) continue;   // a command still being typed
+      k = v;
+    } else {
+      _vim.reset();
+    }
     if (k.code == K_LONG_ESC) {
       popToRoot();
     } else if (k.code == K_MENU && !top()->fullscreen()) {
       ui::screens::openMainMenu(*this);
+    } else if (k.code == K_JUMP_BACK) {
+      ui::screens::jumpBack(*this);
+    } else if (k.code == K_NEXT_UNREAD || k.code == K_PREV_UNREAD) {
+      ui::screens::jumpUnread(*this, k.code == K_NEXT_UNREAD ? 1 : -1);
     } else {
-      top()->onKey(*this, k);
+      dispatch(k);
     }
     _marqueeStart = now;
-    if (top() == before) _k.setTextMode(top()->textMode(*this));
-    _dirty = true;
+    if (top() == before) _k.setTextMode(keyboardText());
   }
+  _in.setVimRepeat(vimActive());
 
   if (top()->tick(*this, now)) _dirty = true;
   uint32_t rev = _m.revision();
@@ -461,13 +489,21 @@ void App::drawFooter() {
     _c.text(4, ty, _toast, f, C_BG, -1, Canvas::W - 8);
     return;
   }
+  // A vim command being typed shows at the right, as vim's showcmd does.
+  const char* cmd = _vim.pending();
+  int right = Canvas::W;
+  if (cmd[0]) {
+    right -= Canvas::textWidth(cmd, f) + 6;
+    _c.text(right + 3, ty, cmd, f, C_ACCENT);
+  }
   const Hint* h = top()->hints(*this);
+  const bool vim = vimActive();
   int x = 3;
   for (; h && h->key; h++) {
-    const char* key = keyName(h->key);
+    const char* key = keyName(h->key, vim);
     int kw = Canvas::textWidth(key, f) + 4;
     int lw = Canvas::textWidth(h->label, f);
-    if (x + kw + lw + 2 > Canvas::W) break;
+    if (x + kw + lw + 2 > right) break;
     _c.pill(x, y + 1, kw, FH - 2, C_DIM);
     _c.text(x + 2, ty, key, f, C_BG);
     x += kw + 2;

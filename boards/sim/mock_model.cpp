@@ -38,6 +38,7 @@ MockModel::MockModel() {
   _prefs.inputLockoutMs = 60;
   _prefs.sound = true;
   _prefs.textSize = 1;
+  _prefs.vimKeys = MC_VIM_KEYS_DEFAULT;
   _prefs.autoAddContacts = true;
   _prefs.autoBackup = true;
   _prefs.backupIdentity = true;

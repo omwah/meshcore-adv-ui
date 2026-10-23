@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include "ui/gfx/canvas.h"
 #include "ui/input/input.h"
+#include "ui/input/vim.h"
 #include "ui/theme.h"
 #include "model/model.h"
 #include "hal/display.h"
@@ -118,8 +119,12 @@ public:
   const mc_font_t* fMenu() const { return _mx->menu; }
 
   Rect content() const;
+  // Vim keys are on and the screen on top isn't taking text.
+  bool vimActive();
 
 private:
+  void dispatch(const Key& k);
+  bool keyboardText();
   void render();
   void drawHeader();
   void drawFooter();
@@ -133,6 +138,7 @@ private:
   hal::Sound* _sound;
   Canvas _c;
   Input _in;
+  Vim _vim;
   Screen* _stack[MAX_DEPTH] = {};
   int _depth = 0;
   uint8_t _theme = 0;

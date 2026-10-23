@@ -37,6 +37,7 @@ public:
   void onHome(App&) override {
     _tab = T_CHATS;
     _query[0] = 0;
+    _typing = false;
     _nav[T_CHATS] = ListNav();
   }
 
@@ -86,10 +87,18 @@ public:
     ListNav& nav = _nav[_tab];
     Rect r = a.content();
     int vis = (r.h - a.mx().tab) / (_tab == T_CHATS ? a.mx().chatRow : a.mx().row);
-    if (k.code == K_LEFT || k.code == K_RIGHT) {
-      if (k.repeat) return;   // one tab per press
-      _tab = (_tab + (k.code == K_RIGHT ? 1 : T_COUNT - 1)) % T_COUNT;
+    int tab = -1;
+    if ((k.code == K_LEFT || k.code == K_RIGHT) && !k.repeat)   // one tab per press
+      tab = (_tab + (k.code == K_RIGHT ? 1 : T_COUNT - 1)) % T_COUNT;
+    else if (k.code == K_TAB_NEXT || k.code == K_TAB_PREV)
+      tab = (_tab + (k.code == K_TAB_NEXT ? 1 : T_COUNT - 1)) % T_COUNT;
+    else if (k.code == K_TAB_N && k.count <= T_COUNT)
+      tab = k.count - 1;
+    if (tab >= 0 || k.code == K_LEFT || k.code == K_RIGHT) {
+      if (tab < 0) return;
+      _tab = tab;
       _query[0] = 0;
+      _typing = false;
       rebuild(a);
       return;
     }
@@ -97,7 +106,22 @@ public:
     if (k.code == K_ESC) {
       // Esc never opens anything here, so pressing it repeatedly to get
       // "back home" can't overshoot into a menu.
+      _typing = false;
       if (_query[0]) { _query[0] = 0; rebuild(a); }
+      return;
+    }
+    // Vim keys: / starts a search (letters are commands otherwise), Enter
+    // ends it keeping the matches, n and N step through them.
+    if (k.code == K_SEARCH) {
+      _typing = true;
+      _query[0] = 0;
+      rebuild(a);
+      return;
+    }
+    if (_typing && k.code == K_ENTER) { _typing = false; return; }
+    if ((k.code == K_NEXT_MATCH || k.code == K_PREV_MATCH) && _n) {
+      nav.sel = (nav.sel + (k.code == K_NEXT_MATCH ? 1 : _n - 1)) % _n;
+      nav.clamp(_n, vis);
       return;
     }
     if (k.code == K_BKSP) {
@@ -105,7 +129,7 @@ public:
       if (l) { _query[l - 1] = 0; rebuild(a); }
       return;
     }
-    if (k.isChar() && k.code != ' ') {
+    if (k.isChar() && k.code != ' ' && !a.vimActive()) {
       int l = (int)strlen(_query);
       if (l < (int)sizeof(_query) - 1) { _query[l] = (char)k.code; _query[l + 1] = 0; nav.sel = 0; rebuild(a); }
       return;
@@ -115,14 +139,22 @@ public:
     int idx = _order[nav.sel];
     if (k.code == K_ENTER) open(a, idx);
     else if (k.code == K_TAB) details(a, idx);
+    else if (k.code == K_COMPOSE) { open(a, idx); startCompose(a); }
   }
 
-  const Hint* hints(App&) override {
+  bool textMode(App&) override { return _typing; }
+
+  const Hint* hints(App& a) override {
     // Most important first: larger text sizes show fewer hints.
     static const Hint chats[] = {{"ent", "open"}, {"opt", "menu"}, {"<>", "tabs"}, {"tab", "info"}, {"a-z", "find"}, {nullptr, nullptr}};
+    static const Hint vimChats[] = {{"ent", "open"}, {"opt", "menu"}, {"<>", "tabs"}, {"tab", "info"}, {"/", "find"}, {nullptr, nullptr}};
     static const Hint search[] = {{"ent", "open"}, {"bksp", "edit"}, {"esc", "clear"}, {nullptr, nullptr}};
+    static const Hint typing[] = {{"ent", "done"}, {"bksp", "edit"}, {"esc", "clear"}, {nullptr, nullptr}};
+    static const Hint found[] = {{"ent", "open"}, {"n/N", "next/prev"}, {"esc", "clear"}, {nullptr, nullptr}};
     static const Hint chan[] = {{"ent", "open"}, {"opt", "menu"}, {"<>", "tabs"}, {"tab", "manage"}, {nullptr, nullptr}};
-    if (_query[0]) return search;
+    if (_typing) return typing;
+    if (_query[0]) return a.m().prefs().vimKeys ? found : search;
+    if (a.m().prefs().vimKeys && _tab != T_CHANNELS) return vimChats;
     return _tab == T_CHANNELS ? chan : chats;
   }
 
@@ -132,10 +164,10 @@ private:
     const mc_font_t* f = a.fMed();
     const int ty = r.y + (TH - f->height) / 2;
     c.fillRect(r.x, r.y, r.w, TH, C_ZEBRA);
-    if (_query[0]) {
+    if (_query[0] || _typing) {
       int x = c.text(r.x + 4, ty, "Find: ", f, C_DIM);
       x = c.text(x, ty, _query, f, C_ACCENT);
-      if (!((a.nowMs() / 500) & 1)) c.fillRect(x, ty, 1, f->height, C_ACCENT);
+      if ((_typing || !a.m().prefs().vimKeys) && !((a.nowMs() / 500) & 1)) c.fillRect(x, ty, 1, f->height, C_ACCENT);
       char n[12];
       snprintf(n, sizeof n, "%d", _n);
       c.text(r.x + r.w - 4 - Canvas::textWidth(n, f), ty, n, f, C_DIM);
@@ -309,6 +341,7 @@ private:
   int _tab = T_CHATS;
   ListNav _nav[T_COUNT];
   char _query[16] = {};
+  bool _typing = false;                // vim keys: typing a search after /
   uint16_t _order[MAX_ORDER];
   int _n = 0;
   uint32_t _builtRev = ~0u;

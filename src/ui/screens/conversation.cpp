@@ -183,22 +183,41 @@ public:
         return;
       case K_PGUP: _scroll += r.h - 20; if (_scroll > _maxScroll) _scroll = _maxScroll; return;
       case K_PGDN: _scroll -= r.h - 20; if (_scroll < 0) _scroll = 0; return;
+      case K_HALF_UP: _scroll += r.h / 2; if (_scroll > _maxScroll) _scroll = _maxScroll; return;
+      case K_HALF_DN: _scroll -= r.h / 2; if (_scroll < 0) _scroll = 0; return;
       case K_END: _scroll = 0; return;
       case K_HOME: _scroll = _maxScroll; return;
       case K_TAB:
         if (id.kind == model::ThreadKind::Channel) openChannel(a, id.idx);
         else openContact(a, id.idx);
         return;
-      case K_ENTER: startCompose(a); return;
+      case K_ENTER: case K_COMPOSE: startCompose(a); return;
+      case K_SEND:
+        // ZZ: send the draft left when writing stopped.
+        if (!_draft[0]) { a.toast("No draft to send", C_DIM); return; }
+        startCompose(a);
+        composeKey(a, Key{K_ENTER, 0, false, 0});
+        return;
+      case K_DISCARD:
+        if (!_draft[0]) return;
+        _draft[0] = 0;
+        _ed.attach(_draft, maxLen(a) + 1);
+        a.toast("Draft discarded", C_DIM);
+        return;
     }
-    if (k.isChar()) {
+    // Typing starts a message, except with vim keys, where letters are
+    // commands and i, a or o start one.
+    if (k.isChar() && !a.vimActive()) {
       startCompose(a);
       composeKey(a, k);
     }
   }
 
-  const Hint* hints(App&) override {
+  const Hint* hints(App& a) override {
     static const Hint view[] = {{"ent", "write"}, {"^v", "scroll"}, {"tab", "info"}, {"esc", "back"}, {nullptr, nullptr}};
+    static const Hint vim[] = {{"i", "write"}, {"^v", "scroll"}, {"tab", "info"}, {"q", "back"}, {nullptr, nullptr}};
+    static const Hint draft[] = {{"i", "write"}, {"ZZ", "send"}, {"ZQ", "discard"}, {"q", "back"}, {nullptr, nullptr}};
+    if (!_composing && a.vimActive()) return _draft[0] ? draft : vim;
     static const Hint comp[] = {{"ent", "send"}, {"esc", "stop"}, {"fn+,/", "cursor"}, {nullptr, nullptr}};
     return _composing ? comp : view;
   }
@@ -247,7 +266,6 @@ public:
   void _loginTriedReset() { _loginTried = false; }
   bool _loggingIn = false;
 
-private:
   void startCompose(App& a) {
     (void)a;
     _composing = true;
@@ -255,6 +273,7 @@ private:
     _ed.attach(_draft, maxLen(a) + 1);
   }
 
+private:
   // Two lines of message text plus a margin.
   static int composeH(App& a) { return 2 * a.fBody()->height + 6; }
 
@@ -396,6 +415,25 @@ private:
 ConversationScreen s_conv;
 void ConversationScreen::s_roomLoginStarted() { s_conv._loggingIn = true; }
 
+// Conversations opened, oldest first, for Ctrl-o.
+model::ThreadId s_jumps[8];
+int s_nJumps = 0;
+
+void noteJump(model::ThreadId t) {
+  int n = 0;
+  for (int i = 0; i < s_nJumps; i++)
+    if (!(s_jumps[i] == t)) s_jumps[n++] = s_jumps[i];
+  if (n == 8) { memmove(s_jumps, s_jumps + 1, sizeof s_jumps[0] * 7); n = 7; }
+  s_jumps[n++] = t;
+  s_nJumps = n;
+}
+
+// Open `t` in place of the conversation on top, or over whatever is there.
+void switchTo(App& a, model::ThreadId t) {
+  if (a.top() == &s_conv) a.pop();
+  openThread(a, t);
+}
+
 }  // namespace
 
 void openThread(App& a, model::ThreadId t) {
@@ -403,7 +441,42 @@ void openThread(App& a, model::ThreadId t) {
   s_conv._loginTriedReset();
   s_conv.id = t;
   s_conv.markNew(a);
+  noteJump(t);
   a.push(&s_conv);
+}
+
+void jumpBack(App& a) {
+  bool open = a.top() == &s_conv;
+  for (int i = s_nJumps - 1; i >= 0; i--) {
+    if (open && s_jumps[i] == s_conv.id) continue;
+    // Gone since (a contact deleted, a channel left): skip it.
+    bool live = false;
+    model::Thread t;
+    for (int j = 0, n = a.m().threadCount(); j < n && !live; j++) live = a.m().thread(j, t) && t.id == s_jumps[i];
+    if (!live) continue;
+    switchTo(a, s_jumps[i]);
+    return;
+  }
+  a.toast("No earlier conversation", C_DIM);
+}
+
+void jumpUnread(App& a, int dir) {
+  // Chats order: newest first. Start beside the open conversation, if any.
+  int n = a.m().threadCount(), cur = -1;
+  model::Thread t;
+  if (a.top() == &s_conv)
+    for (int i = 0; i < n; i++)
+      if (a.m().thread(i, t) && t.id == s_conv.id) { cur = i; break; }
+  for (int step = 1; step <= n; step++) {
+    int i = cur < 0 ? (dir > 0 ? step - 1 : n - step) : ((cur + dir * step) % n + n) % n;
+    if (i == cur) break;
+    if (a.m().thread(i, t) && t.unread && !t.muted) { switchTo(a, t.id); return; }
+  }
+  a.toast("No unread messages", C_DIM);
+}
+
+void startCompose(App& a) {
+  if (a.top() == &s_conv) s_conv.startCompose(a);
 }
 
 int chatNewCount(App& a) { return s_conv.newCount(a); }

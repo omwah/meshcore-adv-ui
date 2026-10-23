@@ -184,7 +184,17 @@ struct Prefs {
   bool pingBot;                   // answer "ping" DMs with the path they took
   NotifyMode notify;              // what a new message does
   bool shortPreview;              // chats list: scroll only the stored preview, not the whole message
+  bool vimKeys;                   // h/j/k/l and friends move around (ui/input/vim.h)
 };
+
+// Vim keys start on where the keyboard has no arrow keys.
+#ifndef MC_VIM_KEYS_DEFAULT
+#ifdef MC_BOARD_TDECK
+#define MC_VIM_KEYS_DEFAULT 1
+#else
+#define MC_VIM_KEYS_DEFAULT 0
+#endif
+#endif
 
 struct BackupStatus {
   bool cardPresent;

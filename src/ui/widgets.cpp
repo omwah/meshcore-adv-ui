@@ -30,8 +30,11 @@ bool ListNav::key(const Key& k, int count, int visible) {
       break;
     case K_PGUP: sel -= visible; break;
     case K_PGDN: sel += visible; break;
+    case K_HALF_UP: sel -= visible > 1 ? visible / 2 : 1; break;
+    case K_HALF_DN: sel += visible > 1 ? visible / 2 : 1; break;
     case K_HOME: sel = 0; break;
     case K_END: sel = count - 1; break;
+    case K_GOTO: sel = k.count - 1; break;
     default: return false;
   }
   (void)old;
@@ -122,7 +125,7 @@ void MenuScreen::onKey(App& app, const Key& k) {
     // Never rest on a header or a disabled row: keep going the way the
     // cursor moved; if there is nothing usable that way, go back to where
     // the cursor started.
-    int dir = (k.code == K_UP || k.code == K_PGUP || k.code == K_END) ? -1 : 1;
+    int dir = (k.code == K_END || _nav.sel < old) ? -1 : 1;
     int start = old;
     for (int guard = 0; guard < 2 * n; guard++) {
       MenuItem it;

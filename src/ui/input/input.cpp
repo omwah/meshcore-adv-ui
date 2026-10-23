@@ -42,7 +42,8 @@ uint16_t Input::translate(uint8_t u, uint8_t mods) {
   return K_NONE;
 }
 
-static bool repeats(uint16_t code) {
+bool Input::repeats(uint16_t code, uint8_t mods) const {
+  if (_vimRepeat && !(mods & 0x55) && (code == 'h' || code == 'j' || code == 'k' || code == 'l')) return true;
   return code == K_UP || code == K_DOWN || code == K_LEFT || code == K_RIGHT ||
          code == K_BKSP || code == K_DEL;
 }
@@ -53,6 +54,7 @@ void Input::push(uint16_t code, uint8_t mods, bool repeat) {
   k.code = code;
   k.mods = mods;
   k.repeat = repeat;
+  k.count = 0;
   _n++;
 }
 
@@ -84,7 +86,7 @@ void Input::tick(uint32_t now) {
       _longEscSent = true;
       push(K_LONG_ESC, 0, false);
     }
-  } else if (repeats(code) && (int32_t)(now - _nextRepeat) >= 0) {
+  } else if (repeats(code, _heldMods) && (int32_t)(now - _nextRepeat) >= 0) {
     push(code, uiMods(_heldMods), true);
     _nextRepeat = now + REPEAT_EVERY;
   }
@@ -97,7 +99,7 @@ uint32_t Input::wakeIn(uint32_t now) const {
     uint32_t at = _heldSince + LONG_ESC;
     return (int32_t)(at - now) > 0 ? at - now : 1;
   }
-  if (repeats(code)) return (int32_t)(_nextRepeat - now) > 0 ? _nextRepeat - now : 1;
+  if (repeats(code, _heldMods)) return (int32_t)(_nextRepeat - now) > 0 ? _nextRepeat - now : 1;
   return 0;
 }
 

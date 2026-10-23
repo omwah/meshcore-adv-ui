@@ -12,6 +12,12 @@ namespace ui { namespace screens {
 Screen* home();
 Screen* boot();
 void openThread(App& a, model::ThreadId t);
+// Vim keys: back to the conversation open before this one (Ctrl-o), and to
+// the next or previous one with unread messages (]u, [u).
+void jumpBack(App& a);
+void jumpUnread(App& a, int dir);
+// If the conversation is on top, start writing in it.
+void startCompose(App& a);
 // The open chat's messages from the "New" line down (-1: no line). For tests.
 int chatNewCount(App& a);
 void openContact(App& a, int contactIdx);

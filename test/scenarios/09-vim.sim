@@ -1,0 +1,49 @@
+# Vim keys: moving around with letters instead of arrows.
+vim on
+shot vim-home
+type 2j
+shot vim-home-2j
+type G
+shot vim-home-last
+type gg
+type gt
+shot vim-home-gt
+type 4gt
+shot vim-home-4gt
+type gT
+type gT
+type gT
+# / searches; letters are commands otherwise.
+type /al
+shot vim-find-typing
+key enter
+type n
+shot vim-find-done
+key esc
+# A conversation: i writes, Esc stops, ZZ sends the draft.
+key enter
+type k
+shot vim-chat
+type i
+type On my way
+key esc
+shot vim-chat-draft
+type ZZ
+shot vim-chat-sent
+# A pending command shows at the right of the footer.
+type 1
+type 2
+shot vim-showcmd
+key esc
+type q
+# ]u opens the next chat with unread messages; Ctrl-o goes back.
+type ]u
+shot vim-next-unread
+key ctrl+o
+shot vim-jump-back
+type q
+# Menus: j/k, Ctrl-d, and q back.
+key menu
+key ctrl+d
+shot vim-menu-half
+type q

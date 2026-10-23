@@ -66,6 +66,17 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
       char legend[16] = {};
       int n = 1;
       sscanf(arg, "%15s %d", legend, &n);
+      // "ctrl+d": the modifier held around each press.
+      int mr = -1, mc = -1;
+      char* plus = strchr(legend, '+');
+      if (plus && plus[1]) {
+        *plus = 0;
+        if (!SimKeyboard::find(legend, mr, mc)) {
+          fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, legend);
+          return 2;
+        }
+        memmove(legend, plus + 1, strlen(plus + 1) + 1);
+      }
       int r, col;
       if (!SimKeyboard::find(legend, r, col)) {
         fprintf(stderr, "line %d: unknown key '%s'\n", lineNo, legend);
@@ -79,8 +90,10 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
       } else {
         // One press at a time: the keyboard's event queue is small.
         for (int i = 0; i < n; i++, t += 160) {
+          if (mr >= 0) kb.at(t - 5, mr, mc, true);
           kb.at(t, r, col, true);
           kb.at(t + 40, r, col, false);
+          if (mr >= 0) kb.at(t + 45, mr, mc, false);
           c.advance(t + 60);
         }
       }
@@ -136,6 +149,11 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
       pr.textSize = (uint8_t)atoi(arg);
       app.m().setPrefs(pr);
       app.applyPrefs();
+      c.advance(now + 20);
+    } else if (!strcmp(cmd, "vim")) {
+      model::Prefs pr = app.m().prefs();
+      pr.vimKeys = !strcmp(arg, "on");
+      app.m().setPrefs(pr);
       c.advance(now + 20);
     } else if (!strcmp(cmd, "theme")) {
       model::Prefs pr = app.m().prefs();

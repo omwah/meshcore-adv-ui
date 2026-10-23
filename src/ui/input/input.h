@@ -4,7 +4,8 @@
 //  * A key that goes down again within `lockout_ms` of its last press is
 //    ignored (contact chatter, a finger bouncing on a key).
 //  * Only arrows, Backspace and Delete auto-repeat (after 400 ms, every
-//    80 ms). Enter and every other key fire once per physical press.
+//    80 ms), and with vim keys h/j/k/l too. Enter and every other key fire
+//    once per physical press.
 //  * Esc fires on release; held for 700 ms it becomes K_LONG_ESC instead
 //    (the app takes that as "go home").
 //  * flush() drops queued keys and swallows the keys still held, so a press
@@ -23,6 +24,8 @@ public:
 
   void setLockout(uint16_t ms) { _lockout = ms; }
   uint16_t lockout() const { return _lockout; }
+  // Vim keys: h/j/k/l repeat like the arrows they stand for.
+  void setVimRepeat(bool on) { _vimRepeat = on; }
 
   // Feed one raw event at time `now` (ms).
   void feed(const hal::KeyEvent& ev, uint32_t now);
@@ -38,11 +41,13 @@ public:
 
 private:
   void push(uint16_t code, uint8_t mods, bool repeat);
+  bool repeats(uint16_t code, uint8_t mods) const;
 
   static constexpr int Q = 8;
   Key _q[Q];
   uint8_t _head = 0, _n = 0;
   uint16_t _lockout = 60;
+  bool _vimRepeat = false;
 
   uint8_t _heldUsage = 0, _heldMods = 0;   // newest key held
   bool _heldSwallowed = false;             // held across a flush(): ignore until released

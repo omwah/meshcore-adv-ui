@@ -20,7 +20,9 @@ static const char* const kNames[][2] = {{nullptr, nullptr}};
 const char* const kCursorHelp = "Fn + , / move cursor";
 #endif
 
-const char* keyName(const char* key) {
+const char* keyName(const char* key, bool vim) {
+  if (vim && !strcmp(key, "^v")) return "j/k";
+  if (vim && !strcmp(key, "<>")) return "h/l";
   for (const auto* n = kNames; (*n)[0]; n++)
     if (!strcmp((*n)[0], key)) return (*n)[1];
   return key;

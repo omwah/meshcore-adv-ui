@@ -123,6 +123,7 @@ void AdapterBase::uiToPrefs() {
   p.deviceMode = _ui.deviceMode == 1 ? model::Mode::Remote : model::Mode::Local;
   p.pingBot = _ui.pingBot;
   p.shortPreview = _ui.shortPreview;
+  p.vimKeys = _ui.vimKeys ? _ui.vimKeys == 2 : MC_VIM_KEYS_DEFAULT;
   p.notify = _ui.notifyMode <= 3 ? (model::NotifyMode)_ui.notifyMode : model::NotifyMode::Led;
 }
 
@@ -145,6 +146,7 @@ void AdapterBase::prefsToUi(const model::Prefs& p) {
   _ui.pingBot = p.pingBot;
   _ui.notifyMode = (uint8_t)p.notify;
   _ui.shortPreview = p.shortPreview;
+  _ui.vimKeys = p.vimKeys ? 2 : 1;
 }
 
 void AdapterBase::setUiMuted(int slot, bool muted) {

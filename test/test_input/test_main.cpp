@@ -2,6 +2,7 @@
 // one-step-per-press.
 #include <unity.h>
 #include "ui/input/input.h"
+#include "ui/input/vim.h"
 #include "ui/widgets.h"
 extern "C" {
 #include "cardputer_keymap.h"
@@ -138,6 +139,133 @@ void test_keymap_opt_is_menu() {
   TEST_ASSERT_EQUAL(K_MENU, Input::translate(0x65, 0));
 }
 
+// ---------------------------------------------------------------- vim keys
+
+static Key ch(char c, uint8_t mods = 0) { return Key{(uint16_t)c, mods, false, 0}; }
+
+// Feed a string of typed keys; returns the commands that came out.
+static int vimType(Vim& v, const char* s, Key* out, int max, uint32_t t = 0) {
+  int n = 0;
+  for (; *s; s++, t += 100) {
+    Key k;
+    if (v.feed(ch(*s), t, k) && n < max) out[n++] = k;
+  }
+  return n;
+}
+
+void test_vim_motions() {
+  Vim v;
+  Key o[4];
+  TEST_ASSERT_EQUAL(4, vimType(v, "jkhl", o, 4));
+  TEST_ASSERT_EQUAL(K_DOWN, o[0].code);
+  TEST_ASSERT_EQUAL(K_UP, o[1].code);
+  TEST_ASSERT_EQUAL(K_LEFT, o[2].code);
+  TEST_ASSERT_EQUAL(K_RIGHT, o[3].code);
+  TEST_ASSERT_EQUAL(0, o[0].count);
+}
+
+void test_vim_counts() {
+  Vim v;
+  Key o[2];
+  TEST_ASSERT_EQUAL(1, vimType(v, "12j", o, 2));
+  TEST_ASSERT_EQUAL(K_DOWN, o[0].code);
+  TEST_ASSERT_EQUAL(12, o[0].count);
+  TEST_ASSERT_EQUAL(1, vimType(v, "3G", o, 2));
+  TEST_ASSERT_EQUAL(K_GOTO, o[0].code);
+  TEST_ASSERT_EQUAL(3, o[0].count);
+  // 0 alone is not a count.
+  TEST_ASSERT_EQUAL(1, vimType(v, "0", o, 2));
+  TEST_ASSERT_EQUAL('0', o[0].code);
+}
+
+void test_vim_g_commands() {
+  Vim v;
+  Key o[4];
+  TEST_ASSERT_EQUAL(4, vimType(v, "ggGgtgT", o, 4));
+  TEST_ASSERT_EQUAL(K_HOME, o[0].code);
+  TEST_ASSERT_EQUAL(K_END, o[1].code);
+  TEST_ASSERT_EQUAL(K_TAB_NEXT, o[2].code);
+  TEST_ASSERT_EQUAL(K_TAB_PREV, o[3].code);
+  TEST_ASSERT_EQUAL(1, vimType(v, "3gt", o, 4));
+  TEST_ASSERT_EQUAL(K_TAB_N, o[0].code);
+  TEST_ASSERT_EQUAL(3, o[0].count);
+  TEST_ASSERT_EQUAL(2, vimType(v, "ZZZQ", o, 4));
+  TEST_ASSERT_EQUAL(K_SEND, o[0].code);
+  TEST_ASSERT_EQUAL(K_DISCARD, o[1].code);
+  TEST_ASSERT_EQUAL(2, vimType(v, "]u[u", o, 4));
+  TEST_ASSERT_EQUAL(K_NEXT_UNREAD, o[0].code);
+  TEST_ASSERT_EQUAL(K_PREV_UNREAD, o[1].code);
+  // Not a command: both keys dropped.
+  TEST_ASSERT_EQUAL(0, vimType(v, "gx", o, 4));
+}
+
+void test_vim_pending_and_timeout() {
+  Vim v;
+  Key o;
+  TEST_ASSERT_FALSE(v.feed(ch('2'), 0, o));
+  TEST_ASSERT_FALSE(v.feed(ch('g'), 100, o));
+  TEST_ASSERT_EQUAL_STRING("2g", v.pending());
+  // Too slow: the half-typed command is dropped, and j is a plain motion.
+  TEST_ASSERT_TRUE(v.feed(ch('j'), 100 + Vim::PENDING_MS, o));
+  TEST_ASSERT_EQUAL(K_DOWN, o.code);
+  TEST_ASSERT_EQUAL(0, o.count);
+  TEST_ASSERT_EQUAL_STRING("", v.pending());
+  // Esc cancels a pending command and does nothing else.
+  TEST_ASSERT_FALSE(v.feed(ch('g'), 0, o));
+  TEST_ASSERT_FALSE(v.feed(Key{K_ESC, 0, false, 0}, 10, o));
+  TEST_ASSERT_TRUE(v.feed(Key{K_ESC, 0, false, 0}, 20, o));
+  TEST_ASSERT_EQUAL(K_ESC, o.code);
+}
+
+void test_vim_ctrl_and_others() {
+  Vim v;
+  Key o;
+  TEST_ASSERT_TRUE(v.feed(ch('d', KM_CTRL), 0, o));
+  TEST_ASSERT_EQUAL(K_HALF_DN, o.code);
+  TEST_ASSERT_TRUE(v.feed(ch('u', KM_CTRL), 0, o));
+  TEST_ASSERT_EQUAL(K_HALF_UP, o.code);
+  TEST_ASSERT_TRUE(v.feed(ch('f', KM_CTRL), 0, o));
+  TEST_ASSERT_EQUAL(K_PGDN, o.code);
+  TEST_ASSERT_TRUE(v.feed(ch('o', KM_CTRL), 0, o));
+  TEST_ASSERT_EQUAL(K_JUMP_BACK, o.code);
+  TEST_ASSERT_TRUE(v.feed(ch('q'), 0, o));
+  TEST_ASSERT_EQUAL(K_ESC, o.code);
+  TEST_ASSERT_TRUE(v.feed(ch('i'), 0, o));
+  TEST_ASSERT_EQUAL(K_COMPOSE, o.code);
+  // Keys that aren't commands pass through (y/n in a confirm box).
+  TEST_ASSERT_TRUE(v.feed(ch('y'), 0, o));
+  TEST_ASSERT_EQUAL('y', o.code);
+  TEST_ASSERT_TRUE(v.feed(Key{K_ENTER, 0, false, 0}, 0, o));
+  TEST_ASSERT_EQUAL(K_ENTER, o.code);
+}
+
+void test_vim_letters_repeat_only_when_on() {
+  static const uint8_t J = 0x0d;
+  Input in;
+  in.feed(down(J), 0);
+  for (uint32_t t = 0; t < 1000; t += 10) in.tick(t);
+  TEST_ASSERT_EQUAL(1, drain(in));
+  in.feed(up(J), 1000);
+  in.setVimRepeat(true);
+  in.feed(down(J), 2000);
+  for (uint32_t t = 2000; t < 3000; t += 10) in.tick(t);
+  TEST_ASSERT_TRUE(drain(in) > 5);
+}
+
+void test_list_half_page_and_goto() {
+  ListNav n;
+  Key k{K_HALF_DN, 0, false, 0};
+  TEST_ASSERT_TRUE(n.key(k, 20, 6));
+  TEST_ASSERT_EQUAL(3, n.sel);
+  k.code = K_GOTO;
+  k.count = 15;
+  TEST_ASSERT_TRUE(n.key(k, 20, 6));
+  TEST_ASSERT_EQUAL(14, n.sel);
+  k.count = 99;
+  TEST_ASSERT_TRUE(n.key(k, 20, 6));
+  TEST_ASSERT_EQUAL(19, n.sel);
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_enter_fires_once_per_press_even_when_held);
@@ -150,5 +278,12 @@ int main(int, char**) {
   RUN_TEST(test_keymap_text_mode_swaps_arrow_keys);
   RUN_TEST(test_keymap_esc_stays_esc_in_text_mode);
   RUN_TEST(test_keymap_opt_is_menu);
+  RUN_TEST(test_vim_motions);
+  RUN_TEST(test_vim_counts);
+  RUN_TEST(test_vim_g_commands);
+  RUN_TEST(test_vim_pending_and_timeout);
+  RUN_TEST(test_vim_ctrl_and_others);
+  RUN_TEST(test_vim_letters_repeat_only_when_on);
+  RUN_TEST(test_list_half_page_and_goto);
   return UNITY_END();
 }
