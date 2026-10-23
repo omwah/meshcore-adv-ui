@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Everything CI would run, locally: PII check, upstream-main guard, unit
+# Everything CI would run, locally: PII check, licence check, upstream-main guard, unit
 # tests, simulator scenarios (mock screenshots and real-MeshCore), firmware
 # builds and size budgets. Run inside pixi: `pixi run ci`.
 set -euo pipefail
@@ -9,6 +9,7 @@ export ASAN_OPTIONS=detect_leaks=0
 step() { printf '\n== %s\n' "$*"; }
 
 step "PII check";                  scripts/pii-check.sh --all
+step "licences";                   python -I scripts/check-licenses.py
 step "upstream main.cpp";          scripts/check-upstream-main.sh
 step "patches apply";              scripts/prepare-deps.sh --force
 step "unit tests";                 pio test -e test -e test_tdeck -e simnet_test
