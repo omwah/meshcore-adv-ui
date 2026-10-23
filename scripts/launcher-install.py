@@ -4,18 +4,20 @@
 # (licenses/Apache-2.0.txt).
 #
 # Changes for meshcore-adv-ui: installs this project's packaged app image
-# (the newest in dist/, BLE or --usb build) under the name meshcore-adv-ui;
+# (the newest in dist/, BLE or --usb build, Cardputer or --tdeck) under the
+# name meshcore-adv-ui;
 # no SD runtime upload; a reboot that drops the connection counts as done.
 """
-Install a meshcore-adv-ui build on a Cardputer running bmorcelli's Launcher,
-over Launcher's web interface (WebUI), the way its own page does.
+Install a meshcore-adv-ui build on a Cardputer or T-Deck running bmorcelli's
+Launcher, over Launcher's web interface (WebUI), the way its own page does.
 
-    pixi run launcher-install IP [--usb] [--boot] [--no-replace]
+    pixi run launcher-install IP [--tdeck] [--usb] [--boot] [--no-replace]
     python -I scripts/launcher-install.py IP [BIN] [--name NAME] ...
 
 IP     the device's address, as Launcher's WebUI screen shows it
-BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin
-       that `pixi run package` made; never a -full.bin)
+BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin,
+       or ...-tdeck.bin, that `pixi run package` made; never a -full.bin)
+--tdeck the T-Deck's build (...-tdeck.bin) instead of the Cardputer's
 --usb  the USB-only build instead (installed as meshcore-adv-ui-usb)
 --name the app's name in Launcher's menu (default: meshcore-adv-ui)
 --no-replace  keep an installed app of that name and add a copy; by default
@@ -233,12 +235,13 @@ def main():
     ap.add_argument("ip")
     ap.add_argument("bin", nargs="?", type=Path)
     ap.add_argument("--usb", action="store_true")
+    ap.add_argument("--tdeck", action="store_true")
     ap.add_argument("--name")
     ap.add_argument("--no-replace", action="store_true")
     ap.add_argument("--boot", action="store_true")
     a = ap.parse_args()
 
-    env = "cardputer_adv_usb" if a.usb else "cardputer_adv"
+    env = ("tdeck" if a.tdeck else "cardputer_adv") + ("_usb" if a.usb else "")
     name = a.name or ("meshcore-adv-ui-usb" if a.usb else "meshcore-adv-ui")
     path = a.bin or newest_image(env)
     if not path.is_file():

@@ -14,7 +14,11 @@ enum Tab { T_CHATS, T_CONTACTS, T_NODES, T_CHANNELS, T_COUNT };
 const char* const kTabNames[T_COUNT] = {"Chats", "Contacts", "Nodes", "Channels"};
 const char* const kTabShort[T_COUNT] = {"Chats", "People", "Nodes", "Chans"};   // when the full names don't fit
 
-constexpr int MAX_ORDER = 256;
+// Rows a tab can list: every contact and channel the build keeps.
+#ifndef MC_LIST_MAX
+#define MC_LIST_MAX 256
+#endif
+constexpr int MAX_ORDER = MC_LIST_MAX;
 
 bool matches(const char* name, const char* q) {
   if (!q[0]) return true;

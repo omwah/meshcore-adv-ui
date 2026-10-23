@@ -36,6 +36,7 @@ struct UiPrefs {
   uint8_t notifyMode;            // model::NotifyMode (0: LED only)
   uint8_t shortPreview;          // 0: chats list scrolls the whole last message
   uint8_t vimKeys;               // 0: the board's default, 1: off, 2: on
+  uint8_t trackballOff;          // 1: the trackball's rolls are ignored
 };
 
 // The mode the device boots in, from the UI prefs on flash (before any

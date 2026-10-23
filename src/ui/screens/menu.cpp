@@ -116,11 +116,14 @@ MainMenu s_menu;
 // ------------------------------------------------------------- settings
 
 enum SItem { S_HDR_ID, S_NAME, S_MODE, S_REMOTE, S_HDR_TIME, S_TZ, S_HDR_DISP, S_THEME, S_BRIGHT, S_TIMEOUT, S_TEXT, S_PREVIEW,
-             S_HDR_IN, S_VIM, S_LOCKOUT, S_SOUND, S_NOTIFY,
+             S_HDR_IN, S_VIM, S_BALL, S_LOCKOUT, S_SOUND, S_NOTIFY,
              S_HDR_MESH, S_AUTOADD, S_PINGBOT, S_BLE, S_PIN, S_PINMODE,
              S_HDR_GPS, S_GPS, S_GPSADV, S_GPSTIME,
              S_HDR_TELEM, S_TBATT, S_TLOC, S_TENV,
              S_HDR_DANGER, S_FACTORY, S_N };
+
+// Row -> item: "Trackball" is only there on boards with one.
+int sItem(int i) { return !MC_HAS_TRACKBALL && i >= S_BALL ? i + 1 : i; }
 
 const uint16_t kTimeouts[] = {0, 15, 30, 60, 120, 300};
 const uint16_t kLockouts[] = {10, 30, 60, 100, 150, 250, 500};
@@ -140,8 +143,9 @@ public:
   const char* title(App&) override { return "Settings"; }
 
 protected:
-  int count(App&) override { return S_N; }
+  int count(App&) override { return MC_HAS_TRACKBALL ? S_N : S_N - 1; }
   void item(App& a, int i, MenuItem& it) override {
+    i = sItem(i);
     const model::Prefs& p = a.m().prefs();
     switch (i) {
       case S_HDR_ID: it.label = "IDENTITY"; it.header = true; break;
@@ -170,6 +174,10 @@ protected:
       case S_PREVIEW: it.label = "Chat preview"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", p.shortPreview ? "short" : "whole message"); break;
       case S_HDR_IN: it.label = "INPUT & SOUND"; it.header = true; break;
       case S_VIM: it.label = "Vim keys"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.vimKeys)); break;
+      case S_BALL:
+        it.label = "Trackball"; it.choice = true;
+        snprintf(it.value, sizeof it.value, "%s", yesNo(p.trackball));
+        break;
       case S_LOCKOUT: it.label = "Key filter"; it.choice = true; snprintf(it.value, sizeof it.value, "%u ms", p.inputLockoutMs); break;
       case S_SOUND: it.label = "Sound"; it.choice = true; snprintf(it.value, sizeof it.value, "%s", yesNo(p.sound)); break;
       case S_NOTIFY: {
@@ -226,6 +234,7 @@ protected:
   }
 
   void activate(App& a, int i) override {
+    i = sItem(i);
     switch (i) {
       case S_NAME:
         a.prompt("Node name", a.m().prefs().nodeName, model::NAME_LEN - 1, [](App& app, int) {
@@ -273,6 +282,7 @@ protected:
   }
 
   void adjust(App& a, int i, int dir) override {
+    i = sItem(i);
     model::Prefs p = a.m().prefs();
     switch (i) {
       case S_MODE:
@@ -298,6 +308,7 @@ protected:
       case S_TEXT: p.textSize = (uint8_t)((p.textSize + 3 + dir) % 3); break;
       case S_PREVIEW: p.shortPreview = !p.shortPreview; break;
       case S_VIM: p.vimKeys = !p.vimKeys; break;
+      case S_BALL: p.trackball = !p.trackball; break;
       case S_LOCKOUT: p.inputLockoutMs = (uint16_t)stepIn(kLockouts, p.inputLockoutMs, dir); break;
       case S_SOUND: p.sound = !p.sound; break;
       case S_NOTIFY: p.notify = (model::NotifyMode)(((int)p.notify + 4 + dir) % 4); break;

@@ -13,6 +13,9 @@ This project includes or derives from the following third-party work:
     adapted from esp_kbd_tdeck.c)
   - TCA8418 register sequence, ST7789 panel init values, SD/LoRa shared-bus
     handling and battery curve, adapted into boards/cardputer_adv/
+  - T-Deck keyboard controller protocol and trackball handling
+    (esp_kbd_tdeck_dev.c), GT911 touch reading and rotation (esp_touch.c) and
+    panel settings, adapted into boards/tdeck/
   Files derived from esp-vim carry their original Apache-2.0 notice and a
   statement of changes. See licenses/Apache-2.0.txt.
 

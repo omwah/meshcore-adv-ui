@@ -18,6 +18,10 @@ BUDGETS = {
     # static RAM against stock's Bluedroid. Room left for BLE client mode.
     "cardputer_adv": (1_000_000, 120_000),       # stock BLE companion is ~1.25 MB
     "cardputer_adv_usb": (740_000, 108_000),     # MeshCore 1.18 adds dynamic prefs/CLI (~7 KB over old cap)
+    # T-Deck: a 6.25 MB app partition, so flash is no concern; internal RAM is
+    # (the node and the UI are made in PSRAM at boot).
+    "tdeck": (1_200_000, 80_000),
+    "tdeck_usb": (900_000, 70_000),
 }
 
 

@@ -185,7 +185,16 @@ struct Prefs {
   NotifyMode notify;              // what a new message does
   bool shortPreview;              // chats list: scroll only the stored preview, not the whole message
   bool vimKeys;                   // h/j/k/l and friends move around (ui/input/vim.h)
+  bool trackball;                 // boards with one: its rolls move (a worn one can be turned off)
 };
+
+#ifndef MC_HAS_TRACKBALL
+#ifdef MC_BOARD_TDECK
+#define MC_HAS_TRACKBALL 1
+#else
+#define MC_HAS_TRACKBALL 0
+#endif
+#endif
 
 // Vim keys start on where the keyboard has no arrow keys.
 #ifndef MC_VIM_KEYS_DEFAULT

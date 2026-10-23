@@ -14,7 +14,7 @@
 #include "ui/screens/screens.h"
 #include "st7789_display.h"
 #include "tca8418_keyboard.h"
-#include "platform_cardputer.h"
+#include "esp32_platform.h"
 #include "es8311_sound.h"
 #include "ws2812_led.h"
 #include <new>
@@ -45,7 +45,7 @@
 
 static MultiSerialInterface interfaces;
 static DataStore store(SPIFFS, rtc_clock);
-static CardputerPlatform platform;
+static Esp32Platform platform;
 static app::MeshAdapter adapter(&board, &interfaces, platform);
 static StdRNG fast_rng;
 static SimpleMeshTables tables;

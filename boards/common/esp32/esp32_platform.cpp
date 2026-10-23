@@ -1,13 +1,13 @@
-#include "platform_cardputer.h"
+#include "esp32_platform.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 #include "target.h"
 
-uint32_t CardputerPlatform::heapFree() { return heap_caps_get_free_size(MALLOC_CAP_INTERNAL); }
-uint32_t CardputerPlatform::heapMin() { return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL); }
-uint32_t CardputerPlatform::heapMaxBlock() { return heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL); }
+uint32_t Esp32Platform::heapFree() { return heap_caps_get_free_size(MALLOC_CAP_INTERNAL); }
+uint32_t Esp32Platform::heapMin() { return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL); }
+uint32_t Esp32Platform::heapMaxBlock() { return heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL); }
 
-model::Gps CardputerPlatform::gps() {
+model::Gps Esp32Platform::gps() {
   model::Gps g;
   memset(&g, 0, sizeof g);
   // Not gps.isEnabled(): with no enable pin it always says yes. Whether the
@@ -24,12 +24,12 @@ model::Gps CardputerPlatform::gps() {
   return g;
 }
 
-void CardputerPlatform::setGpsPower(bool on) {
+void Esp32Platform::setGpsPower(bool on) {
   // MeshCore's sensor manager owns the GPS UART; the setting it listens to is "gps".
   sensors.setSettingValue("gps", on ? "1" : "0");
 }
 
-fs::FS* CardputerPlatform::sd() {
+fs::FS* Esp32Platform::sd() {
   // Card detection: try to mount at most every 5 s while absent; after a
   // successful mount, check the card is still answering.
   uint32_t now = millis();
@@ -47,6 +47,6 @@ fs::FS* CardputerPlatform::sd() {
   return _sdOk ? &SD : nullptr;
 }
 
-void CardputerPlatform::reboot() { ESP.restart(); }
+void Esp32Platform::reboot() { ESP.restart(); }
 
-uint16_t CardputerPlatform::batteryMv() { return board.getBattMilliVolts(); }
+uint16_t Esp32Platform::batteryMv() { return board.getBattMilliVolts(); }

@@ -10,9 +10,9 @@
 namespace ui { class App; }
 class St7789Display;
 class Tca8418Keyboard;
-class CardputerPlatform;
+class Esp32Platform;
 
 // Set by main: plays the message chime (diag 'beep').
 extern void (*g_diagBeep)();
 
-void diagPoll(ui::App& app, St7789Display& d, Tca8418Keyboard& k, CardputerPlatform& p);
+void diagPoll(ui::App& app, St7789Display& d, Tca8418Keyboard& k, Esp32Platform& p);

@@ -3,7 +3,7 @@
 #include "ui/app.h"
 #include "st7789_display.h"
 #include "tca8418_keyboard.h"
-#include "platform_cardputer.h"
+#include "esp32_platform.h"
 #include "target.h"
 #include "MyMesh.h"
 #include <SPIFFS.h>
@@ -12,7 +12,7 @@ void (*g_diagBeep)() = nullptr;
 static char s_line[64];
 static int s_len = 0;
 
-static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, CardputerPlatform& p) {
+static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Esp32Platform& p) {
   if (!strncmp(c, "stat", 4)) {
     Serial.printf("stat: lora-cap %s, keyboard %s, sd %s, heap %u (min %u), asleep %d, batt %u mV (arduino analogRead %u mV at pin)\n",
                   board.loraCapPresent() ? "ok" : "MISSING", k.present() ? "ok" : "MISSING", p.sd() ? "yes" : "no",
@@ -83,7 +83,7 @@ static void run(char* c, ui::App& app, St7789Display& d, Tca8418Keyboard& k, Car
   }
 }
 
-void diagPoll(ui::App& app, St7789Display& d, Tca8418Keyboard& k, CardputerPlatform& p) {
+void diagPoll(ui::App& app, St7789Display& d, Tca8418Keyboard& k, Esp32Platform& p) {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     if (ch == '\r') continue;

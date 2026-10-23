@@ -1,5 +1,5 @@
 // A link to a companion node that carries whole protocol frames: Bluetooth
-// LE on the device (boards/cardputer_adv/nimble_central.*), an in-process
+// LE on the device (boards/common/esp32/nimble_central.*), an in-process
 // pipe in the host simulator. Plain C++, no Arduino.
 #pragma once
 #include <stdint.h>

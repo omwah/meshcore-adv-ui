@@ -28,10 +28,10 @@ test     = { cmd = "pio test -e test -e test_tdeck -e simnet_test", depends-on =
 simnet   = { cmd = "pio run -e simnet", depends-on = ["deps"] }
 simnet-test = { cmd = "python -I scripts/simnet_tests.py", depends-on = ["simnet"] }
 shots    = { cmd = "python -I scripts/screenshots.py", depends-on = ["sim"] }
-build    = { cmd = "pio run -e cardputer_adv -e cardputer_adv_usb", depends-on = ["deps"] }
+build    = { cmd = "pio run -e cardputer_adv -e cardputer_adv_usb -e tdeck -e tdeck_usb", depends-on = ["deps"] }
 size     = { cmd = "python -I scripts/check-size.py", depends-on = ["build"] }
 package  = { cmd = "python -I scripts/package.py", depends-on = ["build"] }
-launcher-install = { cmd = "python -I scripts/launcher-install.py", depends-on = ["package"], description = "Build, package and install over Launcher's WebUI: pixi run launcher-install IP [--usb] [--boot]" }
+launcher-install = { cmd = "python -I scripts/launcher-install.py", depends-on = ["package"], description = "Build, package and install over Launcher's WebUI: pixi run launcher-install IP [--tdeck] [--usb] [--boot]" }
 pii      = "scripts/pii-check.sh --all"
 ci       = "scripts/ci-local.sh"
 upstream = "scripts/check-upstream-main.sh"

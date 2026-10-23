@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ENVS = ["cardputer_adv", "cardputer_adv_usb"]
+ENVS = ["cardputer_adv", "cardputer_adv_usb", "tdeck", "tdeck_usb"]
 
 
 def version():

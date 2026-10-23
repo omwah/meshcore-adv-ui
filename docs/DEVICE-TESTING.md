@@ -53,7 +53,7 @@ Serial bring-up commands (Bluetooth build): `stat`, `bl <0-255>|gpio`,
 ## 5. Bluetooth (default build)
 
 The items below passed with stock's Bluedroid stack. Bluetooth now runs on
-NimBLE (`boards/cardputer_adv/nimble_serial.*`), so they need checking again:
+NimBLE (`boards/common/esp32/nimble_serial.*`), so they need checking again:
 
 - [x] **NimBLE: pairing.** On the phone, forget the old pairing first. The app finds the device, the PIN shows on screen while pairing, and pairing with it succeeds. A wrong PIN is refused and the device advertises again. Works on hardware.
 - [x] **NimBLE: reconnect.** After a reboot of either side, the phone reconnects without asking for the PIN again. Works on hardware.

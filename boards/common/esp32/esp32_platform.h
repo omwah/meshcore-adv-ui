@@ -1,10 +1,12 @@
-// Device services for the adapter: heap figures, GPS, SD card, reboot.
+// Device services for the adapter: heap figures, GPS, SD card, reboot. For
+// any ESP32 board whose target.h names `board`, `sensors`, `gps` and the SPI
+// bus the SD card is on (`loraSpi`, with PIN_SD_CS).
 #pragma once
 #include <SD.h>
 #include <esp_random.h>
 #include "app/platform.h"
 
-class CardputerPlatform : public app::Platform {
+class Esp32Platform : public app::Platform {
 public:
   uint32_t heapFree() override;
   uint32_t heapMin() override;
