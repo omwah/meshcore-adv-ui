@@ -104,9 +104,18 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
     int vw = it.value[0] ? Canvas::textWidth(it.value, vf) : 0;
     if (vw > vmax) vw = vmax;
     app.fitText(c, r.x + 6, y + ty, it.label, f, fg, r.w - 18 - vw - (vw ? 10 : 0), sel);
+    app.hit({r.x, y, r.w, RH}, HitTarget::ROW, i);
     if (vw) {
-      int vx = r.x + r.w - 8 - vw;
-      if (sel && it.enabled && it.choice) {
+      // With touch, a choice reads "< value >" and either side changes it.
+      bool touchChoice = app.hasTouch() && it.enabled && it.choice;
+      int vx = r.x + r.w - 8 - vw - (touchChoice ? 12 : 0);
+      if (touchChoice) {
+        c.bitmap(vx - 11, y + iy, icon::arrowL, 8, 8, sel ? C_ACCENT : C_DIM);
+        c.bitmap(r.x + r.w - 14, y + iy, icon::arrowR, 8, 8, sel ? C_ACCENT : C_DIM);
+        int ax = vx - 16, mid = (ax + r.x + r.w) / 2;
+        app.hit({ax, y, mid - ax, RH}, HitTarget::ADJUST, i * 2);
+        app.hit({mid, y, r.x + r.w - mid, RH}, HitTarget::ADJUST, i * 2 + 1);
+      } else if (sel && it.enabled && it.choice) {
         // Show that Left/Right change this value.
         c.bitmap(vx - 9, y + iy, icon::arrowL, 8, 8, C_DIM);
       }
@@ -114,6 +123,18 @@ void MenuScreen::draw(App& app, Canvas& c, const Rect& r0) {
     }
   }
   drawScrollbar(c, r, n, _nav.top, vis);
+}
+
+bool MenuScreen::selectRow(App& app, int i) {
+  if (i < 0 || i >= count(app)) return false;
+  MenuItem it;
+  memset(&it, 0, sizeof it);
+  it.enabled = true;
+  item(app, i, it);
+  if (it.header || !it.enabled) return false;
+  _nav.sel = i;
+  _nav.clamp(count(app), _vis);
+  return true;
 }
 
 void MenuScreen::onKey(App& app, const Key& k) {

@@ -531,6 +531,7 @@ void openMainMenu(App& a) {
   if (a.top() == &s_menu) a.pop();   // Menu again closes it
   else { s_menu.resetNav(); a.push(&s_menu); }
 }
+bool mainMenuOpen(App& a) { return a.top() == &s_menu; }
 void openSettings(App& a) { s_settings.resetNav(); a.push(&s_settings); }
 void openRadio(App& a) { s_radio.resetNav(); a.push(&s_radio); }
 void openBackup(App& a) { s_backup.resetNav(); a.push(&s_backup); }

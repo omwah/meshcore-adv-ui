@@ -1,0 +1,31 @@
+# T-Deck: everything by touch. The shortcut bar is the bottom 34 rows of
+# 320x240; its buttons are 64 wide.
+vim on
+shot touch-home
+tap 96 223
+shot touch-contacts
+tap 224 223
+shot touch-channels
+tap 32 223
+# The second chat; drag down for older messages; the header arrow is back.
+tap 100 80
+shot touch-chat
+swipe 160 60 160 170 400
+shot touch-chat-dragged
+tap 10 8
+# Hold a row for its details.
+long 100 50
+shot touch-details
+tap 10 8
+# Swipe sideways on Home for the next tab.
+swipe 250 120 80 125 200
+shot touch-swiped
+# The menu, dragged, and a row tapped.
+tap 288 223
+shot touch-menu
+swipe 160 180 160 40 400
+shot touch-menu-dragged
+tap 160 120
+shot touch-menu-tapped
+long 10 8
+shot touch-home-again

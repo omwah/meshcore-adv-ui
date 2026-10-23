@@ -76,6 +76,7 @@ public:
       } else if (row & 1) {
         c.fillRect(lr.x, y, lr.w - 3, rowH, C_ZEBRA);
       }
+      a.hit({lr.x, y, lr.w, rowH}, HitTarget::ROW, i);
       if (_tab == T_CHATS) drawChat(a, c, y, rowH, _order[i], sel);
       else if (_tab == T_CHANNELS) drawChannel(a, c, y, rowH, _order[i], sel);
       else drawContact(a, c, y, rowH, _order[i], sel);
@@ -144,6 +145,20 @@ public:
 
   bool textMode(App&) override { return _typing; }
 
+  bool selectRow(App&, int i) override {
+    if (i < 0 || i >= _n) return false;
+    _nav[_tab].sel = i;
+    return true;
+  }
+
+  void showTab(App& a, int tab) {
+    _tab = tab;
+    _query[0] = 0;
+    _typing = false;
+    rebuild(a);
+  }
+  int tab() const { return _tab; }
+
   const Hint* hints(App& a) override {
     // Most important first: larger text sizes show fewer hints.
     static const Hint chats[] = {{"ent", "open"}, {"opt", "menu"}, {"<>", "tabs"}, {"tab", "info"}, {"a-z", "find"}, {nullptr, nullptr}};
@@ -183,6 +198,7 @@ private:
       bool on = t == _tab;
       if (on) c.pill(x, r.y + 1, w, TH - 2, C_ACCENT);
       c.text(x + 5, ty, names[t], f, on ? C_BG : C_DIM);
+      a.hit({x, r.y, w + 2, TH}, HitTarget::SHORTCUT, SC_CHATS + t);
       // Unread dot on Chats when looking elsewhere.
       if (t == T_CHATS && !on && a.m().unreadTotal()) c.fillRect(x + w - 4, r.y + 3, 3, 3, C_BADGE);
       x += w + 2;
@@ -355,5 +371,21 @@ HomeScreen s_home;
 }  // namespace
 
 Screen* home() { return &s_home; }
+
+void shortcut(App& a, int sc) {
+  if (sc == SC_MENU) {
+    if (!mainMenuOpen(a)) openMainMenu(a);
+    return;
+  }
+  // Home, on that tab; from anywhere, as long Esc does.
+  if (a.top() != &s_home) a.popToRoot();
+  if (a.top() == &s_home) s_home.showTab(a, sc - SC_CHATS);
+  a.invalidate();
+}
+
+int shortcutShowing(App& a) {
+  if (a.top() == &s_home) return SC_CHATS + s_home.tab();
+  return mainMenuOpen(a) ? SC_MENU : -1;
+}
 
 }}  // namespace ui::screens

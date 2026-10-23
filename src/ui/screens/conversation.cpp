@@ -213,6 +213,28 @@ public:
     }
   }
 
+  // Dragging scrolls by the pixel, the messages following the finger; past
+  // the oldest loaded, older ones come in (at most twice a second).
+  void onTouch(App& a, const Gesture& g, const HitTarget* t) override {
+    if (g.type != Gesture::DRAG || _composing) { Screen::onTouch(a, g, t); return; }
+    _scroll += g.dy;
+    if (_scroll > _maxScroll) {
+      _scroll = _maxScroll;
+      if (g.dy > 0 && a.nowMs() - _lastLoad > 500) {
+        _lastLoad = a.nowMs();
+        int n = a.m().loadOlder(id);
+        if (n) _showOlder = n;
+      }
+    }
+    if (_scroll < 0) {
+      _scroll = 0;
+      if (g.dy < 0 && !a.m().atNewest(id) && a.nowMs() - _lastLoad > 500) {
+        _lastLoad = a.nowMs();
+        _keepBottom = a.m().loadNewer(id);
+      }
+    }
+  }
+
   const Hint* hints(App& a) override {
     static const Hint view[] = {{"ent", "write"}, {"^v", "scroll"}, {"tab", "info"}, {"esc", "back"}, {nullptr, nullptr}};
     static const Hint vim[] = {{"i", "write"}, {"^v", "scroll"}, {"tab", "info"}, {"q", "back"}, {nullptr, nullptr}};
@@ -407,6 +429,7 @@ private:
   bool _loginTried = false;
   int _keepBottom = 0, _showOlder = 0;   // messages just loaded below / above
   int _scroll = 0, _maxScroll = 0;
+  uint32_t _lastLoad = 0;                // a drag last brought in messages
   uint32_t _readRev = 0, _blink = 0;
   uint32_t _divSeq = 0;                  // the first new message (0: no "New" line)
   bool _toDivider = false;               // scroll to it on the next draw

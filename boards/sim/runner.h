@@ -1,5 +1,5 @@
-// Script runner shared by the simulators: key presses through the Cardputer
-// keymap, waits on a virtual clock, screenshots. Each simulator adds its own
+// Script runner shared by the simulators: key presses through the board's
+// keymap, touches, waits on a virtual clock, screenshots. Each simulator adds its own
 // commands for the world it simulates (mock data, or real MeshCore nodes).
 #pragma once
 #include <stdint.h>
@@ -7,6 +7,7 @@
 #include "ui/app.h"
 #include "sim_keyboard.h"
 #include "sim_display.h"
+#include "sim_touch.h"
 
 namespace sim {
 
@@ -29,8 +30,9 @@ public:
 };
 
 // Runs a script; returns a process exit code. Errors go to stderr with the
-// line number. Every `shot` writes <outdir>/<name>.ppm.
+// line number. Every `shot` writes <outdir>/<name>.ppm. `touch`, if given,
+// takes the tap/long/swipe commands.
 int runScript(FILE* in, const char* outdir, ui::App& app, ui::Screen* first, SimKeyboard& kb, SimDisplay& disp,
-              uint32_t& now, World& world);
+              uint32_t& now, World& world, SimTouch* touch = nullptr);
 
 }  // namespace sim

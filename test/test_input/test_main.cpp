@@ -3,6 +3,7 @@
 #include <unity.h>
 #include "ui/input/input.h"
 #include "ui/input/vim.h"
+#include "ui/input/gesture.h"
 #include "ui/widgets.h"
 extern "C" {
 #include "cardputer_keymap.h"
@@ -266,6 +267,82 @@ void test_list_half_page_and_goto() {
   TEST_ASSERT_EQUAL(19, n.sel);
 }
 
+// ---------------------------------------------------------------- gestures
+
+static void finger(GestureReader& g, hal::TouchEvent::Type t, int x, int y, uint32_t now) {
+  g.feed(hal::TouchEvent{(int16_t)x, (int16_t)y, t}, now);
+  g.tick(now);
+}
+
+void test_gesture_tap() {
+  GestureReader g;
+  Gesture e;
+  finger(g, hal::TouchEvent::DOWN, 100, 50, 0);
+  finger(g, hal::TouchEvent::MOVE, 104, 53, 30);   // within the slop
+  finger(g, hal::TouchEvent::UP, 104, 53, 90);
+  TEST_ASSERT_TRUE(g.next(e));
+  TEST_ASSERT_EQUAL(Gesture::TAP, e.type);
+  TEST_ASSERT_EQUAL(100, e.x);
+  TEST_ASSERT_EQUAL(50, e.y);
+  TEST_ASSERT_FALSE(g.next(e));
+}
+
+void test_gesture_long_press_fires_while_held() {
+  GestureReader g;
+  Gesture e;
+  finger(g, hal::TouchEvent::DOWN, 10, 10, 0);
+  finger(g, hal::TouchEvent::MOVE, 10, 10, 400);
+  TEST_ASSERT_FALSE(g.next(e));
+  finger(g, hal::TouchEvent::MOVE, 10, 10, GestureReader::LONG_MS);
+  TEST_ASSERT_TRUE(g.next(e));
+  TEST_ASSERT_EQUAL(Gesture::LONG, e.type);
+  // Letting go afterwards is not also a tap.
+  finger(g, hal::TouchEvent::UP, 10, 10, 900);
+  TEST_ASSERT_FALSE(g.next(e));
+}
+
+void test_gesture_drag_reports_distance() {
+  GestureReader g;
+  Gesture e;
+  finger(g, hal::TouchEvent::DOWN, 50, 100, 0);
+  finger(g, hal::TouchEvent::MOVE, 51, 120, 16);    // past the slop: drags from where it went down
+  TEST_ASSERT_TRUE(g.next(e));
+  TEST_ASSERT_EQUAL(Gesture::DRAG, e.type);
+  TEST_ASSERT_EQUAL(20, e.dy);
+  finger(g, hal::TouchEvent::MOVE, 51, 110, 32);
+  TEST_ASSERT_TRUE(g.next(e));
+  TEST_ASSERT_EQUAL(-10, e.dy);
+  finger(g, hal::TouchEvent::UP, 51, 110, 48);
+  TEST_ASSERT_FALSE(g.next(e));   // no tap, no swipe
+}
+
+void test_gesture_swipe_sideways() {
+  GestureReader g;
+  Gesture e;
+  finger(g, hal::TouchEvent::DOWN, 250, 100, 0);
+  finger(g, hal::TouchEvent::MOVE, 200, 104, 16);
+  finger(g, hal::TouchEvent::MOVE, 150, 106, 32);
+  TEST_ASSERT_FALSE(g.next(e));   // sideways: nothing until the finger lifts
+  finger(g, hal::TouchEvent::UP, 150, 106, 48);
+  TEST_ASSERT_TRUE(g.next(e));
+  TEST_ASSERT_EQUAL(Gesture::SWIPE, e.type);
+  TEST_ASSERT_EQUAL(-100, e.dx);
+  // Too short a slide sideways is nothing at all.
+  finger(g, hal::TouchEvent::DOWN, 100, 100, 100);
+  finger(g, hal::TouchEvent::MOVE, 80, 100, 116);
+  finger(g, hal::TouchEvent::UP, 80, 100, 132);
+  TEST_ASSERT_FALSE(g.next(e));
+}
+
+void test_gesture_cancel_ignores_the_rest() {
+  GestureReader g;
+  Gesture e;
+  finger(g, hal::TouchEvent::DOWN, 10, 10, 0);
+  g.cancel();
+  finger(g, hal::TouchEvent::UP, 10, 10, 50);
+  TEST_ASSERT_FALSE(g.next(e));
+}
+
 int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_enter_fires_once_per_press_even_when_held);
@@ -285,5 +362,10 @@ int main(int, char**) {
   RUN_TEST(test_vim_ctrl_and_others);
   RUN_TEST(test_vim_letters_repeat_only_when_on);
   RUN_TEST(test_list_half_page_and_goto);
+  RUN_TEST(test_gesture_tap);
+  RUN_TEST(test_gesture_long_press_fires_while_held);
+  RUN_TEST(test_gesture_drag_reports_distance);
+  RUN_TEST(test_gesture_swipe_sideways);
+  RUN_TEST(test_gesture_cancel_ignores_the_rest);
   return UNITY_END();
 }

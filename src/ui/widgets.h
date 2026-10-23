@@ -32,6 +32,7 @@ public:
   void onKey(App& app, const Key& k) override;
   const Hint* hints(App& app) override;
   void onEnter(App& app) override;
+  bool selectRow(App& app, int i) override;
   // Start at the top: call when opening the menu fresh (not when a child
   // screen returns to it, which also runs onEnter).
   void resetNav() { _nav = ListNav(); _fresh = true; }

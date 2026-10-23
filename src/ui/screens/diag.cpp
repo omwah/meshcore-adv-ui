@@ -257,6 +257,7 @@ public:
       model::RxLogEntry e;
       if (!a.m().rxLog(i, e)) continue;
       int y = r.y + lh + row * lh;
+      a.hit({r.x, y, r.w, lh}, HitTarget::ROW, i);
       if (i == _nav.sel) c.fillRect(r.x, y, r.w - 3, lh, C_SEL);
       char ago[8], snr[8], l[16];
       fmtAge(ago, sizeof ago, (a.m().uptimeMs() - e.ms) / 1000);
@@ -282,6 +283,10 @@ public:
   void onKey(App& a, const Key& k) override {
     if (k.code == K_ESC) a.pop();
     else _nav.key(k, a.m().rxLogCount(), _vis);
+  }
+  bool selectRow(App& a, int i) override {
+    if (i >= 0 && i < a.m().rxLogCount()) _nav.sel = i;
+    return false;   // nothing to open
   }
   const Hint* hints(App&) override {
     static const Hint h[] = {{"^v", "scroll"}, {"esc", "back"}, {nullptr, nullptr}};
@@ -385,6 +390,7 @@ public:
       if (!a.m().heard(i, ct)) continue;
       int y = r.y + row * RH;
       const int iy = y + (RH - 8) / 2, sy = y + (RH - sm->height) / 2;
+      a.hit({r.x, y, r.w, RH}, HitTarget::ROW, _nav.top + row);
       if (_nav.top + row == _nav.sel) c.fillRect(r.x, y, r.w - 3, RH, C_SEL);
       else if (row & 1) c.fillRect(r.x, y, r.w - 3, RH, C_ZEBRA);
       uint8_t col = typeColor(ct.type);
@@ -408,6 +414,13 @@ public:
                 _nav.top + row == _nav.sel);
     }
     drawScrollbar(c, r, _n, _nav.top, vis);
+  }
+  // A tap selects; a tap on the selected advert adds it.
+  bool selectRow(App&, int i) override {
+    if (i < 0 || i >= _n) return false;
+    bool again = i == _nav.sel;
+    _nav.sel = i;
+    return again;
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == K_ESC) { a.pop(); return; }

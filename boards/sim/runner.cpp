@@ -22,7 +22,7 @@ struct Ctx {
 }  // namespace
 
 int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKeyboard& kb, SimDisplay& disp,
-              uint32_t& now, World& world) {
+              uint32_t& now, World& world, SimTouch* touch) {
   Ctx c{app, world, now};
   char line[512];
   bool started = false, preStart = false;
@@ -142,6 +142,25 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
       app.m().setPrefs(pr);
       app.applyPrefs();
       c.advance(now + 20);
+    } else if (touch && (!strcmp(cmd, "tap") || !strcmp(cmd, "long"))) {
+      // tap x y / long x y: a finger down and up in place.
+      int x = 0, y = 0;
+      sscanf(arg, "%d %d", &x, &y);
+      uint32_t t = now + 10, held = cmd[0] == 'l' ? 700 : 80;
+      touch->at(t, x, y, hal::TouchEvent::DOWN);
+      touch->at(t + held, x, y, hal::TouchEvent::UP);
+      c.advance(t + held + 100);
+    } else if (touch && !strcmp(cmd, "swipe")) {
+      // swipe x1 y1 x2 y2 [ms]: down, moves every 16 ms, up.
+      int x1 = 0, y1 = 0, x2 = 0, y2 = 0, ms = 300;
+      sscanf(arg, "%d %d %d %d %d", &x1, &y1, &x2, &y2, &ms);
+      uint32_t t = now + 10;
+      touch->at(t, x1, y1, hal::TouchEvent::DOWN);
+      int steps = ms / 16 > 1 ? ms / 16 : 1;
+      for (int i = 1; i <= steps; i++)
+        touch->at(t + i * 16, x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, hal::TouchEvent::MOVE);
+      touch->at(t + steps * 16 + 10, x2, y2, hal::TouchEvent::UP);
+      c.advance(t + steps * 16 + 100);
     } else if (!strcmp(cmd, "vim")) {
       model::Prefs pr = app.m().prefs();
       pr.vimKeys = !strcmp(arg, "on");

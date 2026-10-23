@@ -1,5 +1,6 @@
 // The UI: a stack of screens drawn into one 4-bpp canvas under a status
-// header and above a key-hint footer. Owns input filtering and theme.
+// header and above a key-hint footer (and, with a touch panel, a bar of
+// shortcuts to the main screens). Owns input filtering and theme.
 //
 // Everything is statically allocated; screens are singletons that keep only
 // their own cursor state and read the model when they draw.
@@ -9,13 +10,21 @@
 #include "ui/gfx/canvas.h"
 #include "ui/input/input.h"
 #include "ui/input/vim.h"
+#include "ui/input/gesture.h"
 #include "ui/theme.h"
 #include "model/model.h"
 #include "hal/display.h"
 #include "hal/keyboard.h"
+#include "hal/touch.h"
 #include "hal/sound.h"
 #include "hal/led.h"
 #include "gen/fonts.h"
+
+// Boards with a touch panel build the touch UI (gestures, targets, the
+// shortcut bar); others leave it out.
+#ifndef MC_TOUCH
+#define MC_TOUCH 0
+#endif
 
 namespace ui {
 
@@ -46,6 +55,19 @@ struct Hint {
   const char* label;
 };
 
+// A place on screen a touch acts on, registered while drawing (App::hit).
+struct HitTarget {
+  enum Kind : uint8_t {
+    KEY,        // arg: the key code a tap sends (a long press on Esc: long Esc)
+    ROW,        // arg: list row; tap opens it (Enter), long press shows details (Tab)
+    ADJUST,     // arg: list row * 2 + (1: right, 0: left); tap changes the value
+    SHORTCUT,   // arg: a shortcut bar button
+  };
+  Rect r;
+  Kind kind;
+  int16_t arg;
+};
+
 class Screen {
 public:
   virtual ~Screen() {}
@@ -62,6 +84,12 @@ public:
   virtual bool fullscreen() { return false; }
   // The user asked to go home (long Esc): return to a known starting state.
   virtual void onHome(App& app) { (void)app; }
+  // A touch, with the target under where it began (nullptr: none). The
+  // default turns it into keys: taps on targets, drags into Up/Down, sideways
+  // swipes into Left/Right.
+  virtual void onTouch(App& app, const Gesture& g, const HitTarget* t);
+  // Put the list cursor on row `i` (a tap on it); false if it can't go there.
+  virtual bool selectRow(App& app, int i) { (void)app; (void)i; return false; }
 };
 
 using Action = void (*)(App& app, int arg);
@@ -69,6 +97,7 @@ using Action = void (*)(App& app, int arg);
 class App {
 public:
   static constexpr int MAX_DEPTH = 8;
+  static constexpr int BAR_H = 34;   // the touch shortcut bar
 
   App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k, hal::Sound* sound = nullptr);
 
@@ -101,6 +130,21 @@ public:
   void wake();
   // The status light, if the board has one (set before begin()).
   void setLed(hal::Led* led) { _led = led; }
+#if MC_TOUCH
+  // The touch panel, if the board has one (set before begin()).
+  void setTouch(hal::Touch* t) { _touch = t; }
+  bool hasTouch() const { return _touch != nullptr; }
+  // While drawing: make `r` act on touch (see HitTarget).
+  void hit(const Rect& r, HitTarget::Kind kind, int arg);
+#else
+  bool hasTouch() const { return false; }
+  void hit(const Rect&, HitTarget::Kind, int) {}
+#endif
+  // Act on a key as if it were typed (touch targets send keys this way).
+  void key(uint16_t code);
+  // Turn a drag's pixels into whole steps of `step` pixels (the rest is kept
+  // for the next drag event); the sign is the finger's direction.
+  int dragSteps(int dy, int step);
   // Play the new-message colours once (a preview, or an alert).
   void flashLed();
   void applyPrefs();               // theme, lockout, brightness from model prefs
@@ -124,7 +168,11 @@ public:
 
 private:
   void dispatch(const Key& k);
+  void handleKey(Key k, uint32_t now);
+  void handleGesture(const Gesture& g);
   bool keyboardText();
+  bool showBar();
+  void drawShortcutBar();
   void render();
   void drawHeader();
   void drawFooter();
@@ -151,6 +199,14 @@ private:
   uint32_t _lastInput = 0;
   uint16_t _lastUnread = 0;
   hal::Led* _led = nullptr;
+#if MC_TOUCH
+  hal::Touch* _touch = nullptr;
+  GestureReader _gest;
+  static constexpr int MAX_HITS = 40;
+  HitTarget _hits[MAX_HITS];
+  int _nHits = 0;
+  int _dragRest = 0;             // drag pixels short of a whole step
+#endif
   uint32_t _ledStart = 0;        // when the burst started
   bool _ledOn = false;           // a burst is playing
   int _ledStep = -1;             // the colour showing (-1: off)

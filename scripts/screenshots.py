@@ -73,6 +73,9 @@ def main():
     files = sorted(glob.glob(os.path.join(ROOT, "test", "scenarios", "*.sim")))
     if a.scenarios:
         files = [f for f in files if os.path.splitext(os.path.basename(f))[0] in a.scenarios]
+    # Scenarios for one board's hardware (touch on the T-Deck) are named after it.
+    others = [b for b in BOARD_ENVS if b != a.board]
+    files = [f for f in files if not any(os.path.basename(f).startswith(b + "-") for b in others)]
     themes = range(len(THEMES)) if a.themes == "all" else [int(t) for t in a.themes.split(",")]
     sizes = range(3) if a.sizes == "all" else [int(z) for z in a.sizes.split(",")]
 

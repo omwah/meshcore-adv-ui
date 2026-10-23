@@ -2,7 +2,8 @@
 //
 //   sim [-s script] [-o outdir]          (script from stdin by default)
 //
-// Commands (see runner.cpp for key/hold/type/wait/shot/theme):
+// Commands (see runner.cpp for key/hold/type/wait/shot/theme, and with
+// MC_BOARD_TDECK tap/long/swipe):
 //   rx dm <contact> <text>, rx chan <slot> <sender>|<text>
 //   ble on|off|pairing, gps on|off|fix|nofix
 //   fresh, empty                (before anything else)
@@ -85,6 +86,12 @@ int main(int argc, char** argv) {
   static sim::SimKeyboard kb(&g_now);
   static ui::App app(model, display, kb);
   static MockWorld world(model);
+#ifdef MC_BOARD_TDECK
+  static sim::SimTouch touch(&g_now);
+  app.setTouch(&touch);
+  return sim::runScript(in, out, app, ui::screens::boot(), kb, display, g_now, world, &touch);
+#else
   return sim::runScript(in, out, app, ui::screens::boot(), kb, display, g_now, world);
+#endif
 }
 #endif

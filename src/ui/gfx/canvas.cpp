@@ -64,10 +64,13 @@ void Canvas::pill(int x, int y, int w, int h, uint8_t c) {
   vline(x + w - 1, y + 1, h - 2, c);
 }
 
-void Canvas::bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c) {
+void Canvas::bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c, int scale) {
   for (int r = 0; r < h; r++)
     for (int i = 0; i < w; i++)
-      if (rows[r] & (0x80 >> i)) pixel(x + i, y + r, c);
+      if (rows[r] & (0x80 >> i)) {
+        if (scale == 1) pixel(x + i, y + r, c);
+        else fillRect(x + i * scale, y + r * scale, scale, scale, c);
+      }
 }
 
 uint32_t utf8Next(const char** sp) {

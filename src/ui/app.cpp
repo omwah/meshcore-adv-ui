@@ -57,6 +57,9 @@ public:
     c.text(bx + bw / 4 - btnW / 2 + 8, btnY + 1, "Y: Yes", bf, C_BG);
     c.pill(bx + 3 * bw / 4 - btnW / 2, btnY, btnW, bh_btn, C_DIM);
     c.text(bx + 3 * bw / 4 - btnW / 2 + 8, btnY + 1, "N: No", bf, C_BG);
+    // Touch: each half of the box's bottom is a button.
+    a.hit({bx, btnY - 6, bw / 2, bh_btn + 6 + pb}, HitTarget::KEY, 'y');
+    a.hit({bx + bw / 2, btnY - 6, bw - bw / 2, bh_btn + 6 + pb}, HitTarget::KEY, 'n');
   }
   void onKey(App& a, const Key& k) override {
     if (k.code == 'y' || k.code == 'Y' || k.code == K_ENTER) {
@@ -156,6 +159,9 @@ App::App(model::MeshModel& m, hal::Display& d, hal::Keyboard& k, hal::Sound* sou
 void App::begin(Screen* root) {
   _d.begin();
   _k.begin();
+#if MC_TOUCH
+  if (_touch) _touch->begin();
+#endif
   applyPrefs();
   _lastUnread = _m.unreadTotal();   // messages already waiting don't chime at boot
   _stack[0] = root;
@@ -184,6 +190,9 @@ void App::previewTheme(uint8_t idx) {
 void App::entered() {
   _marqueeStart = _now;
   _in.flush();
+#if MC_TOUCH
+  _gest.cancel();   // a finger still down was meant for the screen before
+#endif
   _k.setTextMode(keyboardText());
   top()->onEnter(*this);
   _dirty = true;
@@ -220,8 +229,45 @@ void App::toast(const char* text, uint8_t col) {
 
 Rect App::content() const {
   if (_stack[_depth - 1] && _stack[_depth - 1]->fullscreen()) return {0, 0, Canvas::W, Canvas::H};
-  return {0, _mx->head, Canvas::W, Canvas::H - _mx->head - _mx->foot};
+  int bar = const_cast<App*>(this)->showBar() ? BAR_H : 0;
+  return {0, _mx->head, Canvas::W, Canvas::H - _mx->head - _mx->foot - bar};
 }
+
+// The shortcut bar: with a touch panel, except while typing (the keyboard is
+// in use, and the text needs the room).
+bool App::showBar() { return hasTouch() && !top()->fullscreen() && !top()->textMode(*this); }
+
+#if MC_TOUCH
+void App::drawShortcutBar() {
+  static const char* const kLabel[screens::SC_COUNT] = {"Chats", "Contacts", "Nodes", "Channels", "Menu"};
+  static const uint8_t* const kIcon[screens::SC_COUNT] = {icon::envelope, icon::person, icon::repeater, icon::hash, icon::menu};
+  const int y = Canvas::H - BAR_H;
+  const mc_font_t* f = &font_small;
+  _c.fillRect(0, y, Canvas::W, BAR_H, C_HEAD);
+  _c.hline(0, y, Canvas::W, C_ACCENT);
+  // Unread: all of it on Chats, the channels' share on Channels.
+  unsigned chanUnread = 0;
+  for (int i = 0, n = _m.channelCount(); i < n; i++) {
+    model::Channel ch;
+    if (_m.channel(i, ch) && !ch.muted) chanUnread += _m.unreadIn({model::ThreadKind::Channel, ch.idx});
+  }
+  const int showing = screens::shortcutShowing(*this);
+  for (int i = 0; i < screens::SC_COUNT; i++) {
+    int x = i * Canvas::W / screens::SC_COUNT, w = (i + 1) * Canvas::W / screens::SC_COUNT - x;
+    bool on = i == showing;
+    if (on) _c.fillRect(x + 1, y + 2, w - 2, BAR_H - 2, C_SEL);
+    uint8_t col = on ? C_ACCENT : C_HTXT;
+    _c.bitmap(x + (w - 16) / 2, y + 4, kIcon[i], 8, 8, col, 2);
+    int lw = Canvas::textWidth(kLabel[i], f);
+    _c.text(x + (w - lw) / 2, y + BAR_H - f->height - 2, kLabel[i], f, on ? C_TEXT : C_DIM);
+    unsigned n = i == screens::SC_CHATS ? _m.unreadTotal() : i == screens::SC_CHANNELS ? chanUnread : 0;
+    if (n) drawBadge(*this, x + w - 4, y + 3, n);
+    hit({x, y, w, BAR_H}, HitTarget::SHORTCUT, i);
+  }
+}
+#else
+void App::drawShortcutBar() {}
+#endif
 
 int App::fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, bool scroll) {
   int tw = Canvas::textWidth(s, f);
@@ -261,6 +307,120 @@ void App::dispatch(const Key& k) {
   Screen* s = top();
   for (int i = 0; i < n && top() == s; i++) s->onKey(*this, k);
 }
+
+void App::handleKey(Key k, uint32_t now) {
+  Screen* before = top();
+  _dirty = true;
+  if (_pairing && !_pairingHidden) {
+    // The overlay takes keys: Esc hides it, anything else is ignored.
+    if (k.code == K_ESC || k.code == K_LONG_ESC) _pairingHidden = true;
+    return;
+  }
+  if (vimActive()) {
+    Key v;
+    if (!_vim.feed(k, now, v)) return;   // a command still being typed
+    k = v;
+  } else {
+    _vim.reset();
+  }
+  if (k.code == K_LONG_ESC) {
+    popToRoot();
+  } else if (k.code == K_MENU && !top()->fullscreen()) {
+    ui::screens::openMainMenu(*this);
+  } else if (k.code == K_JUMP_BACK) {
+    ui::screens::jumpBack(*this);
+  } else if (k.code == K_NEXT_UNREAD || k.code == K_PREV_UNREAD) {
+    ui::screens::jumpUnread(*this, k.code == K_NEXT_UNREAD ? 1 : -1);
+  } else {
+    dispatch(k);
+  }
+  _marqueeStart = now;
+  if (top() == before) _k.setTextMode(keyboardText());
+}
+
+void App::key(uint16_t code) {
+  // Past the vim layer: a touch target names the key it means.
+  Screen* before = top();
+  _dirty = true;
+  if (code == K_LONG_ESC) popToRoot();
+  else if (code == K_MENU && !top()->fullscreen()) ui::screens::openMainMenu(*this);
+  else top()->onKey(*this, Key{code, 0, false, 0});
+  _marqueeStart = _now;
+  if (top() == before) _k.setTextMode(keyboardText());
+}
+
+#if MC_TOUCH
+void App::hit(const Rect& r, HitTarget::Kind kind, int arg) {
+  if (!_touch || _nHits == MAX_HITS) return;
+  _hits[_nHits++] = {r, kind, (int16_t)arg};
+}
+
+int App::dragSteps(int dy, int step) {
+  if (step < 1) step = 1;
+  // A change of direction starts counting afresh.
+  if ((dy > 0) != (_dragRest > 0)) _dragRest = 0;
+  _dragRest += dy;
+  int n = _dragRest / step;
+  _dragRest -= n * step;
+  return n;
+}
+
+void App::handleGesture(const Gesture& g) {
+  _dirty = true;
+  if (_pairing && !_pairingHidden) {
+    if (g.type == Gesture::TAP) _pairingHidden = true;
+    return;
+  }
+  // The target under where the finger went down; later ones are drawn on top.
+  const HitTarget* t = nullptr;
+  for (int i = _nHits - 1; i >= 0 && !t; i--) {
+    const Rect& r = _hits[i].r;
+    if (g.x >= r.x && g.x < r.x + r.w && g.y >= r.y && g.y < r.y + r.h) t = &_hits[i];
+  }
+  _vim.reset();
+  if (t && t->kind == HitTarget::SHORTCUT) {
+    if (g.type == Gesture::TAP || g.type == Gesture::LONG) ui::screens::shortcut(*this, t->arg);
+    return;
+  }
+  // The header outside the back arrow, and the footer, do nothing.
+  Screen* s = top();
+  Rect r = content();
+  if (!t && !s->fullscreen() && (g.y < r.y || g.y >= r.y + r.h)) return;
+  s->onTouch(*this, g, t);
+  _marqueeStart = _now;
+  if (top() == s) _k.setTextMode(keyboardText());
+}
+
+void Screen::onTouch(App& a, const Gesture& g, const HitTarget* t) {
+  switch (g.type) {
+    case Gesture::TAP:
+    case Gesture::LONG:
+      if (!t) return;
+      if (t->kind == HitTarget::KEY) {
+        a.key(g.type == Gesture::LONG && t->arg == K_ESC ? (uint16_t)K_LONG_ESC : (uint16_t)t->arg);
+      } else if (t->kind == HitTarget::ROW) {
+        if (selectRow(a, t->arg)) a.key(g.type == Gesture::LONG ? K_TAB : K_ENTER);
+      } else if (t->kind == HitTarget::ADJUST) {
+        if (selectRow(a, t->arg >> 1)) a.key(t->arg & 1 ? K_RIGHT : K_LEFT);
+      }
+      return;
+    case Gesture::DRAG: {
+      // The content follows the finger: dragging up shows what is below.
+      int n = a.dragSteps(g.dy, a.mx().row);
+      for (; n > 0; n--) a.key(K_UP);
+      for (; n < 0; n++) a.key(K_DOWN);
+      return;
+    }
+    case Gesture::SWIPE:
+      a.key(g.dx < 0 ? K_RIGHT : K_LEFT);
+      return;
+    default:
+      return;
+  }
+}
+#else
+void Screen::onTouch(App&, const Gesture&, const HitTarget*) {}
+#endif
 
 uint32_t App::loop(uint32_t now) {
   _now = now;
@@ -312,36 +472,27 @@ uint32_t App::loop(uint32_t now) {
   // Text-mode can change within a screen (e.g. starting to compose).
   Key k;
   if (_vim.expire(now)) _dirty = true;
-  while (_in.next(k)) {
-    Screen* before = top();
-    if (_pairing && !_pairingHidden) {
-      // The overlay takes keys: Esc hides it, anything else is ignored.
-      if (k.code == K_ESC || k.code == K_LONG_ESC) _pairingHidden = true;
-      _dirty = true;
-      continue;
+  while (_in.next(k)) handleKey(k, now);
+
+#if MC_TOUCH
+  // Touch: what the finger does, on the frame it saw.
+  if (_touch) {
+    hal::TouchEvent te;
+    while (_touch->poll(te)) {
+      _lastInput = now;
+      if (_asleep) {
+        // The touch that wakes the screen does nothing else.
+        if (te.type == hal::TouchEvent::DOWN) wake();
+        _gest.cancel();
+        continue;
+      }
+      _gest.feed(te, now);
     }
-    _dirty = true;
-    if (vimActive()) {
-      Key v;
-      if (!_vim.feed(k, now, v)) continue;   // a command still being typed
-      k = v;
-    } else {
-      _vim.reset();
-    }
-    if (k.code == K_LONG_ESC) {
-      popToRoot();
-    } else if (k.code == K_MENU && !top()->fullscreen()) {
-      ui::screens::openMainMenu(*this);
-    } else if (k.code == K_JUMP_BACK) {
-      ui::screens::jumpBack(*this);
-    } else if (k.code == K_NEXT_UNREAD || k.code == K_PREV_UNREAD) {
-      ui::screens::jumpUnread(*this, k.code == K_NEXT_UNREAD ? 1 : -1);
-    } else {
-      dispatch(k);
-    }
-    _marqueeStart = now;
-    if (top() == before) _k.setTextMode(keyboardText());
+    _gest.tick(now);
+    Gesture g;
+    while (_gest.next(g)) handleGesture(g);
   }
+#endif
   _in.setVimRepeat(vimActive());
 
   if (top()->tick(*this, now)) _dirty = true;
@@ -359,6 +510,10 @@ uint32_t App::loop(uint32_t now) {
   }
 
   uint32_t wait = _in.wakeIn(now);
+#if MC_TOUCH
+  uint32_t lp = _gest.wakeIn(now);
+  if (lp && (!wait || lp < wait)) wait = lp;
+#endif
   uint32_t led = ledTick(now);
   if (led && (!wait || led < wait)) wait = led;
   return wait ? wait : 50;
@@ -408,6 +563,9 @@ void App::render() {
   _animating = false;
   _c.noClip();
   _c.clear(C_BG);
+#if MC_TOUCH
+  _nHits = 0;
+#endif
   Screen* s = top();
   Rect r = content();
   if (!s->fullscreen()) drawHeader();
@@ -415,6 +573,7 @@ void App::render() {
   s->draw(*this, _c, r);
   _c.noClip();
   if (!s->fullscreen()) drawFooter();
+  if (showBar()) drawShortcutBar();
   if (_pairing && !_pairingHidden) drawPairing();
   _c.flush(_d, kThemes[_theme].pal, _forceFlush);
   _forceFlush = false;
@@ -458,7 +617,15 @@ void App::drawHeader() {
   unsigned unread = _m.unreadTotal();
   if (unread) x = drawBadge(*this, x - 3, (H - 1 - (fSmall()->height + 2)) / 2, unread);
 
-  fitText(_c, 3, ty, top()->title(*this), f, C_HTXT, x - 8, true);
+  // With touch, a back arrow: tap for back, hold for Home.
+  int tx = 3;
+  if (hasTouch() && _depth > 1) {
+    int sc = H - 1 >= 16 ? 2 : 1;
+    _c.bitmap(3, (H - 1 - 8 * sc) / 2, icon::arrowL, 8, 8, C_HTXT, sc);
+    hit({0, 0, 36, H + 6}, HitTarget::KEY, K_ESC);
+    tx = 6 + 8 * sc;
+  }
+  fitText(_c, tx, ty, top()->title(*this), f, C_HTXT, x - 5 - tx, true);
 }
 
 void App::drawPairing() {
@@ -482,7 +649,7 @@ void App::drawPairing() {
 
 void App::drawFooter() {
   const int FH = _mx->foot;
-  int y = Canvas::H - FH;
+  int y = Canvas::H - FH - (showBar() ? BAR_H : 0);
   _c.fillRect(0, y, Canvas::W, FH, C_ZEBRA);
   const mc_font_t* f = fSmall();
   const int ty = y + (FH - f->height) / 2;

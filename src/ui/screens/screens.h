@@ -18,12 +18,18 @@ void jumpBack(App& a);
 void jumpUnread(App& a, int dir);
 // If the conversation is on top, start writing in it.
 void startCompose(App& a);
+// The touch shortcut bar: Home on one of its tabs, or the main menu.
+enum { SC_CHATS, SC_CONTACTS, SC_NODES, SC_CHANNELS, SC_MENU, SC_COUNT };
+void shortcut(App& a, int sc);
+// The shortcut showing now, -1 if none.
+int shortcutShowing(App& a);
 // The open chat's messages from the "New" line down (-1: no line). For tests.
 int chatNewCount(App& a);
 void openContact(App& a, int contactIdx);
 void openChannel(App& a, int channelIdx);
 void openAdmin(App& a, int contactIdx);
 void openMainMenu(App& a);
+bool mainMenuOpen(App& a);
 void openSettings(App& a);
 void openRadio(App& a);
 void openDiag(App& a);

@@ -37,7 +37,8 @@ public:
   // Rectangle with its four corner pixels cut, for pills and badges.
   void pill(int x, int y, int w, int h, uint8_t c);
   // 1bpp bitmap, `w` <= 8 per row byte, MSB left; transparent background.
-  void bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c);
+  // `scale` draws each bit as a scale x scale block.
+  void bitmap(int x, int y, const uint8_t* rows, int w, int h, uint8_t c, int scale = 1);
 
   // UTF-8 text. Returns the x just past the last glyph drawn. bg < 0 is
   // transparent. maxw > 0 clips with an ellipsis when the text is wider.
