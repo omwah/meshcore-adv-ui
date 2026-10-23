@@ -8,6 +8,7 @@
 #pragma once
 #include <stdint.h>
 #include "ui/gfx/font.h"
+#include "ui/gfx/utf8.h"
 #include "hal/display.h"
 
 #ifndef MC_SCREEN_W
@@ -67,8 +68,5 @@ private:
   uint32_t _rowHash[H];
   int _cx0, _cy0, _cx1, _cy1;                 // clip, exclusive max
 };
-
-// Decode one UTF-8 code point; advances *s. Invalid bytes become U+FFFD.
-uint32_t utf8Next(const char** s);
 
 }  // namespace ui

@@ -80,23 +80,6 @@ void Canvas::bitmapWide(int x, int y, const uint8_t* rows, int w, int h, uint8_t
       if (rows[r * stride + i / 8] & (0x80 >> (i & 7))) pixel(x + i, y + r, c);
 }
 
-uint32_t utf8Next(const char** sp) {
-  const uint8_t* s = (const uint8_t*)*sp;
-  uint32_t c = *s++;
-  int extra = 0;
-  if (c < 0x80) {
-  } else if ((c & 0xE0) == 0xC0) { c &= 0x1F; extra = 1; }
-  else if ((c & 0xF0) == 0xE0) { c &= 0x0F; extra = 2; }
-  else if ((c & 0xF8) == 0xF0) { c &= 0x07; extra = 3; }
-  else { *sp = (const char*)s; return 0xFFFD; }
-  for (int i = 0; i < extra; i++) {
-    if ((*s & 0xC0) != 0x80) { *sp = (const char*)s; return 0xFFFD; }
-    c = (c << 6) | (*s++ & 0x3F);
-  }
-  *sp = (const char*)s;
-  return c;
-}
-
 // Binary search, as esp-vim's glyph_in(); unknown code points fall back to '?'.
 static const uint8_t* glyph(const mc_font_t* f, uint32_t cp) {
   int lo = 0, hi = f->count - 1;
