@@ -1,9 +1,9 @@
 # meshcore-adv-ui
 
 A keyboard-native user interface for [MeshCore](https://github.com/meshcore-dev/MeshCore)
-LoRa mesh radios. The first target is the M5Stack Cardputer ADV with the Cap
-LoRa-1262 module. The UI is kept separate from the hardware, so other devices
-can be added as new board directories.
+LoRa mesh radios. It runs on the M5Stack Cardputer ADV with the Cap LoRa-1262
+module, and on the LilyGo T-Deck Plus. The UI is kept separate from the
+hardware, so other devices can be added as new board directories.
 
 - **Stock MeshCore inside.** MeshCore is a git submodule pinned to a release.
   Changes we need live as small patches in `patches/meshcore/`, so moving to a
@@ -36,7 +36,16 @@ are example data, not real contacts. The device display is 240 × 135 pixels.
 | **Amber theme** | |
 | ![Settings in the Amber theme](docs/screenshots/amber-theme.png) | |
 
-Generate the full screenshot gallery locally with `pixi run shots` (`shots/index.html`).
+On the T-Deck Plus (320 × 240, touch):
+
+| Chats, with the shortcut bar | A conversation |
+|---|---|
+| ![Chats tab on the T-Deck with the touch shortcut bar](docs/screenshots/tdeck-home.png) | ![Direct-message conversation on the T-Deck](docs/screenshots/tdeck-chat.png) |
+| **Contact details (hold a row)** | **Vim keys: / and n** |
+| ![Contact details with touch value arrows](docs/screenshots/tdeck-details.png) | ![Search results stepped through with n](docs/screenshots/tdeck-vim-find.png) |
+
+Generate the full screenshot gallery locally with `pixi run shots` (`shots/index.html`),
+and the T-Deck's with `python -I scripts/screenshots.py --board tdeck` (`shots/tdeck/`).
 
 ## Remote node mode
 
@@ -70,6 +79,34 @@ The Bluetooth build only: the USB-only build has no remote mode.
 | Opt | main menu | main menu |
 | Tab | details / actions for the selection | |
 | letters | find (on Home), start writing (in a chat) | type |
+
+## Keys and touch (T-Deck Plus)
+
+The T-Deck has no arrow keys, and its trackball wears with age, so nothing
+depends on it: vim keys are on by default, and everything can be done by touch.
+
+| Key | Does |
+|---|---|
+| letters | vim keys (below): `j` `k` move, `h` `l` change tab or value, `/` finds |
+| Enter, trackball click | open / select / send |
+| Alt | Esc: back, stop typing; hold for Home |
+| Sym + Enter | main menu |
+| Sym + Space | Tab: details / actions for the selection |
+| Mic | Ctrl (for Ctrl-d, Ctrl-u, Ctrl-o) |
+| Sym + Shift + h j k l | arrows, also while typing (move the cursor) |
+| Sym, Sym + Shift | the second legends printed on the keys, and symbols that aren't printed (`boards/tdeck/keymap/tdeck_keymap.h` lists them) |
+| trackball | arrows (Settings → Trackball off ignores a worn one's rolls) |
+
+Touch:
+
+- **Shortcut bar** at the bottom: Chats, Contacts, Nodes, Channels and Menu,
+  from anywhere, with unread counts. It hides while typing.
+- **Rows:** tap to open, hold for details. A heard advert is added on a
+  second tap.
+- **Drag** to move through lists and scroll conversations; older messages
+  load at the top. **Swipe sideways** on Home to change tabs.
+- **‹** in the header goes back; hold it for Home.
+- A setting's value shows `‹ value ›`: tap either side to change it.
 
 ## Vim keys
 
@@ -152,12 +189,13 @@ scripts/install-hooks.sh     # pre-commit check that keeps personal data out of 
 
 pixi run test                # host unit tests
 pixi run shots               # run the simulator scenarios -> shots/index.html
-pixi run build               # Cardputer ADV firmware (BLE and USB-only builds)
+pixi run build               # firmware: Cardputer ADV and T-Deck Plus, BLE and USB-only builds
 pixi run simnet-test         # UI on real MeshCore nodes in a simulated mesh
 pixi run ci                  # everything, including size budgets
 ```
 
-Flash with `pio run -e cardputer_adv -t upload`. `pixi run package` writes
+Flash with `pio run -e cardputer_adv -t upload` (or `-e tdeck`), or install
+over bmorcelli's Launcher with `pixi run launcher-install IP [--tdeck]`. `pixi run package` writes
 release images for esptool, web flashers, M5Burner and M5Launcher to `dist/`.
 See `docs/FLASHING.md` for how to install them, and `docs/DEVICE-TESTING.md`
 for the first-flash checklist.
@@ -166,6 +204,11 @@ for the first-flash checklist.
 |---|---|---|---|
 | `cardputer_adv` | UI + Bluetooth phone companion + remote node mode (default) | ~0.94 MB | ~113 KB |
 | `cardputer_adv_usb` | UI + USB companion, no Bluetooth | ~0.69 MB | ~101 KB |
+| `tdeck` | T-Deck Plus: as `cardputer_adv`, with touch, 350 contacts, 16 channels | ~0.95 MB | ~61 KB + PSRAM |
+| `tdeck_usb` | T-Deck Plus, USB companion only | ~0.71 MB | ~49 KB + PSRAM |
+
+On the T-Deck the node (its contacts) and the UI's frame live in PSRAM, so
+internal RAM stays free for Bluetooth.
 
 The stock MeshCore companion builds are about 1.25 MB with Bluetooth and
 0.64 MB without. The keyboard UI and its diagnostics add about 45 KB. Our
@@ -212,7 +255,8 @@ external/      MeshCore submodule (never edited; see patches/)
 
 - The UI design is inspired by
   [anton-vinogradov/meshtastic-adv](https://github.com/anton-vinogradov/meshtastic-adv).
-- The keyboard mapping and font tooling are adapted from esp-vim (Apache-2.0).
+- The keyboard mappings, the T-Deck keyboard, trackball and touch handling,
+  and the font tooling are adapted from esp-vim (Apache-2.0).
 - The fonts are [Spleen](https://github.com/fcambus/spleen) by Frederic Cambus (BSD-2-Clause).
 
 See `NOTICE` for details.

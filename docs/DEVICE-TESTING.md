@@ -1,4 +1,4 @@
-# Device bring-up checklist (Cardputer ADV + Cap LoRa-1262)
+# Device bring-up checklist (Cardputer ADV + Cap LoRa-1262; T-Deck Plus in section 8)
 
 Everything below was built and tested in the simulators. These items depend on
 hardware facts that the simulators can't check. Verify them in this order on
@@ -101,3 +101,26 @@ Heltec V3, T-Echo or similar), on the same radio preset as the mesh.
 - [x] **Charging.** Pure hardware; the firmware has nothing to enable. A computer's USB port charged it little or not at all (3.5 V after hours); a standalone USB charger works. Use a wall charger. The power switch only disconnects the battery: with USB in, the firmware runs with the switch off too, and the battery still charges, slowly.
 - [x] **Heap.** After an hour with Bluetooth connected, the heap minimum on Diagnostics > System stays above about 30 KB. On hardware: free heap went from 148 KB to 140 KB over the hour (the minimum wasn't read).
 - [x] **Launcher.** If you use bmorcelli's Launcher: the app runs from it (installed over its WebUI), and on first start the restore offer appears and brings back the identity, contacts and settings. Works on hardware.
+
+## 8. LilyGo T-Deck Plus
+
+Install with `pixi run launcher-install IP --tdeck` (or `pio run -e tdeck -t
+upload`; if a flash won't take, hold the trackball down while pressing reset).
+The serial status line at boot reports the keyboard, touch, SD and PSRAM.
+
+- [ ] **Boots.** Splash, then Home; the status line says keyboard ok, touch ok and shows free PSRAM. GPIO10 powers the keyboard, touch, display and radio, and is raised 200 ms before anything is probed.
+- [ ] **Display.** Colours right (inversion on), not mirrored, whole 320x240 used. Brightness in Settings steps visibly (16 pulse-counted steps on GPIO42), and the screen timeout turns it off and back on.
+- [ ] **Keyboard.** Letters, Shift, Sym digits and symbols type as printed; Alt is Esc (hold for Home), Sym+Enter the menu, Sym+Space Tab, Mic Ctrl. If the status line says "chars only", the C3 has old firmware (before June 2025): flash LilyGo's T-Keyboard_Keyboard_ESP32C3_250620.bin to it.
+- [ ] **Key light.** It comes on while typing and goes off about 10 s after.
+- [ ] **Vim keys.** On by default: j/k/gg/G, Ctrl-d/u, /, n, gt, ]u, ZZ work as in the README.
+- [ ] **Trackball.** Rolls move one row per notch-ish (2 toggles per step), the click is Enter. Settings > Trackball off: rolls ignored, the click still works.
+- [ ] **Touch alignment.** Tap each corner's control (header back arrow top left, Menu bottom right, a row near each edge): the right thing responds. If taps land mirrored, note the GT911's Module_Switch1 (panels differ between batches; the driver follows it from 0xB5).
+- [ ] **Touch gestures.** Shortcut bar from deep screens; tap to open, hold for details; drag a long list and a conversation (older messages load at the top); sideways swipe on Home; ‹ value › taps in Settings; Confirm's Yes/No.
+- [ ] **Shared SPI.** Scroll and drag continuously while another node sends DMs and channel posts: every message arrives, nothing glitches on screen. Then the same with an SD card in (back up now during traffic).
+- [ ] **Radio.** Adverts go out and are heard; DMs show delivered (SX1262, TCXO 1.8 V, no DIO2 RF switch, as MeshCore's own T-Deck build).
+- [ ] **GPS (Plus).** Fix, clock sync, position in adverts. If nothing arrives at 38400 (MeshCore's rate), the module may run at 9600: change GPS_BAUD_RATE and note which.
+- [ ] **Bluetooth.** Phone app pairs and syncs; remote node mode connects to another node.
+- [ ] **Sound.** A new message chimes through the speaker (I2S 7/5/6); not with Sound off.
+- [ ] **Battery.** Diagnostics shows a sensible voltage (GPIO4, 2:1). An hour on battery with the screen timing out: note the drop.
+- [ ] **Memory.** Diagnostics > System free heap after an hour with Bluetooth connected (internal RAM; the node and the UI frame are in PSRAM).
+- [ ] **Launcher.** The app fits Launcher's partition on the T-Deck and keeps its files (SPIFFS) across restarts.
