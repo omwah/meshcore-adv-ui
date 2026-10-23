@@ -3,12 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "hal/display.h"
+#include "ui/gfx/canvas.h"
 
 namespace sim {
 
 class SimDisplay : public hal::Display {
 public:
-  static constexpr int W = 240, H = 135;
+  static constexpr int W = ui::Canvas::W, H = ui::Canvas::H;
   bool begin() override { return true; }
   int width() const override { return W; }
   int height() const override { return H; }

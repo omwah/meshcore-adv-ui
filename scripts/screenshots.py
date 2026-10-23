@@ -4,6 +4,7 @@ Run simulator scenarios and turn their frames into PNGs and a gallery.
 
     pixi run shots                       # every test/scenarios/*.sim, theme 0
     python -I scripts/screenshots.py --themes all tour
+    python -I scripts/screenshots.py --board tdeck   # the T-Deck simulator, into shots/tdeck/
 
 Writes shots/<scenario>/<theme>/<name>.png (3x, nearest neighbour), plus
 shots/index.html showing them all. shots/ is git-ignored.
@@ -20,7 +21,8 @@ import tempfile
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SIM = os.path.join(ROOT, ".pio", "build", "sim", "program")
+BOARD_ENVS = {"cardputer": "sim", "tdeck": "sim_tdeck"}
+SIM = None   # set from --board
 THEMES = ["Midnight", "Amber", "Phosphor", "Contrast", "Daylight", "Ocean"]
 SIZES = ["small", "medium", "large"]
 
@@ -56,8 +58,13 @@ def main():
     ap.add_argument("scenarios", nargs="*", help="scenario names (default: all)")
     ap.add_argument("--themes", default="0", help="comma list of theme numbers, or 'all'")
     ap.add_argument("--sizes", default="1", help="comma list of text sizes (0 small, 1 medium, 2 large), or 'all'")
-    ap.add_argument("--out", default=os.path.join(ROOT, "shots"))
+    ap.add_argument("--board", default="cardputer", choices=sorted(BOARD_ENVS))
+    ap.add_argument("--out", help="output directory (default shots/, or shots/tdeck/ for the T-Deck)")
     a = ap.parse_args()
+    global SIM
+    SIM = os.path.join(ROOT, ".pio", "build", BOARD_ENVS[a.board], "program")
+    if not a.out:
+        a.out = os.path.join(ROOT, "shots", *([] if a.board == "cardputer" else [a.board]))
 
     files = sorted(glob.glob(os.path.join(ROOT, "test", "scenarios", "*.sim")))
     if a.scenarios:

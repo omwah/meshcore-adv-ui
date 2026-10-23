@@ -25,8 +25,8 @@ public:
       Ctx* x = (Ctx*)p;
       int row = line - x->first;
       if (row < 0 || row >= x->rows) return;
-      char tmp[64];
-      if (len > 63) len = 63;
+      char tmp[128];
+      if (len > 127) len = 127;
       memcpy(tmp, s, len);
       tmp[len] = 0;
       x->c->text(x->x, x->y + row * x->lh, tmp, x->f, C_TEXT);

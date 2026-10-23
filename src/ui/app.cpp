@@ -1,5 +1,6 @@
 #include "ui/app.h"
 #include "ui/icons.h"
+#include "ui/keynames.h"
 #include "ui/widgets.h"
 #include "ui/screens/screens.h"
 #include "ui/tz.h"
@@ -45,8 +46,8 @@ public:
       Ctx* x = (Ctx*)p;
       int y = x->y + line * x->lh;
       if (y + x->f->height > x->maxY) return;
-      char tmp[64];
-      if (len > 63) len = 63;
+      char tmp[128];
+      if (len > 127) len = 127;
       memcpy(tmp, s, len);
       tmp[len] = 0;
       x->c->text(x->x, y, tmp, x->f, C_TEXT);
@@ -94,7 +95,7 @@ public:
     snprintf(n, sizeof n, "%d/%d", ed.length(), maxLen);
     int ny = top + boxH + 4;
     c.text(r.x + r.w - 6 - Canvas::textWidth(n, a.fSmall()), ny, n, a.fSmall(), C_DIM);
-    c.text(r.x + 6, ny, secret ? "hidden as you type" : "Fn + , / move cursor", a.fSmall(), C_DIM, -1,
+    c.text(r.x + 6, ny, secret ? "hidden as you type" : kCursorHelp, a.fSmall(), C_DIM, -1,
            r.w - 20 - Canvas::textWidth(n, a.fSmall()));
   }
   void onKey(App& a, const Key& k) override {
@@ -463,11 +464,12 @@ void App::drawFooter() {
   const Hint* h = top()->hints(*this);
   int x = 3;
   for (; h && h->key; h++) {
-    int kw = Canvas::textWidth(h->key, f) + 4;
+    const char* key = keyName(h->key);
+    int kw = Canvas::textWidth(key, f) + 4;
     int lw = Canvas::textWidth(h->label, f);
     if (x + kw + lw + 2 > Canvas::W) break;
     _c.pill(x, y + 1, kw, FH - 2, C_DIM);
-    _c.text(x + 2, ty, h->key, f, C_BG);
+    _c.text(x + 2, ty, key, f, C_BG);
     x += kw + 2;
     _c.text(x, ty, h->label, f, C_TEXT);
     x += lw + 7;

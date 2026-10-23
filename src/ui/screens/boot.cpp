@@ -40,10 +40,11 @@ public:
     const mc_font_t* med = &font_large;
     const mc_font_t* sm = &font_medium;
     // "MeshCore" on top, the node's name large in a band, then its key and
-    // the firmware version.
+    // the firmware version, laid out for 135 rows and centred on taller screens.
+    const int oy = r.h > 135 ? (r.h - 135) / 2 : 0;
     const char* t = "MeshCore";
-    c.text((r.w - Canvas::textWidth(t, med)) / 2, 10, t, med, C_ACCENT);
-    int bandY = 34, bandH = big->height + 12;
+    c.text((r.w - Canvas::textWidth(t, med)) / 2, oy + 10, t, med, C_ACCENT);
+    int bandY = oy + 34, bandH = big->height + 12;
     c.fillRect(0, bandY, r.w, bandH, C_HEAD);
     c.hline(0, bandY + bandH, r.w, C_ACCENT);
     // Remote mode: the node's name is known once connected.

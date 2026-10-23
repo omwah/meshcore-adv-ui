@@ -4,17 +4,25 @@
 // the previous frame by hash and pushes only rows that changed, expanding
 // them through the active palette into a small line buffer. 240x135 costs
 // 16.2 KB here plus 3.8 KB of line buffer, instead of 64.8 KB for RGB565.
+// The board sets the size with MC_SCREEN_W/H (the Cardputer's by default).
 #pragma once
 #include <stdint.h>
 #include "ui/gfx/font.h"
 #include "hal/display.h"
 
+#ifndef MC_SCREEN_W
+#define MC_SCREEN_W 240
+#endif
+#ifndef MC_SCREEN_H
+#define MC_SCREEN_H 135
+#endif
+
 namespace ui {
 
 class Canvas {
 public:
-  static constexpr int W = 240;
-  static constexpr int H = 135;
+  static constexpr int W = MC_SCREEN_W;
+  static constexpr int H = MC_SCREEN_H;
   static constexpr int BAND = 8;              // rows per pushRows call
 
   Canvas();
