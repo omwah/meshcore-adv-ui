@@ -2,11 +2,12 @@
 """Package firmware images for release (run after `pixi run build`).
 
 For each device env this writes to dist/<version>/:
-  meshcore-adv-ui-<version>-<env>.bin         application only: for M5Launcher
-                                              (copy to the SD card) or OTA
+  meshcore-adv-ui-<version>-<env>.bin         application only: OTA, and
+                                              Launcher's WebUI install
   meshcore-adv-ui-<version>-<env>-full.bin    bootloader + partitions + app,
                                               flashed at 0x0: M5Burner, web
-                                              flashers, esptool
+                                              flashers, esptool; and
+                                              Launcher from the SD card
   SHA256SUMS
 
     pixi run package                  # both envs

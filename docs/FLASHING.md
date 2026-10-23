@@ -5,8 +5,8 @@ Images for the M5Stack Cardputer ADV with the Cap LoRa-1262. Build them with
 
 | File | Use it with |
 |---|---|
-| `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` | esptool, web flashers, M5Burner: one image, written at offset `0x0` |
-| `meshcore-adv-ui-<ver>-cardputer_adv.bin` | M5Launcher (from the SD card), or anything that installs an app at `0x10000` |
+| `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` | esptool, web flashers, M5Burner: one image, written at offset `0x0`; and Launcher from the SD card |
+| `meshcore-adv-ui-<ver>-cardputer_adv.bin` | Launcher's WebUI install (`pixi run launcher-install`), or anything that installs an app at `0x10000` |
 | `...-cardputer_adv_usb...` | The same pair for the USB-only build (no Bluetooth, about 0.23 MB smaller) |
 | `SHA256SUMS` | Checksums of the above |
 
@@ -63,8 +63,10 @@ If it asks for an address, use `0x0`.
 ## M5Launcher (bmorcelli's Launcher)
 
 From the SD card:
-1. Copy `meshcore-adv-ui-<ver>-cardputer_adv.bin` (the app image, not `-full`)
-   to the SD card.
+1. Copy `meshcore-adv-ui-<ver>-cardputer_adv-full.bin` (or `-tdeck-full.bin`)
+   to the SD card. Use the `-full` image: Launcher reads its partition table
+   and makes the `spiffs` partition the firmware saves to. From the app-only
+   image it makes none, and then nothing is saved.
 2. In Launcher, choose SD, then the file, and install.
 
 Over WiFi, from a source checkout: start Launcher's WebUI on the device, then
@@ -74,18 +76,19 @@ pixi run launcher-install <IP> --replace --boot
 This builds, packages and installs the newest BLE image. `--replace` deletes an
 earlier `meshcore-adv-ui` in Launcher's menu first; without it a second copy is
 added. `--variant tdeck` installs the T-Deck build, and `--usb` the USB-only
-build as `meshcore-adv-ui-usb`. `--upload [FOLDER]` only copies the image to
-the SD card in the device (to `/` by default), to install from Launcher's SD
-browser later. The WebUI login is Launcher's default unless
+build as `meshcore-adv-ui-usb`. `--upload [FOLDER]` only copies the `-full`
+image to the SD card in the device (to `/` by default), to install from
+Launcher's SD browser later. The WebUI login is Launcher's default unless
 `LAUNCHER_USER` and `LAUNCHER_PASS` are set.
 
-The install also asks Launcher for a 1 MB `spiffs` data partition, where the
-firmware keeps its identity, contacts, settings and history; Launcher's own
+The install also asks Launcher for a small (448 KB) `spiffs` data partition,
+where the firmware keeps its identity, contacts, settings and recent history
+(older history goes to the SD card); Launcher's own
 table has none. An existing `spiffs` is kept as it is. Without one nothing is
 saved: every boot is a first boot, and importing an identity from the app
-fails. The firmware then shows "No storage partition" at boot. If an app
-installed from the SD card has this problem, install it again over WiFi with
-`--replace`, or add a `spiffs` partition in Launcher's Partition Manager.
+fails. The firmware then shows "No storage partition" at boot. To fix an
+install like that, install again from the `-full` image or over WiFi, or add
+a `spiffs` partition in Launcher's Partition Manager.
 
 Launcher has its own partition layout, so settings stored on the internal
 flash may not survive switching apps. Turn on Settings > Backup & restore >

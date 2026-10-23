@@ -16,8 +16,9 @@ Launcher, over Launcher's web interface (WebUI), the way its own page does.
     python -I scripts/launcher-install.py IP [BIN] [--name NAME] ...
 
 IP     the device's address, as Launcher's WebUI screen shows it
-BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin,
-       or ...-tdeck.bin, that `pixi run package` made; never a -full.bin)
+BIN    the image (default: the newest dist/<ver>/...-cardputer_adv.bin, or
+       ...-tdeck.bin, that `pixi run package` made; with --upload the merged
+       ...-full.bin)
 --variant  the board: cardputer (default) or tdeck
 --usb  the USB-only build instead (installed as meshcore-adv-ui-usb)
 --name the app's name in Launcher's menu (default: meshcore-adv-ui)
@@ -26,9 +27,11 @@ BIN    the app image (default: the newest dist/<ver>/...-cardputer_adv.bin,
        by restarting: start its WebUI again when asked.
 --boot restart into the app once it is installed (installing already makes it
        the one Launcher boots).
---upload  instead of installing, copy the image to the SD card in the device
-       (to FOLDER, default /), under its own name: install it from there with
-       Launcher's SD file browser.
+--upload  instead of installing, copy the merged image (-full.bin) to the SD
+       card in the device (to FOLDER, default /), under its own name: install
+       it from there with Launcher's SD file browser. Launcher reads the
+       partition table in it and creates the spiffs partition the firmware
+       saves to; from an app-only image it makes none, and nothing is saved.
 
 The WebUI login is Launcher's default (admin / launcher) unless
 $LAUNCHER_USER and $LAUNCHER_PASS say otherwise.
@@ -243,16 +246,25 @@ class Launcher:
         die(f"{path.name}: {status} {text}")
 
 
-# The SPIFFS partition asked for: what a full contact list and history need,
-# with room to spare (Launcher gives a small request its default size).
-SPIFFS_SIZE = 0x100000
+# The SPIFFS partition asked for: small, the SD card holds the rest. Launcher
+# makes an empty one its default size anyway (448 KB with 8 MB of flash or
+# more), and so does an SD install of the merged image.
+SPIFFS_SIZE = 0x70000
+
+def is_merged(path):
+    """A merged image: a partition table at 0x8000."""
+    with open(path, "rb") as f:
+        f.seek(0x8000)
+        return f.read(2) == b"\xaa\x50"
+
 
 VARIANT_ENVS = {"cardputer": "cardputer_adv", "tdeck": "tdeck"}
 
 
-def newest_image(env):
-    """The app image of the newest package in dist/ for env."""
-    imgs = sorted((ROOT / "dist").glob(f"*/meshcore-adv-ui-*-{env}.bin"), key=lambda p: p.stat().st_mtime)
+def newest_image(env, full=False):
+    """The app image (or the merged one) of the newest package in dist/ for env."""
+    suffix = "-full" if full else ""
+    imgs = sorted((ROOT / "dist").glob(f"*/meshcore-adv-ui-*-{env}{suffix}.bin"), key=lambda p: p.stat().st_mtime)
     if not imgs:
         die(f"no {env} image in dist/: run pixi run package")
     return imgs[-1]
@@ -274,10 +286,13 @@ def main():
 
     env = VARIANT_ENVS[a.variant] + ("_usb" if a.usb else "")
     name = a.name or ("meshcore-adv-ui-usb" if a.usb else "meshcore-adv-ui")
-    path = a.bin or newest_image(env)
+    path = a.bin or newest_image(env, full=a.upload is not None)
     if not path.is_file():
         die(f"{path}: no such file")
-    if path.name.endswith("-full.bin"):
+    if a.upload is not None and not is_merged(path):
+        die(f"{path.name}: an app-only image; from the SD card Launcher needs the merged -full.bin "
+            "(its partition table gives the firmware somewhere to save)")
+    if a.upload is None and is_merged(path):
         die(f"{path.name}: that is the merged image for 0x0; give the app image")
 
     dev = Launcher(a.ip)
