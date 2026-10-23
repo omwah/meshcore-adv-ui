@@ -33,7 +33,8 @@ ICONS = [
     ("channels", "ms_tag.svg", 0.0, None),
     ("menu", "ms_tune.svg", 0.0, None),
 ]
-# Splash screen: a link and a keyboard after the name, at the title's height.
+# Splash screen: a link and a keyboard after the name, at the title's height
+# (24 px, beside the 24-row title font).
 SPLASH = [
     ("link", "ms_sync_alt.svg", 0.0, None),
     ("keyboard", "ms_keyboard.svg", 0.0, None),
@@ -187,15 +188,15 @@ def main():
             preview.append((f"{name} {size}", cov, thr))
         lines.append(f"static const uint8_t* const nav{size}[] = {{{', '.join(names)}}};")
         lines.append("")
-    lines.append("// Splash, 16x16")
+    lines.append("// Splash, 24x24")
     for name, svg, nudge, view in SPLASH:
         with open(fetch_assets.get(svg)) as f:
             d = re.search(r'\sd="([^"]+)"', f.read()).group(1)
-        cov = coverage(parse_path(d), 16, view or VIEW)
-        thr = THRESHOLD[16] + nudge
-        body = ",".join(f"0x{b:02X}" for row in rows(cov, 16, thr) for b in row)
-        lines.append(f"static const uint8_t splash16_{name}[] = {{{body}}};")
-        preview.append((f"{name} splash16", cov, thr))
+        cov = coverage(parse_path(d), 24, view or VIEW)
+        thr = 0.45 + nudge
+        body = ",".join(f"0x{b:02X}" for row in rows(cov, 24, thr) for b in row)
+        lines.append(f"static const uint8_t splash24_{name}[] = {{{body}}};")
+        preview.append((f"{name} splash24", cov, thr))
     lines.append("")
     lines.append("}}  // namespace ui::icon")
     with open(OUT, "w") as f:

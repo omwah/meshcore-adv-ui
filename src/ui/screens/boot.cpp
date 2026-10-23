@@ -40,32 +40,33 @@ public:
     const mc_font_t* big = &font_xlarge;
     const mc_font_t* med = &font_large;
     const mc_font_t* sm = &font_medium;
-    // "MeshMash" on top, followed by a link and a keyboard (this is a
-    // keyboard-driven client), the node's name large in a band, then its key
-    // and the firmware version, laid out for 135 rows and centred on taller
-    // screens.
+    // "MeshMash" large in a highlighted band, followed by a link and a
+    // keyboard (this is a keyboard-driven client), then the node's name, its
+    // key and the firmware version below, laid out for 135 rows and centred
+    // on taller screens.
     const int oy = r.h > 135 ? (r.h - 135) / 2 : 0;
     const char* t = "MeshMash";
-    const int IC = 16, GAP = 6;
-    const int tw = Canvas::textWidth(t, med);
-    int tx = (r.w - (tw + 2 * (GAP + IC))) / 2;
-    c.text(tx, oy + 10, t, med, C_ACCENT);
-    tx += tw + GAP;
-    c.bitmapWide(tx, oy + 10, icon::splash16_link, IC, IC, C_ACCENT);
-    c.bitmapWide(tx + IC + GAP, oy + 10, icon::splash16_keyboard, IC, IC, C_ACCENT);
-    int bandY = oy + 34, bandH = big->height + 12;
+    const int IC = 24, GAP = 8;
+    int bandY = oy + 12, bandH = big->height + 12;
     c.fillRect(0, bandY, r.w, bandH, C_HEAD);
     c.hline(0, bandY + bandH, r.w, C_ACCENT);
+    const int tw = Canvas::textWidth(t, big);
+    int tx = (r.w - (tw + 2 * (GAP + IC))) / 2;
+    c.text(tx, bandY + 6, t, big, C_ACCENT);
+    tx += tw + GAP;
+    c.bitmapWide(tx, bandY + 6, icon::splash24_link, IC, IC, C_ACCENT);
+    c.bitmapWide(tx + IC + GAP, bandY + 6, icon::splash24_keyboard, IC, IC, C_ACCENT);
     // Remote mode: the node's name is known once connected.
     const char* name = a.m().prefs().nodeName[0] ? a.m().prefs().nodeName : "Remote node";
-    int nw = Canvas::textWidth(name, big);
-    if (nw <= r.w - 12) c.text((r.w - nw) / 2, bandY + 6, name, big, C_HTXT);
-    else a.fitText(c, 6, bandY + 6, name, big, C_HTXT, r.w - 12, true);
+    const int ny = bandY + bandH + 10;
+    int nw = Canvas::textWidth(name, med);
+    if (nw <= r.w - 12) c.text((r.w - nw) / 2, ny, name, med, C_HTXT);
+    else a.fitText(c, 6, ny, name, med, C_HTXT, r.w - 12, true);
     uint8_t k[6];
     a.m().selfKey(k);
     char l[40];
     snprintf(l, sizeof l, "%02X%02X%02X%02X  " MC_UI_VERSION, k[0], k[1], k[2], k[3]);
-    c.text((r.w - Canvas::textWidth(l, sm)) / 2, bandY + bandH + 10, l, sm, C_DIM);
+    c.text((r.w - Canvas::textWidth(l, sm)) / 2, ny + med->height + 6, l, sm, C_DIM);
     // Progress dots.
     int n = (int)((a.nowMs() - _start) / 200) % 4;
     for (int i = 0; i < 3; i++) c.fillRect(r.w / 2 - 10 + i * 8, r.h - 14, 4, 4, i < n ? C_ACCENT : C_ZEBRA);
