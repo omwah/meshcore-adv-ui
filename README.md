@@ -103,8 +103,9 @@ Touch:
   from anywhere, with unread counts. It hides while typing.
 - **Rows:** tap to open, hold for details. A heard advert is added on a
   second tap.
-- **Drag** to move through lists and scroll conversations; older messages
-  load at the top. **Swipe sideways** on Home to change tabs.
+- **Drag** to move through lists and scroll conversations, in the direction
+  of the finger, as j/k do: drag up for older messages, which load at the top.
+  The header names the tab; there's no tab strip, the bar is the tabs. **Swipe sideways** on Home to change tabs.
 - **‹** in the header goes back; hold it for Home.
 - A setting's value shows `‹ value ›`: tap either side to change it.
 

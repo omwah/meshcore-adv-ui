@@ -163,6 +163,8 @@ public:
   const mc_font_t* fMenu() const { return _mx->menu; }
 
   Rect content() const;
+  // The shortcut bar is showing (touch, and the screen isn't taking text).
+  bool showBar();
   // Vim keys are on and the screen on top isn't taking text.
   bool vimActive();
 
@@ -171,7 +173,6 @@ private:
   void handleKey(Key k, uint32_t now);
   void handleGesture(const Gesture& g);
   bool keyboardText();
-  bool showBar();
   void drawShortcutBar();
   void render();
   void drawHeader();

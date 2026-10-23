@@ -34,7 +34,7 @@ class HomeScreen : public Screen {
 public:
   const char* title(App& a) override {
     // Remote mode: whose screen this is.
-    if (a.m().mode() != model::Mode::Remote) return "MeshCore";
+    if (a.m().mode() != model::Mode::Remote) return a.showBar() ? kTabNames[_tab] : "MeshCore";
     return a.m().prefs().nodeName[0] ? a.m().prefs().nodeName : "Remote node";
   }
 
@@ -56,9 +56,10 @@ public:
   }
 
   void draw(App& a, Canvas& c, const Rect& r) override {
-    drawTabs(a, c, r);
     const Metrics& m = a.mx();
-    Rect lr{r.x, r.y + m.tab, r.w, r.h - m.tab};
+    const int th = tabH(a);
+    if (th) drawTabs(a, c, r);
+    Rect lr{r.x, r.y + th, r.w, r.h - th};
     ListNav& nav = _nav[_tab];
     int rowH = _tab == T_CHATS ? m.chatRow : m.row;
     int vis = lr.h / rowH;
@@ -91,7 +92,7 @@ public:
   void onKey(App& a, const Key& k) override {
     ListNav& nav = _nav[_tab];
     Rect r = a.content();
-    int vis = (r.h - a.mx().tab) / (_tab == T_CHATS ? a.mx().chatRow : a.mx().row);
+    int vis = (r.h - tabH(a)) / (_tab == T_CHATS ? a.mx().chatRow : a.mx().row);
     int tab = -1;
     if ((k.code == K_LEFT || k.code == K_RIGHT) && !k.repeat)   // one tab per press
       tab = (_tab + (k.code == K_RIGHT ? 1 : T_COUNT - 1)) % T_COUNT;
@@ -178,6 +179,10 @@ public:
   }
 
 private:
+  // The tab strip; with the shortcut bar its icons are the tabs, and the
+  // strip is there only for a search.
+  int tabH(App& a) const { return a.showBar() && !_query[0] && !_typing ? 0 : a.mx().tab; }
+
   void drawTabs(App& a, Canvas& c, const Rect& r) {
     const int TH = a.mx().tab;
     const mc_font_t* f = a.fMed();

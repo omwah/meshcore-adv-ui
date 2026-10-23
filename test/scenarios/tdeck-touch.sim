@@ -7,10 +7,10 @@ shot touch-contacts
 tap 224 223
 shot touch-channels
 tap 32 223
-# The second chat; drag down for older messages; the header arrow is back.
+# The second chat; drag up for older messages; the header arrow is back.
 tap 100 80
 shot touch-chat
-swipe 160 60 160 170 400
+swipe 160 170 160 60 400
 shot touch-chat-dragged
 tap 10 8
 # Hold a row for its details.
@@ -23,7 +23,7 @@ shot touch-swiped
 # The menu, dragged, and a row tapped.
 tap 288 223
 shot touch-menu
-swipe 160 180 160 40 400
+swipe 160 40 160 180 400
 shot touch-menu-dragged
 tap 160 120
 shot touch-menu-tapped

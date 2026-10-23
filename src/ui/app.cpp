@@ -405,10 +405,10 @@ void Screen::onTouch(App& a, const Gesture& g, const HitTarget* t) {
       }
       return;
     case Gesture::DRAG: {
-      // The content follows the finger: dragging up shows what is below.
+      // The selection follows the finger: dragging down moves it down.
       int n = a.dragSteps(g.dy, a.mx().row);
-      for (; n > 0; n--) a.key(K_UP);
-      for (; n < 0; n++) a.key(K_DOWN);
+      for (; n > 0; n--) a.key(K_DOWN);
+      for (; n < 0; n++) a.key(K_UP);
       return;
     }
     case Gesture::SWIPE:

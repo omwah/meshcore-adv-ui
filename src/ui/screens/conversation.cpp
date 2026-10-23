@@ -213,14 +213,15 @@ public:
     }
   }
 
-  // Dragging scrolls by the pixel, the messages following the finger; past
-  // the oldest loaded, older ones come in (at most twice a second).
+  // Dragging scrolls by the pixel, the view moving with the finger as the
+  // arrow keys move it (down is toward the newest); past the oldest loaded,
+  // older ones come in (at most twice a second).
   void onTouch(App& a, const Gesture& g, const HitTarget* t) override {
     if (g.type != Gesture::DRAG || _composing) { Screen::onTouch(a, g, t); return; }
-    _scroll += g.dy;
+    _scroll -= g.dy;
     if (_scroll > _maxScroll) {
       _scroll = _maxScroll;
-      if (g.dy > 0 && a.nowMs() - _lastLoad > 500) {
+      if (g.dy < 0 && a.nowMs() - _lastLoad > 500) {
         _lastLoad = a.nowMs();
         int n = a.m().loadOlder(id);
         if (n) _showOlder = n;
@@ -228,7 +229,7 @@ public:
     }
     if (_scroll < 0) {
       _scroll = 0;
-      if (g.dy < 0 && !a.m().atNewest(id) && a.nowMs() - _lastLoad > 500) {
+      if (g.dy > 0 && !a.m().atNewest(id) && a.nowMs() - _lastLoad > 500) {
         _lastLoad = a.nowMs();
         _keepBottom = a.m().loadNewer(id);
       }
