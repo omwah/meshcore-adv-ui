@@ -1,0 +1,14 @@
+# Received text beyond ASCII: Spleen's own Latin-1/Cyrillic, the Noto fallback
+# layer (Greek, Latin Extended-A, typographic punctuation), and code points no
+# layer has, which show the replacement box.
+rx dm 0 Café résumé naïve — “quotes” and … dots
+rx dm 0 Καλημέρα κόσμε, Привет, мир! Łódź Żółć ő €5
+rx dm 0 Nothing here: 日本 ✓ ★ and a broken byte
+wait 200
+key enter
+shot unicode-chat
+key down 4
+shot unicode-chat-2
+key down 6
+shot unicode-chat-3
+key esc

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "ui/app.h"
 #include "gen/fonts.h"
+#include "gen/unicode_cfg.h"
 
 using namespace ui;
 
@@ -192,6 +193,111 @@ void test_utf8_width_with_invalid_input() {
   TEST_ASSERT_EQUAL(4 * 8, Canvas::textWidth("\xed\xa0\x80z", &font_large));
 }
 
+
+// --- Font layers ---------------------------------------------------------
+
+// What drawing `text` at (0,0) leaves on an empty canvas: one byte per pixel
+// of the first `h` rows and `w` columns.
+static void render(const char* text, const mc_font_t* f, uint8_t* out, int w, int h) {
+  s_c.noClip();
+  s_c.fillRect(0, 0, Canvas::W, Canvas::H, 0);
+  s_c.text(0, 0, text, f, 1);
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++) out[y * w + x] = s_c.get(x, y);
+}
+static int lit(const uint8_t* px, int n) { int c = 0; for (int i = 0; i < n; i++) c += px[i] != 0; return c; }
+
+// A primary font (4x2 cells) with a double-width, two-byte-per-row layer.
+static const mc_run_t kWideRuns[] = {{0x57, 1, 0}, {0xFFFD, 1, 1}};          // 'W', replacement
+static const uint8_t kWideBits[] = {
+  0x80, 0x10,  0x00, 0x00,    // 'W': pixel 0 and pixel 11 of row 0
+  0xFF, 0xF0,  0xFF, 0xF0,    // replacement: a solid 12x2 block
+};
+static const mc_font_t kWide = {"wide", 12, 2, 2, 0, 2, kWideRuns, kWideBits, nullptr};
+static const mc_run_t kNarrowRuns[] = {{0x61, 2, 0}};                      // 'a', 'b'
+static const uint8_t kNarrowBits[] = {0x80, 0x00,  0x40, 0x00};
+static const mc_font_t kNarrow = {"narrow", 4, 2, 1, 0, 1, kNarrowRuns, kNarrowBits, &kWide};
+
+void test_layer_advance_comes_from_the_layer() {
+  // 'a' 4 + 'W' 12 + 'b' 4; an unknown code point takes the replacement, 12 wide.
+  TEST_ASSERT_EQUAL(4 + 12 + 4, Canvas::textWidth("aWb", &kNarrow));
+  TEST_ASSERT_EQUAL(4 + 12, Canvas::textWidth("a?", &kNarrow));
+  TEST_ASSERT_EQUAL(1, Canvas::fitBytes("aWb", &kNarrow, 15));   // 'W' needs 12 of the 11 left
+  TEST_ASSERT_EQUAL(2, Canvas::fitBytes("aWb", &kNarrow, 16));
+}
+
+void test_layer_glyphs_draw_across_bytes() {
+  uint8_t px[16 * 2];
+  render("W", &kNarrow, px, 16, 2);
+  TEST_ASSERT_EQUAL(1, px[0]);
+  TEST_ASSERT_EQUAL(1, px[11]);        // second byte of the row
+  TEST_ASSERT_EQUAL(2, lit(px, 16 * 2));
+  render("\xef\xbf\xbd", &kNarrow, px, 16, 2);   // U+FFFD directly
+  TEST_ASSERT_EQUAL(24, lit(px, 16 * 2));
+}
+
+void test_layer_text_clips_and_scrolls_by_layer_width() {
+  uint8_t px[16 * 2];
+  s_c.noClip();
+  s_c.fillRect(0, 0, Canvas::W, Canvas::H, 0);
+  s_c.textScrolled(0, 0, "aW", &kNarrow, 1, 16, 4);   // scrolled past the 'a'
+  for (int y = 0; y < 2; y++) for (int x = 0; x < 16; x++) px[y * 16 + x] = s_c.get(x, y);
+  TEST_ASSERT_EQUAL(1, px[0]);                          // 'W' starts at x=0 now
+  TEST_ASSERT_EQUAL(1, px[11]);
+}
+
+void test_spleen_ascii_is_unchanged_by_layers() {
+  // A layered font draws ASCII from Spleen itself, exactly as a bare one.
+  mc_font_t bare = font_large;
+  bare.next = nullptr;
+  uint8_t a[8 * 16 * 4], b[8 * 16 * 4];
+  render("Hamburgefonstiv 0123", &font_large, a, 8 * 4, 16);
+  render("Hamburgefonstiv 0123", &bare, b, 8 * 4, 16);
+  TEST_ASSERT_EQUAL_MEMORY(a, b, 8 * 4 * 16);
+  TEST_ASSERT_TRUE(lit(a, 8 * 4 * 16) > 40);
+  TEST_ASSERT_EQUAL(20 * 8, Canvas::textWidth("Hamburgefonstiv 0123", &font_large));
+}
+
+void test_generated_fallback_draws_greek_and_marks_unknown() {
+#if MC_UNICODE_LAYERS
+  TEST_ASSERT_NOT_NULL(font_large.next);
+  uint8_t alpha[8 * 16], rep[8 * 16], cjk[8 * 16], q[8 * 16];
+  render("\xce\xb1", &font_large, alpha, 8, 16);        // α: Greek comes from the layer
+  render("\xef\xbf\xbd", &font_large, rep, 8, 16);       // the replacement glyph
+  render("\xe4\xb8\xad", &font_large, cjk, 8, 16);       // 中: in no layer
+  render("?", &font_large, q, 8, 16);
+  TEST_ASSERT_TRUE(lit(alpha, 8 * 16) > 8);
+  TEST_ASSERT_TRUE(memcmp(alpha, rep, sizeof alpha) != 0);
+  TEST_ASSERT_TRUE(memcmp(alpha, q, sizeof alpha) != 0);
+  TEST_ASSERT_EQUAL_MEMORY(rep, cjk, sizeof rep);        // unknown shows the replacement,
+  TEST_ASSERT_TRUE(memcmp(q, cjk, sizeof q) != 0);       // not a question mark
+  TEST_ASSERT_EQUAL(8, Canvas::textWidth("\xce\xb1", &font_large));
+#else
+  // Spleen only: unknown code points show '?' as they always did.
+  uint8_t cjk[8 * 16], q[8 * 16];
+  render("\xe4\xb8\xad", &font_large, cjk, 8, 16);
+  render("?", &font_large, q, 8, 16);
+  TEST_ASSERT_EQUAL_MEMORY(q, cjk, sizeof q);
+#endif
+}
+
+void test_layers_cover_every_size() {
+#if MC_UNICODE_LAYERS
+  const mc_font_t* fs[] = {&font_small, &font_medium, &font_large, &font_xlarge};
+  for (const mc_font_t* f : fs) {
+    TEST_ASSERT_NOT_NULL(f->next);
+    TEST_ASSERT_EQUAL(f->width, f->next->width);       // text layers keep the cell
+    TEST_ASSERT_EQUAL(f->height, f->next->height);
+    // Latin-1 stays in Spleen: no fallback needed, so same advance either way.
+    TEST_ASSERT_EQUAL(4 * f->width, Canvas::textWidth("caf\xc3\xa9", f));
+    // U+0151 (ő, Latin Extended-A) is drawn, not replaced, at the sizes whose
+    // profile carries it; otherwise it is the replacement. Neither may crash
+    // or change the advance.
+    TEST_ASSERT_EQUAL(f->width, Canvas::textWidth("\xc5\x91", f));
+  }
+#endif
+}
+
 static int s_lines;
 static char s_line[8][64];
 static void collect(void*, const char* s, int len, int line) {
@@ -225,6 +331,12 @@ int main(int, char**) {
   RUN_TEST(test_utf8_never_reads_past_end);
   RUN_TEST(test_utf8_next_walks_a_string);
   RUN_TEST(test_utf8_width_with_invalid_input);
+  RUN_TEST(test_layer_advance_comes_from_the_layer);
+  RUN_TEST(test_layer_glyphs_draw_across_bytes);
+  RUN_TEST(test_layer_text_clips_and_scrolls_by_layer_width);
+  RUN_TEST(test_spleen_ascii_is_unchanged_by_layers);
+  RUN_TEST(test_generated_fallback_draws_greek_and_marks_unknown);
+  RUN_TEST(test_layers_cover_every_size);
   RUN_TEST(test_wrap_breaks_at_spaces);
   RUN_TEST(test_wrap_hard_breaks_long_words);
   return UNITY_END();

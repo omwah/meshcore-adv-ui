@@ -80,33 +80,55 @@ void Canvas::bitmapWide(int x, int y, const uint8_t* rows, int w, int h, uint8_t
       if (rows[r * stride + i / 8] & (0x80 >> (i & 7))) pixel(x + i, y + r, c);
 }
 
-// Binary search, as esp-vim's glyph_in(); unknown code points fall back to '?'.
-static const uint8_t* glyph(const mc_font_t* f, uint32_t cp) {
-  int lo = 0, hi = f->count - 1;
-  int stride = f->height * f->bytes_per_row;
+// The glyph for cp within one font layer: binary search over its runs.
+static const uint8_t* findGlyph(const mc_font_t* f, uint32_t cp) {
+  int lo = 0, hi = (int)f->nruns - 1;
+  const int stride = f->height * f->bytes_per_row;
   while (lo <= hi) {
     int mid = (lo + hi) >> 1;
-    uint32_t v = f->codepoints[mid];
-    if (v == cp) return f->bitmaps + mid * stride;
-    if (v < cp) lo = mid + 1; else hi = mid - 1;
+    const mc_run_t& r = f->runs[mid];
+    if (cp < r.first) hi = mid - 1;
+    else if (cp - r.first >= r.count) lo = mid + 1;
+    else return f->bitmaps + (r.index + (cp - r.first)) * stride;
   }
-  return cp == '?' ? nullptr : glyph(f, '?');
+  return nullptr;
 }
 
-static void drawGlyph(Canvas& c, int x, int y, const mc_font_t* f, uint32_t cp, uint8_t fg) {
-  const uint8_t* g = glyph(f, cp);
-  if (!g) return;
-  for (int r = 0; r < f->height; r++) {
-    uint16_t bits = f->bytes_per_row == 1 ? (uint16_t)(g[r] << 8) : (uint16_t)((g[2 * r] << 8) | g[2 * r + 1]);
-    for (int i = 0; bits; i++, bits <<= 1)
-      if (bits & 0x8000) c.pixel(x + i, y + r, fg);
+struct Glyph {
+  const uint8_t* bits;
+  const mc_font_t* layer;   // the font (primary or fallback) it came from
+};
+
+// The font itself first, then each fallback layer in turn. A code point none
+// of them has shows the first layer's replacement glyph (U+FFFD), or '?' from
+// the primary font when no layer carries one.
+static Glyph resolve(const mc_font_t* f, uint32_t cp) {
+  for (const mc_font_t* l = f; l; l = l->next)
+    if (const uint8_t* g = findGlyph(l, cp)) return {g, l};
+  for (const mc_font_t* l = f->next; l; l = l->next)
+    if (const uint8_t* g = findGlyph(l, REPLACEMENT)) return {g, l};
+  return {findGlyph(f, '?'), f};
+}
+
+static void drawGlyph(Canvas& c, int x, int y, const Glyph& g, uint8_t fg) {
+  if (!g.bits) return;
+  const mc_font_t* l = g.layer;
+  for (int r = 0; r < l->height; r++) {
+    const uint8_t* row = g.bits + r * l->bytes_per_row;
+    for (int b = 0; b < l->bytes_per_row; b++)
+      for (uint8_t v = row[b], i = 0; v; i++, v <<= 1)
+        if (v & 0x80) c.pixel(x + b * 8 + i, y + r, fg);
   }
 }
 
 int Canvas::textWidth(const char* s, const mc_font_t* f) {
-  int n = 0;
-  while (*s) { utf8Next(&s); n++; }
-  return n * f->width;
+  int w = 0;
+  if (!f->next) {                       // one cell size: just count
+    while (*s) { utf8Next(&s); w += f->width; }
+    return w;
+  }
+  while (*s) w += resolve(f, utf8Next(&s)).layer->width;
+  return w;
 }
 
 int Canvas::fitBytes(const char* s, const mc_font_t* f, int maxw) {
@@ -114,9 +136,9 @@ int Canvas::fitBytes(const char* s, const mc_font_t* f, int maxw) {
   int w = 0;
   while (*p) {
     const char* q = p;
-    utf8Next(&q);
-    if (w + f->width > maxw) break;
-    w += f->width;
+    int adv = resolve(f, utf8Next(&q)).layer->width;
+    if (w + adv > maxw) break;
+    w += adv;
     p = q;
   }
   return (int)(p - s);
@@ -135,10 +157,11 @@ int Canvas::text(int x, int y, const char* s, const mc_font_t* f, uint8_t fg, in
   }
   int cx = x;
   while (*s) {
-    uint32_t cp = utf8Next(&s);
-    if (cx + f->width - x > limit) break;
-    drawGlyph(*this, cx, y, f, cp, fg);
-    cx += f->width;
+    Glyph g = resolve(f, utf8Next(&s));
+    int adv = g.layer->width;
+    if (cx + adv - x > limit) break;
+    drawGlyph(*this, cx, y, g, fg);
+    cx += adv;
   }
   if (ell) {
     // Three dots on the baseline (Spleen's small fonts have no U+2026).
@@ -156,9 +179,10 @@ void Canvas::textScrolled(int x, int y, const char* s, const mc_font_t* f, uint8
   _cx1 = x + maxw < c1 ? x + maxw : c1;
   int cx = x - offset;
   while (*s) {
-    uint32_t cp = utf8Next(&s);
-    if (cx + f->width > _cx0 && cx < _cx1) drawGlyph(*this, cx, y, f, cp, fg);
-    cx += f->width;
+    Glyph g = resolve(f, utf8Next(&s));
+    int adv = g.layer->width;
+    if (cx + adv > _cx0 && cx < _cx1) drawGlyph(*this, cx, y, g, fg);
+    cx += adv;
     if (cx >= _cx1) break;
   }
   _cx0 = c0; _cx1 = c1; _cy0 = r0; _cy1 = r1;
