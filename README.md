@@ -105,6 +105,13 @@ depends on it: vim keys are on by default, and everything can be done by touch.
 | Sym, Sym + Shift | the second legends printed on the keys, and symbols that aren't printed (`boards/tdeck/keymap/tdeck_keymap.h` lists them) |
 | trackball | arrows (Settings → Trackball off ignores a worn one's rolls) |
 
+Pocket lock (Settings → Lock when screen off, on by default): when the screen
+times out the T-Deck locks, and keys, trackball rolls and touches do nothing
+(they don't even wake it) until the trackball is clicked. A message can still
+light the screen; it stays locked, with a padlock in the header, and a key
+pressed then says so. The click that unlocks does nothing else. Off, any key
+wakes the screen as before. The Cardputer, which has no such button, never locks.
+
 Touch:
 
 - **Shortcut bar** at the bottom: Chats, Contacts, Nodes, Channels and Menu,
@@ -175,7 +182,7 @@ A command being typed (`2g`) shows at the right of the footer.
 - **GPS:**
   - The receiver is off by default.
   - Sharing your position in adverts and setting the clock at boot are separate options, also off by default.
-- **Settings:** node name, theme, brightness, screen timeout, text size, chat preview, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and PIN, factory reset.
+- **Settings:** node name, theme, brightness, screen timeout, lock when the screen is off (T-Deck), text size, chat preview, key filter, sound, new-message alert, auto-add, ping bot, Bluetooth and PIN, factory reset.
 - **New-message alert:** a 2-second burst of colours on the RGB LED with the screen left off (the default, easiest on the battery), the screen turning on, both, or neither. The chime follows the Sound setting either way. Enter on the setting previews the colours. The LED runs on the backlight's power, so the screen glows briefly while it flashes.
 - **Ping bot** (local node mode, off by default):
   - A direct message that is just `ping` or `test` gets an automatic reply with the path it took, for example `pong: 2 hops a1>Hilltop, SNR 6.5`.

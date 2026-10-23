@@ -40,6 +40,7 @@ MockModel::MockModel() {
   _prefs.textSize = 1;
   _prefs.vimKeys = MC_VIM_KEYS_DEFAULT;
   _prefs.trackball = true;
+  _prefs.lockOnTimeout = true;
   _prefs.autoAddContacts = true;
   _prefs.autoBackup = true;
   _prefs.backupIdentity = true;

@@ -17,7 +17,8 @@ extern "C" {
 namespace sim {
 
 // Keys pressed together: the last one is the key, those before it are held
-// around it (modifiers). A row of BALL is a trackball roll, col its direction.
+// around it (modifiers). A row of BALL is a trackball roll, col its direction
+// (the T-Deck's col 4 is its click).
 struct Chord {
   static constexpr int8_t BALL = -1;
   int n = 0;
@@ -31,6 +32,10 @@ public:
   bool begin() override { return true; }
   void setTextMode(bool on) override;
   bool poll(hal::KeyEvent& ev) override;
+#ifdef MC_BOARD_TDECK
+  bool hasUnlockButton() const override { return true; }   // the trackball's click
+  bool unlockPressed() override { bool u = _unlock; _unlock = false; return u; }
+#endif
 
   // Schedule a matrix change (or a trackball roll) at an absolute time.
   void at(uint32_t ms, int row, int col, bool down);
@@ -58,6 +63,7 @@ private:
   cardputer_keymap_t _st{};
 #endif
   ReportDiff _diff;
+  bool _unlock = false;
 };
 
 }  // namespace sim

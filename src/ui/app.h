@@ -127,6 +127,10 @@ public:
   // pauses, slides to show the end, pauses and starts again.
   int fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uint8_t fg, int maxw, bool scroll);
   bool asleep() const { return _asleep; }
+  // Locked: the screen timed out on a board with an unlock button, and keys
+  // and touch are ignored until it is pressed. The screen can still light for
+  // a message or a pairing, and stays locked.
+  bool locked() const { return _locked; }
   void wake();
   // The status light, if the board has one (set before begin()).
   void setLed(hal::Led* led) { _led = led; }
@@ -212,6 +216,8 @@ private:
   bool _ledOn = false;           // a burst is playing
   int _ledStep = -1;             // the colour showing (-1: off)
   bool _asleep = false;
+  bool _locked = false;
+  void unlock(uint32_t now);
   uint32_t _marqueeStart = 0;   // restarts on every key, so a new selection starts at its beginning
   bool _animating = false;       // a marquee is moving: keep redrawing
   bool _pairing = false;         // the PIN overlay is showing

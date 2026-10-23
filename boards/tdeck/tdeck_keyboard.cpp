@@ -79,7 +79,7 @@ void TDeckKeyboard::keys() {
   if (!_raw) {
     if (Wire.requestFrom(ADDR, (uint8_t)1) == 1) {
       uint8_t c = Wire.read();
-      if (c) { _lastKey = millis(); typed(c); }
+      if (c) { if (!_locked) _lastKey = millis(); typed(c); }
     }
     return;
   }
@@ -97,7 +97,7 @@ void TDeckKeyboard::keys() {
     for (int r = 0; changed && r < TDECK_KEYMAP_ROWS; r++) {
       if (!(changed & (1u << r))) continue;
       bool down = m[c] & (1u << r);
-      if (down) _lastKey = millis();
+      if (down && !_locked) _lastKey = millis();
       kbd_report_t rep;
       if (tdeck_keymap_event(&_st, c, r, down, &rep)) _diff.update(rep);
     }
@@ -113,12 +113,13 @@ void TDeckKeyboard::ball() {
     interrupts();
     if (!_ballOn) continue;
     int n = tdeck_keymap_ball(&_ball, d, t, BALL_STEP);
-    if (n > 0) _lastKey = millis();
+    if (n > 0 && !_locked) _lastKey = millis();
     while (n-- > 0) tap(tdeck_keymap_ball_usage(d), 0);
   }
 }
 
-// The click: Enter once it has stayed down for 30 ms (a worn switch bounces).
+// The click: Enter, and the unlock button, once it has stayed down for 30 ms (a
+// worn switch bounces).
 void TDeckKeyboard::click() {
   bool down = digitalRead(PIN_BALL_CLICK) == LOW;
   uint32_t now = millis();
@@ -128,6 +129,7 @@ void TDeckKeyboard::click() {
   } else if (down && _clickAt && now - _clickAt >= 30) {
     _clickAt = 0;
     _lastKey = now;
+    _unlock = true;
     tap(0x28, 0);
   } else if (!down) {
     _clickDown = false;

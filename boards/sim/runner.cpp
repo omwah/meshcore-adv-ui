@@ -161,6 +161,22 @@ int runScript(FILE* in, const char* out, ui::App& app, ui::Screen* first, SimKey
         touch->at(t + i * 16, x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, hal::TouchEvent::MOVE);
       touch->at(t + steps * 16 + 10, x2, y2, hal::TouchEvent::UP);
       c.advance(t + steps * 16 + 100);
+    } else if (!strcmp(cmd, "assert")) {
+      // assert awake|asleep|locked|unlocked: stop with a failure when it is not so, so a
+      // scenario asserts as well as shows. (`expect` is the simnet world's own.)
+      const bool known = !strcmp(arg, "awake") || !strcmp(arg, "asleep") || !strcmp(arg, "locked") || !strcmp(arg, "unlocked");
+      if (!known) {
+        fprintf(stderr, "line %d: assert what? '%s'\n", lineNo, arg);
+        return 2;
+      }
+      const bool ok = !strcmp(arg, "awake") ? !app.asleep()
+                    : !strcmp(arg, "asleep") ? app.asleep()
+                    : !strcmp(arg, "locked") ? app.locked() : !app.locked();
+      if (!ok) {
+        fprintf(stderr, "line %d: expected %s, but the device is %s and %s\n", lineNo, arg,
+                app.asleep() ? "asleep" : "awake", app.locked() ? "locked" : "unlocked");
+        return 4;
+      }
     } else if (!strcmp(cmd, "vim")) {
       model::Prefs pr = app.m().prefs();
       pr.vimKeys = !strcmp(arg, "on");

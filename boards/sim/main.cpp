@@ -49,6 +49,27 @@ public:
       else { _m.setPairing(false); _m.setBle(!strcmp(arg, "on")); }
       return true;
     }
+    if (!strcmp(cmd, "pref")) {   // pref notify led|screen|dark|both, pref timeout <s>, pref lock on|off
+      char what[16] = {}, val[8] = {};
+      sscanf(arg, "%15s %7s", what, val);
+      model::Prefs pr = _m.prefs();
+      if (!strcmp(what, "notify")) {
+        static const char* const modes[] = {"led", "screen", "dark", "both"};
+        int m = 0;
+        while (m < 4 && strcmp(val, modes[m])) m++;
+        if (m == 4) { snprintf(err, n, "unknown notify mode '%s'", val); return true; }
+        pr.notify = (model::NotifyMode)m;
+      } else if (!strcmp(what, "timeout")) {
+        pr.screenTimeoutS = (uint16_t)atoi(val);
+      } else if (!strcmp(what, "lock")) {
+        pr.lockOnTimeout = !strcmp(val, "on");
+      } else {
+        snprintf(err, n, "unknown pref '%s'", what);
+        return true;
+      }
+      _m.setPrefs(pr);
+      return true;
+    }
     if (!strcmp(cmd, "gps")) {
       if (!strcmp(arg, "on") || !strcmp(arg, "off")) {
         model::Prefs pr = _m.prefs();

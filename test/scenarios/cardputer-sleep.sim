@@ -1,0 +1,10 @@
+# The Cardputer has no unlock button: the screen times out and any key wakes
+# it, as it always did.
+assert awake
+assert unlocked
+wait 61000
+assert asleep
+assert unlocked
+key a
+assert awake
+assert unlocked

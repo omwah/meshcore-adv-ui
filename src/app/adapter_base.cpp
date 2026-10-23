@@ -125,6 +125,7 @@ void AdapterBase::uiToPrefs() {
   p.shortPreview = _ui.shortPreview;
   p.vimKeys = _ui.vimKeys ? _ui.vimKeys == 2 : MC_VIM_KEYS_DEFAULT;
   p.trackball = !_ui.trackballOff;
+  p.lockOnTimeout = !_ui.lockOff;
   p.notify = _ui.notifyMode <= 3 ? (model::NotifyMode)_ui.notifyMode : model::NotifyMode::Led;
 }
 
@@ -149,6 +150,7 @@ void AdapterBase::prefsToUi(const model::Prefs& p) {
   _ui.shortPreview = p.shortPreview;
   _ui.vimKeys = p.vimKeys ? 2 : 1;
   _ui.trackballOff = !p.trackball;
+  _ui.lockOff = !p.lockOnTimeout;
 }
 
 void AdapterBase::setUiMuted(int slot, bool muted) {

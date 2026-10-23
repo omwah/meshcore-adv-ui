@@ -1,0 +1,44 @@
+# The T-Deck locks when the screen times out; only the trackball's click
+# unlocks it, so a pocket full of keys does nothing.
+vim on
+assert awake
+assert unlocked
+shot lock-before
+wait 61000
+assert asleep
+assert locked
+# Keys, a roll and a touch in the pocket: they neither wake it nor unlock it.
+key a
+key enter
+key down
+tap 160 120
+assert asleep
+assert locked
+# A message may light the screen, and it stays locked; the header shows it.
+pref notify screen
+rx dm 0 Are you there?
+wait 300
+assert awake
+assert locked
+shot lock-lit-by-message
+# Keys and touches now give a hint instead of acting.
+key down 2
+key enter
+assert locked
+shot lock-key-hint
+# The click unlocks.
+key click
+assert unlocked
+assert awake
+shot lock-unlocked
+# And keys work again.
+key down
+shot lock-working
+# Off, the screen times out unlocked and a key wakes it, as before.
+pref lock off
+wait 61000
+assert asleep
+assert unlocked
+key a
+assert awake
+assert unlocked

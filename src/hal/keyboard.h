@@ -19,6 +19,16 @@ public:
   virtual bool poll(KeyEvent& ev) = 0;
   // Text entry vs. navigation layout (boards with dual-purpose keys).
   virtual void setTextMode(bool on) { (void)on; }
+
+  // A dedicated unlock button, on boards that have one (the T-Deck's trackball
+  // click). The UI locks itself when the screen times out only if there is one.
+  virtual bool hasUnlockButton() const { return false; }
+  // True once for each press of it. The press also arrives as an ordinary key
+  // event (an Enter), so the UI tells the two apart by this.
+  virtual bool unlockPressed() { return false; }
+  // The UI is locked: keys and rolls are not activity, so a pocket full of
+  // them must not light the key backlight. The unlock button still counts.
+  virtual void setLocked(bool locked) { (void)locked; }
 };
 
 }  // namespace hal

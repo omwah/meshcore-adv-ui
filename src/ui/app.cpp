@@ -285,6 +285,16 @@ int App::fitText(Canvas& c, int x, int y, const char* s, const mc_font_t* f, uin
   return x + maxw;
 }
 
+void App::unlock(uint32_t now) {
+  _locked = false;
+  _k.setLocked(false);
+  _lastInput = now;
+  _in.flush();
+  if (_asleep) wake();
+  else toast("Unlocked", C_OK);
+  _dirty = true;
+}
+
 void App::wake() {
   if (!_asleep) return;
   _asleep = false;
@@ -433,6 +443,11 @@ uint32_t App::loop(uint32_t now) {
   _now = now;
   hal::KeyEvent ev;
   while (_k.poll(ev)) {
+    if (_locked) {
+      // Not activity: a pocket full of keys must not keep the screen on.
+      if (ev.down && !_asleep) toast("Locked: click the trackball", C_WARN);
+      continue;
+    }
     _lastInput = now;
     if (_asleep) {
       // The key that wakes the screen does nothing else.
@@ -442,6 +457,8 @@ uint32_t App::loop(uint32_t now) {
     }
     _in.feed(ev, now);
   }
+  // The unlock button's press also came through as an Enter, dropped above.
+  if (_k.unlockPressed() && _locked) unlock(now);
   _in.tick(now);
 
   // A phone pairing over Bluetooth: show the PIN on top of everything.
@@ -474,6 +491,10 @@ uint32_t App::loop(uint32_t now) {
     _asleep = true;
     _d.setBacklight(0);
     _d.sleep(true);
+    if (_k.hasUnlockButton() && _m.prefs().lockOnTimeout) {
+      _locked = true;
+      _k.setLocked(true);
+    }
   }
 
   // Text-mode can change within a screen (e.g. starting to compose).
@@ -486,6 +507,11 @@ uint32_t App::loop(uint32_t now) {
   if (_touch) {
     hal::TouchEvent te;
     while (_touch->poll(te)) {
+      if (_locked) {
+        if (te.type == hal::TouchEvent::DOWN && !_asleep) toast("Locked: click the trackball", C_WARN);
+        _gest.cancel();
+        continue;
+      }
       _lastInput = now;
       if (_asleep) {
         // The touch that wakes the screen does nothing else.
@@ -604,6 +630,11 @@ void App::drawHeader() {
   model::Diag d = _m.diag();
   x -= 17;
   drawBattery(_c, x, (H - 1 - 7) / 2, d.battPct, d.charging, C_HTXT);
+
+  if (_locked) {   // the screen was lit by a message: say that the keys are off
+    x -= 10;
+    _c.bitmap(x, iy, icon::lock, 8, 8, C_WARN);
+  }
 
   model::Gps g = _m.gps();
   if (g.enabled) {

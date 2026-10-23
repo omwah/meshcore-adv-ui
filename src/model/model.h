@@ -186,6 +186,8 @@ struct Prefs {
   bool shortPreview;              // chats list: scroll only the stored preview, not the whole message
   bool vimKeys;                   // h/j/k/l and friends move around (ui/input/vim.h)
   bool trackball;                 // boards with one: its rolls move (a worn one can be turned off)
+  bool lockOnTimeout;             // boards with an unlock button: when the screen times out, keys and
+                                  // touch are ignored until it is pressed (a pocket can't type)
 };
 
 #ifndef MC_HAS_TRACKBALL

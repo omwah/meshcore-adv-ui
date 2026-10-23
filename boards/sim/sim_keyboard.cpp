@@ -31,9 +31,10 @@ static const char kSymShift[ROWS][COLS] = {
 };
 static const char* const kAlias[][2] = {{"esc", "alt"}, {"ctrl", "mic"}, {"menu", "sym+enter"},
                                         {"tab", "sym+space"}, {"del", "sym+bksp"}, {"backspace", "bksp"},
-                                        {"ret", "enter"}, {"click", "enter"}};
-// The trackball, in tdeck_keymap's direction order.
-static const char* const kBall[] = {"up", "down", "left", "right"};
+                                        {"ret", "enter"}};
+// The trackball, in tdeck_keymap's direction order, then its click.
+static const char* const kBall[] = {"up", "down", "left", "right", "click"};
+static constexpr int BALL_CLICK = 4;
 #else
 // The printed layout, as in cardputer_keymap.h.
 static constexpr int ROWS = 4, COLS = 14;
@@ -73,7 +74,7 @@ void SimKeyboard::setTextMode(bool on) {
 static bool add(const char* legend, Chord& out) {
   if (out.n == 3) return false;
 #ifdef MC_BOARD_TDECK
-  for (int d = 0; d < 4; d++)
+  for (int d = 0; d < 5; d++)
     if (!strcmp(legend, kBall[d])) {
       out.row[out.n] = Chord::BALL;
       out.col[out.n++] = (int8_t)d;
@@ -154,10 +155,15 @@ bool SimKeyboard::poll(hal::KeyEvent& ev) {
     kbd_report_t r;
 #ifdef MC_BOARD_TDECK
     if (e.row == Chord::BALL) {
-      // A roll is an arrow key's press and release, as the board sends it.
+      // A roll is an arrow key's press and release, as the board sends it; the
+      // click is an Enter, and the unlock button.
       memset(&r, 0, sizeof r);
       r.has_mods = true;
-      if (e.down) r.key[r.n++] = tdeck_keymap_ball_usage(e.col);
+      if (e.col == BALL_CLICK) {
+        if (e.down) { r.key[r.n++] = 0x28; _unlock = true; }
+      } else if (e.down) {
+        r.key[r.n++] = tdeck_keymap_ball_usage(e.col);
+      }
       _diff.update(r);
     } else if (tdeck_keymap_event(&_st, e.row, e.col, e.down, &r)) {
       _diff.update(r);
